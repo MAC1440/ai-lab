@@ -1,0 +1,6 @@
+- [x] Refactor /documents router to a thin adapter
+- [x] Build a real RAGService with index/search/ask/answer
+- [x] Add retrieval filtering by distance threshold
+- [x] Improve prompt engineering for grounded answers and fallback behavior
+- [x] Add streaming support for /documents/ask
+- [ ] Optionally update frontend to consume streamed RAG responses more cleanly
