@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.embeddings import router as embeddings_router
 from routes.document_loader import router as document_loader_router
 from routes.chat import router as chat_router
-
+from routes.tools import router as tools_router
 
 def create_app() -> FastAPI:
     load_dotenv()
@@ -33,7 +33,7 @@ def create_app() -> FastAPI:
     app.include_router(chat_router)
     app.include_router(embeddings_router)
     app.include_router(document_loader_router)
-
+    app.include_router(tools_router)    
     return app
 
 
