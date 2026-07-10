@@ -59,17 +59,12 @@ def ask_question(request: DocumentAskRequest):
             media_type="text/plain",
         )
 
-    results = rag_service.search(
+    return rag_service.ask(
         query=request.query,
         top_k=request.top_k,
-    )
-
-    return rag_service.answer(
-        query=request.query,
-        results=results,
+        stream=False,
         agent=agent,
     )
-
 
 @router.post("/index")
 def index_documents():

@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Any, Dict, Iterator, List, Optional
+from urllib import response
 
 import requests
 
@@ -38,7 +39,19 @@ class OllamaClient:
 
         messages.append({"role": "user", "content": prompt})
         return messages
+    def _raise_ollama_error(self, response: requests.Response) -> None:
+        if response.ok:
+             return
 
+        try:
+                 error_data = response.json()
+                 detail = error_data.get("error", response.text)
+        except ValueError:
+                detail = response.text
+
+        raise RuntimeError(
+                f"Ollama request failed with status {response.status_code}: {detail}"
+    )
     def chat(
         self,
         prompt: str,
@@ -59,7 +72,7 @@ class OllamaClient:
             json=payload,
             timeout=360,
         )
-        response.raise_for_status()
+        self._raise_ollama_error(response)
 
         data = response.json()
         return data.get("message", {}).get("content", "")
@@ -85,7 +98,7 @@ class OllamaClient:
             stream=True,
             timeout=360,
         )
-        response.raise_for_status()
+        self._raise_ollama_error(response)
 
         for line in response.iter_lines(decode_unicode=True):
             if not line:

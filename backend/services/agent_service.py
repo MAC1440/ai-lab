@@ -6,7 +6,7 @@ AGENTS: Dict[str, Dict[str, Any]] = {
         "id": "general",
         "name": "General Assistant",
         "description": "General-purpose local assistant.",
-        "model": "llama3.2:3b",
+        "model": "qwen3:4b",
         "system_prompt": (
             "You are a helpful personal assistant. "
             "Give direct, accurate and concise answers."
@@ -18,7 +18,7 @@ AGENTS: Dict[str, Dict[str, Any]] = {
         "id": "unity",
         "name": "Unity Assistant",
         "description": "Answers Unity questions using indexed documentation.",
-        "model": "llama3.2:3b",
+        "model": "qwen3:4b",
         "system_prompt": (
             "You are a Unity development assistant. "
             "Prefer the retrieved Unity documentation when it is relevant. "
