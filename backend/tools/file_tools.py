@@ -1,25 +1,11 @@
-from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-
-def safe_path(relative_path: str) -> Path:
-    """
-    Convert a user-provided relative path into a safe absolute path.
-    Prevents access outside backend folder.
-    """
-    target_path = (PROJECT_ROOT / relative_path).resolve()
-
-    if not str(target_path).startswith(str(PROJECT_ROOT)):
-        raise ValueError("Access outside project root is not allowed")
-
-    return target_path
+from dependencies import workspace_service
 
 
 def list_files(folder: str = ".") -> List[Dict[str, str]]:
-    path = safe_path(folder)
+    workspace_root = workspace_service.get_workspace()
+    path = workspace_service.resolve_workspace_path(folder)
 
     if not path.exists():
         raise FileNotFoundError(f"Folder not found: {folder}")
@@ -27,20 +13,23 @@ def list_files(folder: str = ".") -> List[Dict[str, str]]:
     if not path.is_dir():
         raise NotADirectoryError(f"Not a folder: {folder}")
 
-    files = []
+    items = []
 
     for item in path.iterdir():
-        files.append({
-            "name": item.name,
-            "path": str(item.relative_to(PROJECT_ROOT)),
-            "type": "folder" if item.is_dir() else "file",
-        })
+        items.append(
+            {
+                "name": item.name,
+                "path": str(item.relative_to(workspace_root)),
+                "type": "folder" if item.is_dir() else "file",
+            }
+        )
 
-    return files
+    return items
 
 
 def read_file(file_path: str) -> Dict[str, str]:
-    path = safe_path(file_path)
+    workspace_root = workspace_service.get_workspace()
+    path = workspace_service.resolve_workspace_path(file_path)
 
     if not path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
@@ -49,6 +38,6 @@ def read_file(file_path: str) -> Dict[str, str]:
         raise IsADirectoryError(f"Not a file: {file_path}")
 
     return {
-        "path": str(path.relative_to(PROJECT_ROOT)),
+        "path": str(path.relative_to(workspace_root)),
         "content": path.read_text(encoding="utf-8"),
     }

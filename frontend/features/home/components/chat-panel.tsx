@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircleIcon, Loader2Icon, SparklesIcon } from "lucide-react";
+import { AlertCircleIcon, FolderCogIcon, Loader2Icon, SparklesIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,10 @@ import { ChatMessageBubble } from "@/features/home/components/chat-message-bubbl
 import { useGetModelsQuery } from "@/features/home/ollama-api";
 import type { HomeChatMessage, OllamaCompletionMetrics, OllamaGenerationSettings } from "@/features/home/types";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
+import { WorkspacePicker } from "@/features/workspaces";
+import { getActiveWorkspace } from "@/features/workspaces/workspace-api";
+import { AgentProfile, getAgents } from "@/features/agents/agent-api";
 
 type OllamaStreamChunk = {
     message?: {
@@ -113,6 +117,14 @@ export function ChatPanel() {
     const [isStreaming, setIsStreaming] = useState(false);
     const bottomRef = useRef<HTMLDivElement>(null);
 
+    const [agents, setAgents] = useState<AgentProfile[]>([]);
+    const [selectedAgentId, setSelectedAgentId] = useState("general");
+    const [agentsLoading, setAgentsLoading] = useState(true);
+
+    const [activeWorkspace, setActiveWorkspace] = useState<string | null>(null);
+    const [workspaceLoading, setWorkspaceLoading] = useState(true);
+    const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
+
     const { data, isLoading: modelsLoading, error: modelsError } = useGetModelsQuery();
 
     const availableModels = data?.models ?? [];
@@ -125,13 +137,65 @@ export function ChatPanel() {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, isStreaming]);
 
+    useEffect(() => {
+        async function loadActiveWorkspace() {
+            setWorkspaceLoading(true);
+
+            try {
+                const result = await getActiveWorkspace();
+                setActiveWorkspace(result.workspace);
+            } catch (requestError) {
+                setError(
+                    requestError instanceof Error
+                        ? requestError.message
+                        : "Could not load active workspace.",
+                );
+            } finally {
+                setWorkspaceLoading(false);
+            }
+        }
+
+        void loadActiveWorkspace();
+    }, []);
+
+    useEffect(() => {
+        async function loadAgents() {
+            setAgentsLoading(true);
+
+            try {
+                const result = await getAgents();
+                setAgents(result);
+
+                if (result.length > 0) {
+                    setSelectedAgentId((current) => {
+                        const stillExists = result.some(
+                            (agent) => agent.id === current,
+                        );
+
+                        return stillExists ? current : result[0].id;
+                    });
+                }
+            } catch (error) {
+                setError(
+                    error instanceof Error
+                        ? error.message
+                        : "Could not load agents.",
+                );
+            } finally {
+                setAgentsLoading(false);
+            }
+        }
+
+        void loadAgents();
+    }, []);
+
     function updateGenerationSetting<K extends keyof OllamaGenerationSettings>(key: K, value: OllamaGenerationSettings[K]) {
         setGenerationSettings((current) => ({ ...current, [key]: value }));
     }
 
     async function handleSend() {
         const content = input.trim();
-        if (!content || isStreaming) {
+        if (!content || isStreaming || !activeWorkspace) {
             return;
         }
 
@@ -167,26 +231,11 @@ export function ChatPanel() {
                     {
                         "prompt": userMessage.content,
                         "stream": true,
-                        // "system_prompt": "string",
                         "use_rag": false,
                         "documents": [
                             // "string"
                         ]
                     }
-                    //     {
-                    //     model: selectedModel,
-                    //     messages: pendingMessages.map(({ role, content }) => ({ role, content })),
-                    //     stream: true,
-                    //     think: generationSettings.thinkingMode,
-                    //     options: {
-                    //         temperature: generationSettings.temperature,
-                    //         top_p: generationSettings.topP,
-                    //         top_k: generationSettings.topK,
-                    //         num_predict: generationSettings.maxOutputTokens,
-                    //         num_ctx: generationSettings.contextSize,
-                    //         seed: generationSettings.seed === "" ? undefined : Number(generationSettings.seed),
-                    //     },
-                    // }
                 ),
             });
 
@@ -292,7 +341,7 @@ export function ChatPanel() {
     return (
         <TooltipProvider>
             <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-                <header className="flex shrink-0 items-center justify-between gap-4 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+                <header className="flex shrink-1 items-center justify-between gap-4 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
                     <div className="flex items-center gap-2">
                         <div className="flex size-9 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
                             <SparklesIcon className="size-5" />
@@ -306,22 +355,72 @@ export function ChatPanel() {
                             </p>
                         </div>
                     </div>
+                    <div className="hidden max-w-[260px] items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 md:flex dark:border-zinc-800 dark:bg-zinc-900">
+                        <FolderCogIcon className="size-4 shrink-0 text-violet-600 dark:text-violet-400" />
 
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                                Workspace
+                            </p>
+                            <p
+                                className="truncate text-xs font-medium text-zinc-800 dark:text-zinc-200"
+                                title={activeWorkspace ?? "No workspace selected"}
+                            >
+                                {workspaceLoading
+                                    ? "Loading…"
+                                    : activeWorkspace ?? "Not selected"}
+                            </p>
+                        </div>
+                    </div>
+
+                    <Dialog
+                        open={workspaceDialogOpen}
+                        onOpenChange={setWorkspaceDialogOpen}
+                    >
+                        <DialogTrigger asChild>
+                            <Button type="button" variant="outline" size="sm">
+                                <FolderCogIcon className="mr-2 size-4" />
+                                {activeWorkspace ? "Change workspace" : "Select workspace"}
+                            </Button>
+                        </DialogTrigger>
+
+                        <DialogContent className="max-w-2xl">
+                            <DialogTitle>Select workspace</DialogTitle>
+
+                            <DialogDescription>
+                                The assistant will only be allowed to access files inside the
+                                selected folder.
+                            </DialogDescription>
+
+                            <WorkspacePicker
+                                activeWorkspace={activeWorkspace}
+                                onWorkspaceSelected={(workspace) => {
+                                    setActiveWorkspace(workspace);
+                                    setMessages([]);
+                                    setError(null);
+                                    setWorkspaceDialogOpen(false);
+                                }}
+                            />
+                        </DialogContent>
+                    </Dialog>
                     <div className="flex items-center gap-2">
                         {modelsLoading ? (
                             <div className="flex items-center gap-2 text-xs text-zinc-500">
                                 <Loader2Icon className="size-4 animate-spin" />
                                 Loading models…
                             </div>
-                        ) : availableModels.length > 0 ? (
-                            <Select value={activeModel} onValueChange={setSelectedModel}>
+                        ) : agents.length > 0 ? (
+                            <Select value={selectedAgentId} onValueChange={(event) => {
+                                setSelectedAgentId(event);
+                                setMessages([]);
+                            }}>
                                 <SelectTrigger className="w-[180px]">
                                     <SelectValue placeholder="Select model" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {availableModels.map((model) => (
-                                        <SelectItem key={model.name} value={model.name}>
-                                            {model.name}
+                                    {agents.map((agent) => (
+                                        <SelectItem key={agent.id} value={agent.id}>
+                                            {agent.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -514,7 +613,12 @@ export function ChatPanel() {
                     value={input}
                     onChange={setInput}
                     onSubmit={handleSend}
-                    disabled={isStreaming || modelsLoading}
+                    disabled={
+                        isStreaming ||
+                        modelsLoading ||
+                        workspaceLoading ||
+                        !activeWorkspace
+                    }
                 />
             </div>
         </TooltipProvider>
