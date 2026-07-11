@@ -2,6 +2,8 @@ import math
 import re
 from typing import Any, Dict, Iterator, List, Optional
 
+from chromadb import logger
+
 from services.chroma_service import ChromaService
 from services.chunker import chunk_markdown_by_headings
 from services.embeddings import EmbeddingService
@@ -109,7 +111,11 @@ class RAGService:
             if ranked_documents:
                 return "\n\n".join(ranked_documents)
 
-        except Exception:
+        except Exception as error:
+            logger.warning(
+                "Embedding context ranking failed: %s",
+                    error,
+                )
             # Fall back to basic keyword ranking if embedding comparison fails.
             pass
 
