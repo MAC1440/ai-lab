@@ -129,3 +129,31 @@ class OllamaClient:
 
         data = response.json()
         return data.get("embeddings", [])
+def chat_with_tools(
+    self,
+    messages: List[Dict[str, Any]],
+    tools: List[Dict[str, Any]],
+    *,
+    options: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    payload = {
+        "model": self.model,
+        "messages": messages,
+        "tools": tools,
+        "stream": False,
+        "think": False,
+        "options": {
+            **self.default_options,
+            **(options or {}),
+        },
+    }
+
+    response = requests.post(
+        f"{self.base_url}/api/chat",
+        json=payload,
+        timeout=360,
+    )
+
+    self._raise_ollama_error(response)
+
+    return response.json()
