@@ -3,6 +3,7 @@ from typing import List, Literal, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from services.agent_service import AgentService
 from services.agent_runner import AgentRunner
 
 router = APIRouter(
@@ -28,6 +29,9 @@ class AgentChatRequest(BaseModel):
         ge=0.0,
     )
 
+@router.get("/list")
+def list_agents():
+    return {"agents": AgentService().list_agents()}
 
 @router.post("/chat")
 def agent_chat(request: AgentChatRequest):

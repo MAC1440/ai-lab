@@ -1,11 +1,12 @@
 "use client";
 
 import { BotIcon, UserIcon } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
 import type { HomeChatMessage } from "@/features/home/types";
-import ReactMarkdown from "react-markdown";
+import { cn } from "@/lib/utils";
+import { AgentExecutionDetails } from "./agent-execution-details";
 
 export function ChatMessageBubble({
     message,
@@ -38,45 +39,64 @@ export function ChatMessageBubble({
                     )}
                 </AvatarFallback>
             </Avatar>
-            <div className="min-w-0 flex-1 space-y-1">
+
+            <div className="min-w-0 flex-1 space-y-2">
                 <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                    {isUser ? "You" : "Assistant"}
+                    {isUser
+                        ? "You"
+                        : message.agentResult
+                            ? `${message.agentResult.agent_id} agent`
+                            : "Assistant"}
                 </p>
+
                 <div className="space-y-2 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
                     {message.reasoning ? (
                         <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-2 text-xs italic text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
                             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-80">
                                 Thinking
                             </p>
-                            {/* Reasoning stays as plain text */}
                             <p className="whitespace-pre-wrap">{message.reasoning}</p>
                         </div>
                     ) : null}
 
-                    <div className="whitespace-pre-wrap">
-                        {/* Render content as Markdown */}
-                        <ReactMarkdown>{message.content || (isStreaming ? "…" : "")}</ReactMarkdown>
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                        <ReactMarkdown>
+                            {message.content || (isStreaming ? "…" : "")}
+                        </ReactMarkdown>
 
-                        {isStreaming && message.content && (
+                        {isStreaming && message.content ? (
                             <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-emerald-500" />
-                        )}
+                        ) : null}
                     </div>
                 </div>
-                {message.role !== "user" && message.metrics ? (
+
+                {!isUser && message.agentResult ? (
+                    <AgentExecutionDetails result={message.agentResult} />
+                ) : null}
+
+                {!isUser && message.metrics ? (
                     <div className="rounded-md border border-zinc-200 bg-zinc-100/80 p-2 text-[11px] text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/70 dark:text-zinc-300">
                         <div className="flex flex-wrap gap-3">
                             {message.metrics.tokensPerSecond != null ? (
-                                <span>Throughput: {message.metrics.tokensPerSecond} tok/s</span>
+                                <span>
+                                    Throughput: {message.metrics.tokensPerSecond} tok/s
+                                </span>
                             ) : null}
+
                             {message.metrics.totalDurationMs != null ? (
-                                <span>Total: {(message.metrics.totalDurationMs / 1000).toFixed(1)}s</span>
+                                <span>
+                                    Total: {(message.metrics.totalDurationMs / 1000).toFixed(1)}s
+                                </span>
                             ) : null}
+
                             {message.metrics.promptEvalCount != null ? (
                                 <span>Input tokens: {message.metrics.promptEvalCount}</span>
                             ) : null}
+
                             {message.metrics.evalCount != null ? (
                                 <span>Output tokens: {message.metrics.evalCount}</span>
                             ) : null}
+
                             {message.metrics.doneReason ? (
                                 <span>Done: {message.metrics.doneReason}</span>
                             ) : null}

@@ -1,3 +1,14 @@
+import type { AgentChatResponse } from "@/features/agents/agent-api";
+
+export interface HomeChatMessage {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    reasoning?: string;
+    metrics?: OllamaCompletionMetrics;
+    agentResult?: AgentChatResponse;
+}
+
 export interface OllamaModelOption {
     name: string;
 }
