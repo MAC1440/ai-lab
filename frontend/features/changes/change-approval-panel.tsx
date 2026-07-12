@@ -14,13 +14,25 @@ import {
   type ChangeProposal,
   rejectChangeProposal,
 } from "@/features/changes/change-api";
-
+import { UnifiedDiffView } from "@/features/changes/unified-diff-view";
+import { cn } from "@/lib/utils";
 
 type ChangeApprovalPanelProps = {
   proposal: ChangeProposal;
   onResolved?: (proposal: ChangeProposal) => void;
 };
 
+function statusClasses(status: ChangeProposal["status"]) {
+  return cn(
+    "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]",
+    status === "pending" &&
+      "border-amber-700/70 bg-amber-950/50 text-amber-300",
+    status === "approved" &&
+      "border-emerald-700/70 bg-emerald-950/50 text-emerald-300",
+    status === "rejected" &&
+      "border-red-700/70 bg-red-950/50 text-red-300",
+  );
+}
 
 export function ChangeApprovalPanel({
   proposal: initialProposal,
@@ -63,39 +75,41 @@ export function ChangeApprovalPanel({
 
   return (
     <article className="overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl">
-      <header className="flex items-start justify-between gap-4 border-b border-zinc-800 px-4 py-3">
+      <header className="flex items-start justify-between gap-4 bg-zinc-900/70 px-4 py-3.5">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-            <FileDiffIcon className="size-4 shrink-0" />
-            <span className="truncate">
+            <FileDiffIcon className="size-4 shrink-0 text-sky-400" />
+            <span className="truncate" title={proposal.file_path}>
               Proposed {proposal.operation}: {proposal.file_path}
             </span>
           </div>
 
           {proposal.summary ? (
-            <p className="mt-1 text-xs leading-5 text-zinc-400">
+            <p className="mt-1.5 text-xs leading-5 text-zinc-400">
               {proposal.summary}
             </p>
           ) : null}
         </div>
 
-        <span className="shrink-0 rounded-full border border-zinc-700 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-zinc-300">
+        <span className={statusClasses(proposal.status)}>
           {proposal.status}
         </span>
       </header>
 
-      <pre className="max-h-72 overflow-auto bg-black/40 p-4 font-mono text-xs leading-5 text-zinc-200">
-        {proposal.diff || "No textual diff was produced."}
-      </pre>
+      <UnifiedDiffView diff={proposal.diff} />
 
       {error ? (
-        <p className="border-t border-red-900/60 bg-red-950/40 px-4 py-2 text-xs text-red-300">
+        <p className="border-t border-red-900/60 bg-red-950/40 px-4 py-2.5 text-xs text-red-300">
           {error}
         </p>
       ) : null}
 
       {proposal.status === "pending" ? (
-        <footer className="flex justify-end gap-2 border-t border-zinc-800 px-4 py-3">
+        <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-800 bg-zinc-900/70 px-4 py-3">
+          <p className="mr-auto text-xs text-zinc-500">
+            Review every changed line before writing it to disk.
+          </p>
+
           <Button
             type="button"
             variant="outline"
@@ -116,6 +130,7 @@ export function ChangeApprovalPanel({
             type="button"
             size="sm"
             disabled={action !== null}
+            className="bg-emerald-600 text-white hover:bg-emerald-500"
             onClick={() => void resolve("approve")}
           >
             {action === "approve" ? (
