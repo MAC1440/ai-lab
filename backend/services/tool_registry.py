@@ -131,9 +131,10 @@ TOOL_SCHEMAS: Dict[str, ToolSchema] = {
         "function": {
             "name": "propose_file_change",
             "description": (
-                "Create a reviewable exact-text replacement proposal and unified diff. "
-                "This does not write the file. A human must approve it through "
-                "the changes API or approval panel."
+                "Create a reviewable file-change proposal and unified diff. "
+                "This never writes the file. Prefer an exact unique old_text "
+                "for a small replacement. If old_text is omitted, new_text is "
+                "treated as the complete proposed file content."
             ),
             "parameters": {
                 "type": "object",
@@ -145,15 +146,16 @@ TOOL_SCHEMAS: Dict[str, ToolSchema] = {
                     "old_text": {
                         "type": "string",
                         "description": (
-                            "Exact unique text currently in the file. Use an "
-                            "empty string only when creating a new file."
+                            "Optional exact unique text currently in the file. "
+                            "Omit it when new_text contains the complete file."
                         ),
+                        "default": "",
                     },
                     "new_text": {
                         "type": "string",
                         "description": (
-                            "Replacement text. For a new file, this is the "
-                            "complete file content."
+                            "Replacement text when old_text is supplied, or the "
+                            "complete proposed file when old_text is omitted."
                         ),
                     },
                     "summary": {
@@ -162,7 +164,7 @@ TOOL_SCHEMAS: Dict[str, ToolSchema] = {
                         "default": "",
                     },
                 },
-                "required": ["file_path", "old_text", "new_text"],
+                "required": ["file_path", "new_text"],
                 "additionalProperties": False,
             },
         },

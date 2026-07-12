@@ -198,15 +198,22 @@ def search_text(
 
 def propose_file_change(
     file_path: str,
-    old_text: str,
     new_text: str,
+    old_text: str = "",
     summary: str = "",
 ) -> Dict[str, Any]:
-    """Propose one exact text replacement without writing the file.
+    """Create a reviewable proposal without writing the file.
 
-    For a new file, old_text must be empty and new_text is the complete file.
-    For an existing file, old_text must occur exactly once. This keeps local
-    model output small and prevents an ambiguous replacement.
+    Two proposal modes are supported:
+
+    1. Exact replacement mode: provide a unique ``old_text`` snippet and the
+       replacement ``new_text``. This is efficient for small edits.
+    2. Full-file mode: omit ``old_text`` and provide the complete desired file
+       content in ``new_text``. This is more tolerant of small local models
+       that occasionally omit optional tool arguments.
+
+    Both modes only create a diff. The file is written later only if a human
+    approves the proposal.
     """
 
     clean_path = _require_non_empty_string(file_path, "file_path")
@@ -233,18 +240,16 @@ def propose_file_change(
                 f"File is not a readable UTF-8 text file: {clean_path}"
             ) from error
 
-        if not old_text:
-            raise ValueError(
-                "old_text cannot be empty for an existing file. Read the "
-                "target range and provide an exact unique snippet."
-            )
-        occurrence_count = current_content.count(old_text)
-        if occurrence_count != 1:
-            raise ValueError(
-                "old_text must occur exactly once in the current file; "
-                f"found {occurrence_count} occurrences"
-            )
-        proposed_content = current_content.replace(old_text, new_text, 1)
+        if old_text:
+            occurrence_count = current_content.count(old_text)
+            if occurrence_count != 1:
+                raise ValueError(
+                    "old_text must occur exactly once in the current file; "
+                    f"found {occurrence_count} occurrences"
+                )
+            proposed_content = current_content.replace(old_text, new_text, 1)
+        else:
+            proposed_content = new_text
 
     proposal = change_service.propose(
         file_path=clean_path,

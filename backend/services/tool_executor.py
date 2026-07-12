@@ -128,16 +128,18 @@ class ToolExecutor:
             }
 
         if tool_name == "propose_file_change":
-            old_text = arguments.get("old_text")
-            new_text = arguments.get("new_text")
+            old_text = arguments.get("old_text", "")
+            new_text = arguments.get("new_text", arguments.get("content"))
+
             if not isinstance(old_text, str):
                 raise ValueError(
-                    "propose_file_change requires string 'old_text'"
+                    "propose_file_change 'old_text' must be a string when supplied"
                 )
             if not isinstance(new_text, str):
                 raise ValueError(
                     "propose_file_change requires string 'new_text'"
                 )
+
             return {
                 "file_path": self._file_path(arguments),
                 "old_text": old_text,
