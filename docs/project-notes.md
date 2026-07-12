@@ -43,7 +43,7 @@ The goal is not only to build a chatbot, but to understand the full AI applicati
 ### Local AI
 
 * Ollama
-* Chat model: `qwen3:4b or qwen2.5-coder:3b`
+* Chat model: `granite4.1:3b or qwen3:4b or qwen2.5-coder:3b`
 * Embedding model: `nomic-embed-text`
 
 ### Vector Database

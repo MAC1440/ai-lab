@@ -109,8 +109,8 @@ class AgentRunner:
                 options={
                     "temperature": 0.1,
                     "top_p": 0.9,
-                    "num_predict": 1024,
-                    "num_ctx": 4096,
+                    "num_ctx": 8192,
+                    "num_predict": 2048,
                 },
             )
 

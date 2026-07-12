@@ -29,7 +29,7 @@ Copy [.env.example](.env.example) to [.env](.env) and adjust as needed.
 
 ```env
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen3:4b and qwen2.5-coder:3b
+OLLAMA_MODEL=granite4.1:3b and qwen2.5-coder:3b
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 HOST=0.0.0.0
 PORT=8000

@@ -3,7 +3,7 @@ from services.tool_registry import get_tool_schemas
 
 
 def main():
-    client = OllamaClient(model="qwen3:4b")
+    client = OllamaClient(model="granite4.1:3b")
 
     response = client.chat_with_tools(
         messages=[

@@ -39,7 +39,7 @@ class DummyToolExecutor:
 
 class DummyStreamingOllamaClient:
     def __init__(self, model=None):
-        self.model = model or "qwen3:4b"
+        self.model = model or "granite4.1:3b"
         self.calls = []
 
     def stream_chat_with_tools(self, messages, tools, options=None):
@@ -173,7 +173,7 @@ class OllamaToolStreamingTests(unittest.TestCase):
     def test_stream_chat_with_tools_uses_streaming_payload(self):
         client = OllamaClient(
             base_url="http://localhost:11434",
-            model="qwen3:4b",
+            model="granite4.1:3b",
         )
 
         class DummyResponse:

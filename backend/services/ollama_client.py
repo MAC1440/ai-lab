@@ -24,15 +24,15 @@ class OllamaClient:
             model
             or os.getenv(
                 "OLLAMA_MODEL",
-                "qwen3:4b",
+                "granite4.1:3b",
             )
         )
         self.default_options: Dict[str, Any] = {
             "temperature": 0.7,
             "top_p": 0.9,
             "top_k": 40,
+            "num_ctx": 8192,
             "num_predict": 2048,
-            "num_ctx": 4096,
         }
 
     def health(self) -> Dict[str, Any]:
@@ -288,7 +288,6 @@ class OllamaClient:
             "model": self.model,
             "messages": messages,
             "stream": stream,
-            "think": False,
             "options": {
                 **self.default_options,
                 **(options or {}),

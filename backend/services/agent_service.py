@@ -9,7 +9,7 @@ AGENTS: Dict[str, AgentConfig] = {
         "id": "general",
         "name": "General Assistant",
         "description": "A general-purpose local assistant.",
-        "model": "qwen3:4b",
+       "model": "granite4.1:3b",
         "system_prompt": (
             "You are a helpful personal assistant. "
             "Give accurate, direct, and concise answers."
@@ -24,7 +24,7 @@ AGENTS: Dict[str, AgentConfig] = {
             "A Unity assistant that can inspect local files and use "
             "indexed Unity documentation."
         ),
-        "model": "qwen3:4b",
+       "model": "granite4.1:3b",
         "system_prompt": (
             "You are a Unity development assistant. "
             "Use local project files and retrieved Unity documentation "
@@ -48,7 +48,7 @@ AGENTS: Dict[str, AgentConfig] = {
         # qwen2.5-coder:3b is useful for code generation but has unreliable
         # native tool calling through Ollama. Qwen 3 is used for now because
         # this route requires reliable tool_calls.
-        "model": "qwen3:4b",
+       "model": "granite4.1:3b",
 
         "system_prompt": (
             "You are a careful senior software engineer. "
