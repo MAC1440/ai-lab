@@ -34,14 +34,6 @@ export interface OllamaGenerationSettings {
     seed: number | "";
 }
 
-export interface HomeChatMessage {
-    id: string;
-    role: "user" | "assistant";
-    content: string;
-    reasoning?: string;
-    metrics?: OllamaCompletionMetrics;
-}
-
 export interface OllamaModelsResponse {
     models: OllamaModelOption[];
     host: string;

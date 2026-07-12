@@ -10,7 +10,6 @@ from routes.document_loader import router as documents_router
 from routes.embeddings import router as embeddings_router
 from routes.tools import router as tools_router
 from routes.workspaces import router as workspaces_router
-from routes.agent_chat import router as agent_chat_router
 
 def create_app() -> FastAPI:
     load_dotenv()
@@ -42,7 +41,6 @@ def create_app() -> FastAPI:
     app.include_router(embeddings_router)
     app.include_router(workspaces_router)
     app.include_router(tools_router)
-    app.include_router(agent_chat_router)
 
     return app
 
