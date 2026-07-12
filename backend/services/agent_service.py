@@ -9,7 +9,7 @@ AGENTS: Dict[str, AgentConfig] = {
         "id": "general",
         "name": "General Assistant",
         "description": "A general-purpose local assistant.",
-       "model": "granite4.1:3b",
+        "model": "granite4.1:3b",
         "system_prompt": (
             "You are a helpful personal assistant. "
             "Give accurate, direct, and concise answers."
@@ -24,7 +24,7 @@ AGENTS: Dict[str, AgentConfig] = {
             "A Unity assistant that can inspect local files and use "
             "indexed Unity documentation."
         ),
-       "model": "granite4.1:3b",
+        "model": "granite4.1:3b",
         "system_prompt": (
             "You are a Unity development assistant. "
             "Use local project files and retrieved Unity documentation "
@@ -34,36 +34,39 @@ AGENTS: Dict[str, AgentConfig] = {
         "use_rag": True,
         "tools": [
             "list_files",
+            "search_files",
             "read_file",
+            "read_file_range",
+            "search_text",
         ],
     },
     "coding": {
         "id": "coding",
         "name": "Coding Agent",
         "description": (
-            "A coding assistant that can inspect the selected workspace."
+            "A coding assistant that can inspect the selected workspace "
+            "and prepare reviewable file-change proposals."
         ),
-
-        # Important:
-        # qwen2.5-coder:3b is useful for code generation but has unreliable
-        # native tool calling through Ollama. Qwen 3 is used for now because
-        # this route requires reliable tool_calls.
-       "model": "granite4.1:3b",
-
+        "model": "granite4.1:3b",
         "system_prompt": (
             "You are a careful senior software engineer. "
-            "Inspect relevant project files before drawing conclusions. "
-            "Never claim that you read or modified a file unless a tool "
-            "actually performed that action."
+            "Inspect the relevant project files before drawing conclusions. "
+            "Use search tools to locate symbols and read tools to verify the "
+            "exact current code. When the user asks for a code change, use "
+            "propose_file_change only after reading the target file. "
+            "propose_file_change creates a reviewable diff and does not write "
+            "the file; a human must approve it first. Never claim that you "
+            "read, changed, or applied a file unless the corresponding tool "
+            "actually completed that action."
         ),
         "use_rag": False,
         "tools": [
             "list_files",
+            "search_files",
             "read_file",
-
-            # The permission remains available for the manually tested route,
-            # but write_file is intentionally not sent to the LLM yet.
-            "write_file",
+            "read_file_range",
+            "search_text",
+            "propose_file_change",
         ],
     },
 }
@@ -75,28 +78,18 @@ class AgentService:
 
     def get_agent(self, agent_id: str) -> AgentConfig:
         agent = AGENTS.get(agent_id)
-
         if agent is None:
             raise ValueError(f"Unknown agent: {agent_id}")
-
         return agent
 
     def get_allowed_tool_names(self, agent_id: str) -> List[str]:
         agent = self.get_agent(agent_id)
         return list(agent.get("tools", []))
 
-    def is_tool_allowed(
-        self,
-        agent_id: str,
-        tool_name: str,
-    ) -> bool:
+    def is_tool_allowed(self, agent_id: str, tool_name: str) -> bool:
         return tool_name in self.get_allowed_tool_names(agent_id)
 
-    def ensure_tool_allowed(
-        self,
-        agent_id: str,
-        tool_name: str,
-    ) -> None:
+    def ensure_tool_allowed(self, agent_id: str, tool_name: str) -> None:
         if not self.is_tool_allowed(agent_id, tool_name):
             raise PermissionError(
                 f"Agent '{agent_id}' is not allowed to use "

@@ -9,10 +9,14 @@ from datetime import datetime, timezone
 from difflib import unified_diff
 from pathlib import Path
 from threading import RLock
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
 from services.workspace_service import WorkspaceService
+
+
+ChangeProposalStatus = Literal["pending", "approved", "rejected"]
+_VALID_STATUSES = {"pending", "approved", "rejected"}
 
 
 class ChangeProposalNotFoundError(LookupError):
@@ -33,8 +37,8 @@ class _StoredProposal:
     workspace: str
     file_path: str
     summary: str
-    status: str
-    operation: str
+    status: ChangeProposalStatus
+    operation: Literal["create", "update"]
     diff: str
     created_at: str
     resolved_at: Optional[str]
@@ -46,8 +50,8 @@ class _StoredProposal:
 class ChangeService:
     """Create reviewable file changes and apply them only after approval.
 
-    Proposals are intentionally held in memory for the first implementation.
-    A backend restart therefore clears pending proposals.
+    Proposals are stored in memory in this milestone. Restarting the backend
+    clears pending and resolved proposal history.
     """
 
     def __init__(
@@ -72,6 +76,7 @@ class ChangeService:
         summary: str = "",
     ) -> Dict[str, Any]:
         clean_path = self._validate_path(file_path)
+
         if not isinstance(content, str):
             raise ValueError("content must be a string")
         if len(content.encode("utf-8")) > self.max_file_bytes:
@@ -91,10 +96,13 @@ class ChangeService:
 
         base_exists = target.exists()
         before_content = self._read_current_content(target, clean_path)
-        if before_content == content and base_exists:
+
+        if base_exists and before_content == content:
             raise ValueError("The proposed content is identical to the file")
 
-        operation = "update" if base_exists else "create"
+        operation: Literal["create", "update"] = (
+            "update" if base_exists else "create"
+        )
         relative_path = str(target.relative_to(workspace_root))
         diff = self._build_diff(
             file_path=relative_path,
@@ -102,16 +110,16 @@ class ChangeService:
             after_content=content,
             base_exists=base_exists,
         )
-        now = self._utc_now()
+
         proposal = _StoredProposal(
             proposal_id=uuid4().hex,
-            workspace=str(workspace_root),
+            workspace=str(workspace_root.resolve()),
             file_path=relative_path,
             summary=summary.strip(),
             status="pending",
             operation=operation,
             diff=diff,
-            created_at=now,
+            created_at=self._utc_now(),
             resolved_at=None,
             base_exists=base_exists,
             base_sha256=self._hash_text(before_content),
@@ -122,6 +130,28 @@ class ChangeService:
             self._proposals[proposal.proposal_id] = proposal
 
         return self._public(proposal)
+
+    def list_proposals(
+        self,
+        *,
+        status: Optional[ChangeProposalStatus] = None,
+    ) -> List[Dict[str, Any]]:
+        if status is not None and status not in _VALID_STATUSES:
+            raise ValueError(
+                "status must be one of: pending, approved, rejected"
+            )
+
+        with self._lock:
+            proposals = [
+                proposal
+                for proposal in self._proposals.values()
+                if status is None or proposal.status == status
+            ]
+            proposals.sort(
+                key=lambda proposal: proposal.created_at,
+                reverse=True,
+            )
+            return [self._public(proposal) for proposal in proposals]
 
     def get(self, proposal_id: str) -> Dict[str, Any]:
         with self._lock:
@@ -138,15 +168,18 @@ class ChangeService:
                 str(active_workspace.resolve())
             )
             proposal_workspace_text = os.path.normcase(proposal.workspace)
+
             if active_workspace_text != proposal_workspace_text:
                 raise ChangeProposalConflictError(
-                    "The active workspace changed after this proposal was created"
+                    "The active workspace changed after this proposal was "
+                    "created"
                 )
 
             target = self.workspace_service.resolve_workspace_path(
                 proposal.file_path
             )
             current_exists = target.exists()
+
             if current_exists and target.is_dir():
                 raise ChangeProposalConflictError(
                     "The proposed file path now points to a folder"
@@ -157,13 +190,15 @@ class ChangeService:
                 proposal.file_path,
             )
             current_hash = self._hash_text(current_content)
+
             if (
                 current_exists != proposal.base_exists
                 or current_hash != proposal.base_sha256
             ):
                 raise ChangeProposalConflictError(
                     "The file changed after this proposal was created. "
-                    "Ask the agent to inspect it again and create a new proposal."
+                    "Ask the agent to inspect it again and create a new "
+                    "proposal."
                 )
 
             self._atomic_write(target, proposal.proposed_content)
@@ -200,11 +235,13 @@ class ChangeService:
     def _read_current_content(self, target: Path, display_path: str) -> str:
         if not target.exists():
             return ""
+
         if target.stat().st_size > self.max_file_bytes:
             raise ValueError(
-                f"File exceeds the {self.max_file_bytes}-byte proposal limit: "
-                f"{display_path}"
+                f"File exceeds the {self.max_file_bytes}-byte proposal "
+                f"limit: {display_path}"
             )
+
         try:
             return target.read_bytes().decode("utf-8")
         except UnicodeDecodeError as error:
@@ -222,6 +259,7 @@ class ChangeService:
     ) -> str:
         before_name = f"a/{file_path}" if base_exists else "/dev/null"
         after_name = f"b/{file_path}"
+
         return "".join(
             unified_diff(
                 before_content.splitlines(keepends=True),
@@ -237,6 +275,7 @@ class ChangeService:
         target.parent.mkdir(parents=True, exist_ok=True)
         existing_mode = target.stat().st_mode if target.exists() else None
         temp_path: Optional[str] = None
+
         try:
             with tempfile.NamedTemporaryFile(
                 mode="w",
@@ -254,6 +293,7 @@ class ChangeService:
 
             if existing_mode is not None:
                 os.chmod(temp_path, existing_mode)
+
             os.replace(temp_path, target)
             temp_path = None
         finally:

@@ -6,7 +6,7 @@ import {
   Loader2Icon,
   XIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,14 +15,24 @@ import {
   rejectChangeProposal,
 } from "@/features/changes/change-api";
 
+
+type ChangeApprovalPanelProps = {
+  proposal: ChangeProposal;
+  onResolved?: (proposal: ChangeProposal) => void;
+};
+
+
 export function ChangeApprovalPanel({
   proposal: initialProposal,
-}: {
-  proposal: ChangeProposal;
-}) {
+  onResolved,
+}: ChangeApprovalPanelProps) {
   const [proposal, setProposal] = useState(initialProposal);
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setProposal(initialProposal);
+  }, [initialProposal]);
 
   async function resolve(nextAction: "approve" | "reject") {
     if (proposal.status !== "pending" || action) {
@@ -31,12 +41,15 @@ export function ChangeApprovalPanel({
 
     setAction(nextAction);
     setError(null);
+
     try {
       const result =
         nextAction === "approve"
           ? await approveChangeProposal(proposal.proposal_id)
           : await rejectChangeProposal(proposal.proposal_id);
+
       setProposal(result);
+      onResolved?.(result);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -49,67 +62,71 @@ export function ChangeApprovalPanel({
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-violet-200 bg-white text-xs dark:border-violet-900/60 dark:bg-zinc-950">
-      <header className="flex flex-wrap items-center gap-2 border-b border-violet-100 px-3 py-2 dark:border-violet-900/40">
-        <FileDiffIcon className="size-4 text-violet-600 dark:text-violet-400" />
-        <span className="font-semibold text-zinc-800 dark:text-zinc-100">
-          Proposed {proposal.operation}
-        </span>
-        <code className="break-all text-zinc-600 dark:text-zinc-300">
-          {proposal.file_path}
-        </code>
-        <span className="ml-auto rounded-full bg-zinc-100 px-2 py-0.5 capitalize text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+    <article className="overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl">
+      <header className="flex items-start justify-between gap-4 border-b border-zinc-800 px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+            <FileDiffIcon className="size-4 shrink-0" />
+            <span className="truncate">
+              Proposed {proposal.operation}: {proposal.file_path}
+            </span>
+          </div>
+
+          {proposal.summary ? (
+            <p className="mt-1 text-xs leading-5 text-zinc-400">
+              {proposal.summary}
+            </p>
+          ) : null}
+        </div>
+
+        <span className="shrink-0 rounded-full border border-zinc-700 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-zinc-300">
           {proposal.status}
         </span>
       </header>
 
-      {proposal.summary ? (
-        <p className="border-b border-zinc-100 px-3 py-2 text-zinc-600 dark:border-zinc-900 dark:text-zinc-300">
-          {proposal.summary}
-        </p>
-      ) : null}
-
-      <pre className="max-h-96 overflow-auto whitespace-pre p-3 font-mono text-[11px] leading-5 text-zinc-700 dark:text-zinc-200">
+      <pre className="max-h-72 overflow-auto bg-black/40 p-4 font-mono text-xs leading-5 text-zinc-200">
         {proposal.diff || "No textual diff was produced."}
       </pre>
 
       {error ? (
-        <p className="border-t border-red-200 bg-red-50 px-3 py-2 text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
+        <p className="border-t border-red-900/60 bg-red-950/40 px-4 py-2 text-xs text-red-300">
           {error}
         </p>
       ) : null}
 
       {proposal.status === "pending" ? (
-        <footer className="flex justify-end gap-2 border-t border-zinc-200 px-3 py-2 dark:border-zinc-800">
+        <footer className="flex justify-end gap-2 border-t border-zinc-800 px-4 py-3">
           <Button
             type="button"
-            size="sm"
             variant="outline"
-            disabled={Boolean(action)}
+            size="sm"
+            disabled={action !== null}
+            className="border-red-900/70 text-red-300 hover:bg-red-950/50"
             onClick={() => void resolve("reject")}
           >
             {action === "reject" ? (
-              <Loader2Icon className="mr-2 size-3.5 animate-spin" />
+              <Loader2Icon className="size-4 animate-spin" />
             ) : (
-              <XIcon className="mr-2 size-3.5" />
+              <XIcon className="size-4" />
             )}
             Reject
           </Button>
+
           <Button
             type="button"
             size="sm"
-            disabled={Boolean(action)}
+            disabled={action !== null}
             onClick={() => void resolve("approve")}
           >
             {action === "approve" ? (
-              <Loader2Icon className="mr-2 size-3.5 animate-spin" />
+              <Loader2Icon className="size-4 animate-spin" />
             ) : (
-              <CheckIcon className="mr-2 size-3.5" />
+              <CheckIcon className="size-4" />
             )}
             Approve and write
           </Button>
         </footer>
       ) : null}
-    </section>
+    </article>
   );
 }
