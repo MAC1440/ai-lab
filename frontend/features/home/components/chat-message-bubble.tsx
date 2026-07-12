@@ -5,6 +5,7 @@ import { BotIcon, UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { HomeChatMessage } from "@/features/home/types";
+import ReactMarkdown from "react-markdown";
 
 export function ChatMessageBubble({
     message,
@@ -47,11 +48,15 @@ export function ChatMessageBubble({
                             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-80">
                                 Thinking
                             </p>
+                            {/* Reasoning stays as plain text */}
                             <p className="whitespace-pre-wrap">{message.reasoning}</p>
                         </div>
                     ) : null}
+
                     <div className="whitespace-pre-wrap">
-                        {message.content || (isStreaming ? "…" : "")}
+                        {/* Render content as Markdown */}
+                        <ReactMarkdown>{message.content || (isStreaming ? "…" : "")}</ReactMarkdown>
+
                         {isStreaming && message.content && (
                             <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-emerald-500" />
                         )}
