@@ -7,6 +7,8 @@ export interface HomeChatMessage {
     reasoning?: string;
     metrics?: OllamaCompletionMetrics;
     agentResult?: AgentChatResponse;
+    streamingStatus?: string;
+    streamError?: string;
 }
 
 export interface OllamaModelOption {

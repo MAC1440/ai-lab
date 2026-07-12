@@ -30,9 +30,11 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
     type AgentChatHistoryMessage,
+    type AgentChatResponse,
     type AgentProfile,
+    type AgentStreamEvent,
     getAgents,
-    sendAgentChat,
+    streamAgentChat,
 } from "@/features/agents/agent-api";
 import { ChatInput } from "@/features/home/components/chat-input";
 import { ChatMessageBubble } from "@/features/home/components/chat-message-bubble";
@@ -61,6 +63,148 @@ function buildHistory(
             content: message.content,
         }))
         .slice(-12);
+}
+
+function createInitialAgentResult(
+    agent: AgentProfile,
+    distanceThreshold: number | null,
+): AgentChatResponse {
+    return {
+        answer: "",
+        agent_id: agent.id,
+        model: agent.model,
+        steps: 0,
+        tools_used: [],
+        rag: {
+            enabled: agent.use_rag,
+            context_found: false,
+            retrieved_count: 0,
+            included_count: 0,
+            sources: [],
+            distances: [],
+            distance_threshold: distanceThreshold,
+        },
+    };
+}
+
+function applyAgentStreamEvent(
+    message: HomeChatMessage,
+    event: AgentStreamEvent,
+): HomeChatMessage {
+    const currentResult = message.agentResult;
+
+    switch (event.type) {
+        case "status":
+            return {
+                ...message,
+                streamingStatus: event.message,
+                agentResult: currentResult
+                    ? {
+                        ...currentResult,
+                        steps: event.step ?? currentResult.steps,
+                    }
+                    : currentResult,
+            };
+
+        case "rag":
+            return currentResult
+                ? {
+                    ...message,
+                    agentResult: {
+                        ...currentResult,
+                        rag: event.rag,
+                    },
+                }
+                : message;
+
+        case "answer_delta":
+            return {
+                ...message,
+                content: message.content + event.content,
+                agentResult: currentResult
+                    ? {
+                        ...currentResult,
+                        answer: currentResult.answer + event.content,
+                        steps: event.step,
+                    }
+                    : currentResult,
+            };
+
+        case "answer_reset":
+            return {
+                ...message,
+                content: "",
+                agentResult: currentResult
+                    ? {
+                        ...currentResult,
+                        answer: "",
+                        steps: event.step,
+                    }
+                    : currentResult,
+            };
+
+        case "tool_start":
+            return currentResult
+                ? {
+                    ...message,
+                    streamingStatus: `Running ${event.name}`,
+                    agentResult: {
+                        ...currentResult,
+                        steps: event.step,
+                        tools_used: [
+                            ...currentResult.tools_used,
+                            {
+                                id: event.call_id,
+                                name: event.name,
+                                arguments: event.arguments,
+                                status: "running",
+                            },
+                        ],
+                    },
+                }
+                : message;
+
+        case "tool_result":
+            return currentResult
+                ? {
+                    ...message,
+                    streamingStatus:
+                        event.tool.status === "success"
+                            ? `${event.tool.name} completed`
+                            : `${event.tool.name} failed`,
+                    agentResult: {
+                        ...currentResult,
+                        steps: event.step,
+                        tools_used: currentResult.tools_used.some(
+                            (tool) => tool.id === event.call_id,
+                        )
+                            ? currentResult.tools_used.map((tool) =>
+                                tool.id === event.call_id ? event.tool : tool,
+                            )
+                            : [...currentResult.tools_used, event.tool],
+                    },
+                }
+                : message;
+
+        case "done":
+            return {
+                ...message,
+                content: event.result.answer,
+                agentResult: event.result,
+                streamingStatus: undefined,
+                streamError: undefined,
+            };
+
+        case "error":
+            return {
+                ...message,
+                streamingStatus: undefined,
+                streamError: event.message,
+            };
+
+        default:
+            return message;
+    }
 }
 
 export function ChatPanel() {
@@ -164,6 +308,11 @@ export function ChatPanel() {
             return;
         }
 
+        const distanceThreshold =
+            settings.ragDistanceThreshold === ""
+                ? null
+                : settings.ragDistanceThreshold;
+
         const userMessage: HomeChatMessage = {
             id: crypto.randomUUID(),
             role: "user",
@@ -174,10 +323,13 @@ export function ChatPanel() {
             id: crypto.randomUUID(),
             role: "assistant",
             content: "",
+            streamingStatus: "Preparing the selected agent",
+            agentResult: createInitialAgentResult(
+                selectedAgent,
+                distanceThreshold,
+            ),
         };
 
-        // Only previous completed messages are sent as history.
-        // The current message is sent separately as `prompt`.
         const history = buildHistory(messages);
         const pendingMessages = [...messages, userMessage];
 
@@ -186,33 +338,61 @@ export function ChatPanel() {
         setError(null);
         setIsSending(true);
 
+        let receivedDoneEvent = false;
+
+        const updateAssistantMessage = (
+            updater: (message: HomeChatMessage) => HomeChatMessage,
+        ) => {
+            setMessages((currentMessages) =>
+                currentMessages.map((message) =>
+                    message.id === assistantPlaceholder.id
+                        ? updater(message)
+                        : message,
+                ),
+            );
+        };
+
         try {
-            const result = await sendAgentChat({
+            for await (const event of streamAgentChat({
                 agent_id: selectedAgent.id,
                 prompt: content,
                 history: history.length > 0 ? history : null,
                 rag_top_k: settings.ragTopK,
-                rag_distance_threshold:
-                    settings.ragDistanceThreshold === ""
-                        ? null
-                        : settings.ragDistanceThreshold,
-            });
+                rag_distance_threshold: distanceThreshold,
+            })) {
+                if (event.type === "error") {
+                    updateAssistantMessage((message) =>
+                        applyAgentStreamEvent(message, event),
+                    );
+                    throw new Error(event.message);
+                }
 
-            setMessages([
-                ...pendingMessages,
-                {
-                    ...assistantPlaceholder,
-                    content: result.answer,
-                    agentResult: result,
-                },
-            ]);
+                if (event.type === "done") {
+                    receivedDoneEvent = true;
+                }
+
+                updateAssistantMessage((message) =>
+                    applyAgentStreamEvent(message, event),
+                );
+            }
+
+            if (!receivedDoneEvent) {
+                throw new Error(
+                    "The agent stream ended before sending a final result.",
+                );
+            }
         } catch (requestError) {
-            setMessages(pendingMessages);
-            setError(
+            const message =
                 requestError instanceof Error
                     ? requestError.message
-                    : "The message could not be sent.",
-            );
+                    : "The message could not be sent.";
+
+            updateAssistantMessage((assistantMessage) => ({
+                ...assistantMessage,
+                streamingStatus: undefined,
+                streamError: assistantMessage.streamError ?? message,
+            }));
+            setError(message);
         } finally {
             setIsSending(false);
         }
@@ -341,7 +521,7 @@ export function ChatPanel() {
                                     <DialogTitle>Agent retrieval settings</DialogTitle>
                                     <DialogDescription>
                                         These values map directly to the supported
-                                        <code className="mx-1">/agent/chat</code>
+                                        <code className="mx-1">/agent/chat/stream</code>
                                         request fields. Agents with RAG disabled safely ignore
                                         them.
                                     </DialogDescription>
@@ -531,8 +711,8 @@ export function ChatPanel() {
                         />
 
                         <p className="mt-2 text-center text-[11px] text-zinc-400">
-                            The current agent route is non-streaming. The loading bubble
-                            remains visible while RAG retrieval and tool calls complete.
+                            RAG progress, tool execution, and answer tokens are streamed from
+                            the backend as newline-delimited JSON events.
                         </p>
                     </div>
                 </footer>

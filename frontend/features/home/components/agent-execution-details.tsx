@@ -1,9 +1,37 @@
 "use client";
 
-import type { AgentChatResponse } from "@/features/agents/agent-api";
+import { Loader2Icon } from "lucide-react";
+
+import type {
+    AgentChatResponse,
+    AgentToolExecution,
+} from "@/features/agents/agent-api";
 
 function formatDistance(distance: number | null | undefined) {
     return typeof distance === "number" ? distance.toFixed(4) : "unknown";
+}
+
+function ToolStatus({ tool }: { tool: AgentToolExecution }) {
+    if (tool.status === "running") {
+        return (
+            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                <Loader2Icon className="size-3 animate-spin" />
+                running
+            </span>
+        );
+    }
+
+    return (
+        <span
+            className={
+                tool.status === "success"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-red-600 dark:text-red-400"
+            }
+        >
+            {tool.status}
+        </span>
+    );
 }
 
 export function AgentExecutionDetails({
@@ -115,14 +143,11 @@ export function AgentExecutionDetails({
                                         >
                                             <div className="flex flex-wrap gap-x-3 gap-y-1">
                                                 <span>
-                                                    Source:{" "}
-                                                    <strong>{String(source.source ?? "unknown")}</strong>
+                                                    Source: <strong>{String(source.source ?? "unknown")}</strong>
                                                 </span>
                                                 <span>
                                                     Chunk:{" "}
-                                                    <strong>
-                                                        {String(source.chunk_index ?? "unknown")}
-                                                    </strong>
+                                                    <strong>{String(source.chunk_index ?? "unknown")}</strong>
                                                 </span>
                                                 <span>
                                                     Distance:{" "}
@@ -150,26 +175,18 @@ export function AgentExecutionDetails({
 
                     {!hasTools ? (
                         <p className="mt-2 text-zinc-500">
-                            The model produced the answer without calling a tool.
+                            The model has not called a tool for this response.
                         </p>
                     ) : (
                         <div className="mt-2 space-y-2">
                             {result.tools_used.map((tool, index) => (
                                 <div
-                                    key={`${tool.name}-${index}`}
+                                    key={tool.id ?? `${tool.name}-${index}`}
                                     className="rounded-md border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-900"
                                 >
                                     <div className="flex items-center justify-between gap-3">
                                         <code className="font-semibold">{tool.name}</code>
-                                        <span
-                                            className={
-                                                tool.status === "success"
-                                                    ? "text-emerald-600 dark:text-emerald-400"
-                                                    : "text-red-600 dark:text-red-400"
-                                            }
-                                        >
-                                            {tool.status}
-                                        </span>
+                                        <ToolStatus tool={tool} />
                                     </div>
 
                                     <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words rounded bg-zinc-100 p-2 text-[11px] dark:bg-zinc-950">

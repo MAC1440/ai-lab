@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from services.agent_service import AgentService
 from services.ollama_client import OllamaClient
@@ -8,6 +8,7 @@ from services.tool_executor import ToolExecutor
 from services.tool_registry import get_tool_schemas
 
 Message = Dict[str, Any]
+AgentEvent = Dict[str, Any]
 RAGResults = Dict[str, Any]
 
 EXPECTED_TOOL_ERRORS = (
@@ -42,6 +43,7 @@ class AgentRunner:
         self.tool_executor = tool_executor or ToolExecutor(
             self.agent_service
         )
+
         # RAG is created lazily so agents with use_rag=False do not need
         # Chroma or the embedding model for ordinary conversations.
         self.rag_service = rag_service
@@ -57,6 +59,58 @@ class AgentRunner:
         rag_top_k: int = 3,
         rag_distance_threshold: Optional[float] = 1.0,
     ) -> Dict[str, Any]:
+        """Run the agent and return only the final response object.
+
+        The normal JSON endpoint and the streaming endpoint both use
+        ``run_events``. This avoids maintaining two separate agent loops.
+        """
+
+        final_result: Optional[Dict[str, Any]] = None
+
+        for event in self.run_events(
+            agent_id=agent_id,
+            prompt=prompt,
+            history=history,
+            rag_top_k=rag_top_k,
+            rag_distance_threshold=rag_distance_threshold,
+        ):
+            if event.get("type") == "done":
+                raw_result = event.get("result")
+                if isinstance(raw_result, dict):
+                    final_result = raw_result
+
+        if final_result is None:
+            raise RuntimeError(
+                "The agent event stream ended without a final result."
+            )
+
+        return final_result
+
+    def run_events(
+        self,
+        *,
+        agent_id: str,
+        prompt: str,
+        history: Optional[List[Message]] = None,
+        rag_top_k: int = 3,
+        rag_distance_threshold: Optional[float] = 1.0,
+    ) -> Iterator[AgentEvent]:
+        """Yield structured lifecycle events for one agent request.
+
+        Event types:
+        - status: current backend stage
+        - rag: completed RAG trace
+        - answer_delta: one streamed answer fragment
+        - answer_reset: discard temporary model text before tool execution
+        - tool_start: tool execution is about to begin
+        - tool_result: tool execution completed or failed
+        - done: final response object
+
+        Runtime exceptions deliberately propagate. The FastAPI streaming
+        route converts them into an ``error`` NDJSON event, while the normal
+        JSON route converts them into ordinary HTTP errors.
+        """
+
         clean_prompt = prompt.strip()
         if not clean_prompt:
             raise ValueError("Prompt cannot be empty")
@@ -66,6 +120,12 @@ class AgentRunner:
             distance_threshold=rag_distance_threshold,
         )
 
+        yield {
+            "type": "status",
+            "stage": "preparing",
+            "message": "Preparing the selected agent",
+        }
+
         agent = self.agent_service.get_agent(agent_id)
         client = OllamaClient(model=agent["model"])
 
@@ -74,12 +134,24 @@ class AgentRunner:
         )
         tool_schemas = get_tool_schemas(allowed_tool_names)
 
+        if bool(agent.get("use_rag", False)):
+            yield {
+                "type": "status",
+                "stage": "retrieving",
+                "message": "Searching indexed documentation",
+            }
+
         rag_trace, rag_context = self._retrieve_rag_context(
             agent=agent,
             query=clean_prompt,
             top_k=rag_top_k,
             distance_threshold=rag_distance_threshold,
         )
+
+        yield {
+            "type": "rag",
+            "rag": rag_trace,
+        }
 
         messages: List[Message] = [
             {
@@ -103,7 +175,23 @@ class AgentRunner:
         executed_tools: List[Dict[str, Any]] = []
 
         for step in range(1, self.max_steps + 1):
-            response = client.chat_with_tools(
+            yield {
+                "type": "status",
+                "stage": "model",
+                "message": (
+                    "Generating the answer"
+                    if step == 1
+                    else "Continuing after tool results"
+                ),
+                "step": step,
+            }
+
+            accumulated_content = ""
+            accumulated_thinking = ""
+            raw_tool_calls: List[Any] = []
+            emitted_answer_content = False
+
+            for chunk in client.stream_chat_with_tools(
                 messages=messages,
                 tools=tool_schemas,
                 options={
@@ -112,31 +200,59 @@ class AgentRunner:
                     "num_predict": 1024,
                     "num_ctx": 4096,
                 },
-            )
+            ):
+                raw_message = chunk.get("message", {})
+                if not isinstance(raw_message, dict):
+                    raise RuntimeError(
+                        "Ollama returned a stream chunk without a valid "
+                        "'message' object"
+                    )
 
-            assistant_message = response.get("message", {})
-            content = assistant_message.get("content", "")
-            if not isinstance(content, str):
-                content = str(content or "")
+                thinking_delta = raw_message.get("thinking", "")
+                if thinking_delta:
+                    if not isinstance(thinking_delta, str):
+                        thinking_delta = str(thinking_delta)
+                    accumulated_thinking += thinking_delta
 
-            raw_tool_calls = assistant_message.get("tool_calls", [])
-            if not isinstance(raw_tool_calls, list):
-                raise RuntimeError(
-                    "Ollama returned 'tool_calls' in an unexpected format"
-                )
+                content_delta = raw_message.get("content", "")
+                if content_delta:
+                    if not isinstance(content_delta, str):
+                        content_delta = str(content_delta)
 
-            # Keep only fields Ollama expects when the message is sent
-            # back in the next loop iteration.
+                    accumulated_content += content_delta
+                    emitted_answer_content = True
+
+                    yield {
+                        "type": "answer_delta",
+                        "content": content_delta,
+                        "step": step,
+                    }
+
+                chunk_tool_calls = raw_message.get("tool_calls", [])
+                if chunk_tool_calls:
+                    if not isinstance(chunk_tool_calls, list):
+                        raise RuntimeError(
+                            "Ollama returned 'tool_calls' in an "
+                            "unexpected format"
+                        )
+                    raw_tool_calls.extend(chunk_tool_calls)
+
             stored_assistant_message: Message = {
                 "role": "assistant",
-                "content": content,
+                "content": accumulated_content,
             }
+
+            # Ollama's streaming tool-calling guidance requires accumulated
+            # thinking/content/tool_calls to be returned in the next request.
+            if accumulated_thinking:
+                stored_assistant_message["thinking"] = accumulated_thinking
             if raw_tool_calls:
                 stored_assistant_message["tool_calls"] = raw_tool_calls
+
             messages.append(stored_assistant_message)
 
             if not raw_tool_calls:
-                final_answer = content.strip()
+                final_answer = accumulated_content.strip()
                 if not final_answer:
                     raise RuntimeError(
                         f"Model '{client.model}' returned neither a text "
@@ -145,7 +261,7 @@ class AgentRunner:
                         "Ollama tool calling."
                     )
 
-                return {
+                result = {
                     "answer": final_answer,
                     "agent_id": agent_id,
                     "model": client.model,
@@ -154,11 +270,37 @@ class AgentRunner:
                     "rag": rag_trace,
                 }
 
-            for tool_call in raw_tool_calls:
+                yield {
+                    "type": "done",
+                    "result": result,
+                }
+                return
+
+            # A model can emit text before deciding to call a tool. That text
+            # is not the final answer. Tell the frontend to clear it before
+            # displaying tool progress and the next model step.
+            if emitted_answer_content:
+                yield {
+                    "type": "answer_reset",
+                    "step": step,
+                }
+
+            for tool_index, tool_call in enumerate(raw_tool_calls, start=1):
                 tool_name, arguments = self._parse_tool_call(tool_call)
+                call_id = f"step-{step}-tool-{tool_index}"
+
                 tool_record: Dict[str, Any] = {
+                    "id": call_id,
                     "name": tool_name,
                     "arguments": arguments,
+                }
+
+                yield {
+                    "type": "tool_start",
+                    "call_id": call_id,
+                    "name": tool_name,
+                    "arguments": arguments,
+                    "step": step,
                 }
 
                 try:
@@ -186,6 +328,14 @@ class AgentRunner:
                     )
 
                 executed_tools.append(tool_record)
+
+                yield {
+                    "type": "tool_result",
+                    "call_id": call_id,
+                    "tool": tool_record,
+                    "step": step,
+                }
+
                 messages.append(
                     {
                         "role": "tool",

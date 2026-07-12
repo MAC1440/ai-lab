@@ -1,12 +1,17 @@
 "use client";
 
-import { BotIcon, UserIcon } from "lucide-react";
+import {
+    AlertCircleIcon,
+    BotIcon,
+    Loader2Icon,
+    UserIcon,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AgentExecutionDetails } from "@/features/home/components/agent-execution-details";
 import type { HomeChatMessage } from "@/features/home/types";
 import { cn } from "@/lib/utils";
-import { AgentExecutionDetails } from "./agent-execution-details";
 
 export function ChatMessageBubble({
     message,
@@ -49,6 +54,13 @@ export function ChatMessageBubble({
                             : "Assistant"}
                 </p>
 
+                {!isUser && message.streamingStatus ? (
+                    <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                        <Loader2Icon className="size-3.5 animate-spin" />
+                        <span>{message.streamingStatus}</span>
+                    </div>
+                ) : null}
+
                 <div className="space-y-2 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
                     {message.reasoning ? (
                         <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-2 text-xs italic text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
@@ -69,6 +81,13 @@ export function ChatMessageBubble({
                         ) : null}
                     </div>
                 </div>
+
+                {!isUser && message.streamError ? (
+                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                        <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
+                        <span>{message.streamError}</span>
+                    </div>
+                ) : null}
 
                 {!isUser && message.agentResult ? (
                     <AgentExecutionDetails result={message.agentResult} />

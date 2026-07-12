@@ -4,7 +4,6 @@ from typing import Any, Dict, Iterator, List, Optional
 
 import requests
 
-
 Message = Dict[str, Any]
 
 
@@ -21,7 +20,6 @@ class OllamaClient:
                 "http://localhost:11434",
             )
         ).rstrip("/")
-
         self.model = (
             model
             or os.getenv(
@@ -29,7 +27,6 @@ class OllamaClient:
                 "qwen3:4b",
             )
         )
-
         self.default_options: Dict[str, Any] = {
             "temperature": 0.7,
             "top_p": 0.9,
@@ -77,7 +74,6 @@ class OllamaClient:
                 "content": prompt,
             }
         )
-
         return messages
 
     def _raise_ollama_error(
@@ -155,7 +151,6 @@ class OllamaClient:
 
         response = self._post_chat(payload)
         data = response.json()
-
         return data.get("message", {}).get("content", "")
 
     def stream_chat(
@@ -185,17 +180,7 @@ class OllamaClient:
             stream=True,
         )
 
-        for line in response.iter_lines(
-            decode_unicode=True,
-        ):
-            if not line:
-                continue
-
-            try:
-                chunk = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-
+        for chunk in self._iter_ndjson_response(response):
             delta = chunk.get(
                 "message",
                 {},
@@ -203,9 +188,8 @@ class OllamaClient:
                 "content",
                 "",
             )
-
             if delta:
-                yield delta
+                yield str(delta)
 
     def embed(
         self,
@@ -235,7 +219,6 @@ class OllamaClient:
             ) from error
 
         self._raise_ollama_error(response)
-
         data = response.json()
         return data.get("embeddings", [])
 
@@ -246,25 +229,15 @@ class OllamaClient:
         *,
         options: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "stream": False,
-            "think": False,
-            "options": {
-                **self.default_options,
-                **(options or {}),
-            },
-        }
-
-        # Do not send an empty tools array.
-        # A normal no-tool agent should behave like ordinary chat.
-        if tools:
-            payload["tools"] = tools
+        payload = self._build_tool_chat_payload(
+            messages=messages,
+            tools=tools,
+            options=options,
+            stream=False,
+        )
 
         response = self._post_chat(payload)
         data = response.json()
-
         message = data.get("message")
 
         if not isinstance(message, dict):
@@ -274,3 +247,87 @@ class OllamaClient:
             )
 
         return data
+
+    def stream_chat_with_tools(
+        self,
+        messages: List[Message],
+        tools: List[Dict[str, Any]],
+        *,
+        options: Optional[Dict[str, Any]] = None,
+    ) -> Iterator[Dict[str, Any]]:
+        """Stream raw Ollama chat chunks while retaining tool-call fields.
+
+        The agent runner is responsible for accumulating ``content``,
+        ``thinking``, and ``tool_calls`` across chunks before making the next
+        tool-loop request.
+        """
+
+        payload = self._build_tool_chat_payload(
+            messages=messages,
+            tools=tools,
+            options=options,
+            stream=True,
+        )
+
+        response = self._post_chat(
+            payload,
+            stream=True,
+        )
+
+        yield from self._iter_ndjson_response(response)
+
+    def _build_tool_chat_payload(
+        self,
+        *,
+        messages: List[Message],
+        tools: List[Dict[str, Any]],
+        options: Optional[Dict[str, Any]],
+        stream: bool,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "stream": stream,
+            "think": False,
+            "options": {
+                **self.default_options,
+                **(options or {}),
+            },
+        }
+
+        # Do not send an empty tools array. A normal no-tool agent should
+        # behave like ordinary chat.
+        if tools:
+            payload["tools"] = tools
+
+        return payload
+
+    def _iter_ndjson_response(
+        self,
+        response: requests.Response,
+    ) -> Iterator[Dict[str, Any]]:
+        for line in response.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+
+            if isinstance(line, bytes):
+                line = line.decode("utf-8")
+
+            try:
+                chunk = json.loads(line)
+            except json.JSONDecodeError:
+                # Ollama normally returns one JSON object per line. Ignore a
+                # malformed transport line rather than crashing after a
+                # partially streamed answer.
+                continue
+
+            if not isinstance(chunk, dict):
+                continue
+
+            error_message = chunk.get("error")
+            if isinstance(error_message, str) and error_message:
+                raise RuntimeError(
+                    f"Ollama streaming request failed: {error_message}"
+                )
+
+            yield chunk
