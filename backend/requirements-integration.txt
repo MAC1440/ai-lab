@@ -1,0 +1,12 @@
+# Optional personal-assistant integrations
+#
+# Install together with the production runtime:
+#   python -m pip install -r requirements.txt -r requirements-integrations.txt
+
+# Gmail and Google Calendar OAuth/API clients
+google-api-python-client>=2.176,<3.0
+google-auth-httplib2>=0.2,<1.0
+google-auth-oauthlib>=1.2,<2.0
+
+# Persistent local schedules: email polling, reminders, maintenance jobs
+APScheduler[sqlalchemy]~=3.11.3

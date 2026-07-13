@@ -1,0 +1,9 @@
+# Desktop/backend packaging dependencies
+#
+# Do not install this in the normal runtime environment yet.
+# Tauri itself is installed and built from the frontend/Rust toolchain.
+#
+# Install during the desktop packaging stage:
+#   python -m pip install -r requirements.txt -r requirements-integrations.txt -r requirements-build.txt
+
+pyinstaller>=6.14,<7.0

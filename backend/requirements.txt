@@ -1,8 +1,34 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.30.0
-requests>=2.32.0
-chromadb>=1.0.0
-httpx>=0.28.0
-ollama>=0.5.0
-python-dotenv>=1.0.0
-pytest>=8.0.0
+# AI Lab production runtime
+# Recommended Python: 3.11 or 3.12
+#
+# Install:
+#   python -m pip install -r requirements.txt
+
+# API and configuration
+fastapi~=0.139.0
+uvicorn[standard]>=0.30,<1.0
+pydantic>=2.11,<3.0
+pydantic-settings>=2.10,<3.0
+python-dotenv>=1.1,<2.0
+python-multipart>=0.0.20,<1.0
+orjson>=3.10,<4.0
+
+# Agent runtime:
+# - openai: required because PydanticAI talks to Ollama through Ollama's
+#   OpenAI-compatible /v1 endpoint.
+# - mcp: lets AI Lab consume existing MCP servers and tools.
+# - duckduckgo and web-fetch: planned general research/tech companion tools.
+pydantic-ai-slim[openai,mcp,duckduckgo,web-fetch]~=2.9.0
+
+# Direct HTTP calls for Ollama health/model management and integrations
+httpx>=0.28,<1.0
+
+# Local persistence
+sqlalchemy>=2.0,<3.0
+aiosqlite>=0.21,<1.0
+alembic>=1.16,<2.0
+platformdirs>=4.3,<5.0
+keyring>=25.6,<26.0
+
+# Local RAG/vector storage
+chromadb~=1.5.9

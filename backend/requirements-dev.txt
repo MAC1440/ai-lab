@@ -1,0 +1,12 @@
+# Development-only dependencies
+#
+# Install:
+#   python -m pip install -r requirements.txt -r requirements-dev.txt
+
+pytest>=8.4,<9.0
+pytest-asyncio>=1.0,<2.0
+pytest-cov>=6.2,<7.0
+ruff>=0.12,<1.0
+mypy>=1.16,<2.0
+pre-commit>=4.2,<5.0
+pip-audit>=2.9,<3.0
