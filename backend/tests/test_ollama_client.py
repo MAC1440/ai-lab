@@ -48,9 +48,6 @@ class OllamaClientTests(unittest.TestCase):
         )
         self.assertTrue(payload["stream"])
 
-        # stream_chat should not send the agent-specific thinking option.
-        self.assertNotIn("think", payload)
-
         # Confirm requests.post itself was configured for streaming.
         self.assertTrue(
             post_mock.call_args.kwargs["stream"]

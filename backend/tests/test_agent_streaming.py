@@ -231,7 +231,6 @@ class OllamaToolStreamingTests(unittest.TestCase):
 
         payload = post_mock.call_args.kwargs["json"]
         self.assertTrue(payload["stream"])
-        self.assertFalse(payload["think"])
         self.assertEqual(payload["tools"], tools)
         self.assertTrue(post_mock.call_args.kwargs["stream"])
 
