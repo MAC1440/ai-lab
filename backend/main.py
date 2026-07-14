@@ -1,6 +1,9 @@
 import os
 
 from dotenv import load_dotenv
+# Load configuration before importing routes and their dependencies.
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,7 +12,6 @@ from routes.workspaces import router as workspaces_router
 from routes.changes import router as changes_router
 
 def create_app() -> FastAPI:
-    load_dotenv()
 
     app = FastAPI(
         title="AI Lab Backend",

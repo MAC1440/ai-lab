@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 
 from services.agent_runner import AgentRunner
 from services.agent_service import AgentService
-
+from services.pydantic_agent import get_pydantic_agent
+from services.pydantic_runner import PydanticAgentRunner
 router = APIRouter(
     prefix="/agent",
     tags=["Agent"],
@@ -16,7 +17,9 @@ router = APIRouter(
 agent_service = AgentService()
 agent_runner = AgentRunner(agent_service=agent_service)
 
-
+pydantic_runner = PydanticAgentRunner(
+    agent_service=agent_service
+)
 class HistoryMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1)
@@ -39,7 +42,40 @@ def list_agents():
         "agents": agent_service.list_agents(),
     }
 
+@router.post("/chat/pydantic/stream")
+async def pydantic_agent_chat_stream(
+    request: AgentChatRequest,
+):
+    history = _serialize_history(request.history)
 
+    async def generate_events():
+        try:
+            async for event in pydantic_runner.run_events(
+                agent_id=request.agent_id,
+                prompt=request.prompt,
+                history=history,
+                rag_top_k=request.rag_top_k,
+                rag_distance_threshold=request.rag_distance_threshold,
+            ):
+                yield _encode_ndjson(event)
+
+        except Exception as error:
+            yield _encode_ndjson(
+                {
+                    "type": "error",
+                    "message": str(error),
+                    "status_code": 500,
+                }
+            )
+
+    return StreamingResponse(
+        generate_events(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
+    )
 @router.post("/chat/stream")
 def agent_chat_stream(request: AgentChatRequest):
     """Stream agent lifecycle events as newline-delimited JSON.
