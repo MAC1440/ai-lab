@@ -40,38 +40,6 @@ def list_agents():
     }
 
 
-@router.post("/chat")
-def agent_chat(request: AgentChatRequest):
-    """Existing non-streaming endpoint.
-
-    It now consumes the same AgentRunner event loop used by /chat/stream.
-    """
-
-    try:
-        return agent_runner.run(
-            agent_id=request.agent_id,
-            prompt=request.prompt,
-            history=_serialize_history(request.history),
-            rag_top_k=request.rag_top_k,
-            rag_distance_threshold=request.rag_distance_threshold,
-        )
-    except PermissionError as error:
-        raise HTTPException(
-            status_code=403,
-            detail=str(error),
-        ) from error
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
-    except RuntimeError as error:
-        raise HTTPException(
-            status_code=502,
-            detail=str(error),
-        ) from error
-
-
 @router.post("/chat/stream")
 def agent_chat_stream(request: AgentChatRequest):
     """Stream agent lifecycle events as newline-delimited JSON.
