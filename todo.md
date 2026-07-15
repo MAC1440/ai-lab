@@ -3,4 +3,4 @@
 - [x] Add retrieval filtering by distance threshold
 - [x] Improve prompt engineering for grounded answers and fallback behavior
 - [x] Add streaming support for /documents/ask
-- [ ] Optionally update frontend to consume streamed RAG responses more cleanly
+- [x] Optionally update frontend to consume streamed RAG responses more cleanly

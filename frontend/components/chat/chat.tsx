@@ -104,7 +104,7 @@ export function Chat() {
     }));
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/chat/stream", {
+      const response = await fetch("http://127.0.0.1:8000/agent/chat/pydantic/stream", {
         // const response = await fetch("/api/ollama/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

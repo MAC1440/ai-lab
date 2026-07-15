@@ -28,7 +28,7 @@ class AgentRunner:
         agent_service: Optional[AgentService] = None,
         tool_executor: Optional[ToolExecutor] = None,
         rag_service: Optional[RAGService] = None,
-        max_steps: int = 6,
+        max_steps: int = 8,
         max_rag_context_chars: int = 8000,
     ):
         if max_steps < 1:
