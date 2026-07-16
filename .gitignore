@@ -5,6 +5,7 @@ backend/**/*.py[cod]
 backend/.pytest_cache/
 backend/.env
 backend/chroma_db/
+backend/data/
 
 # Node / Next.js
 frontend/node_modules/
