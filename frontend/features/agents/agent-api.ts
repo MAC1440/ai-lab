@@ -195,7 +195,7 @@ export async function* streamAgentChat(
     request: AgentChatRequest,
     signal?: AbortSignal,
 ): AsyncGenerator<AgentStreamEvent, void, void> {
-    const response = await fetch(`${API_BASE_URL}/agent/chat/stream`, {
+    const response = await fetch(`${API_BASE_URL}/agent/chat/pydantic/stream`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

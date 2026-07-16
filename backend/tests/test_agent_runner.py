@@ -5,7 +5,7 @@ from services.agent_service import AgentService
 from services.ollama_client import OllamaClient
 from services.rag import RAGService
 from services.tool_executor import ToolExecutor
-from services.tool_registry import get_tool_schemas
+from services.tool_registry import GetToolSchemas
 
 Message = Dict[str, Any]
 RAGResults = Dict[str, Any]
@@ -72,7 +72,7 @@ class AgentRunner:
         allowed_tool_names = (
             self.agent_service.get_allowed_tool_names(agent_id)
         )
-        tool_schemas = get_tool_schemas(allowed_tool_names)
+        tool_schemas = GetToolSchemas(allowed_tool_names)
 
         rag_trace, rag_context = self._retrieve_rag_context(
             agent=agent,

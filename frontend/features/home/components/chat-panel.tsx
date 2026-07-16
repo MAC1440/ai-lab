@@ -560,7 +560,7 @@ export function ChatPanel() {
                                     <DialogTitle>Agent retrieval settings</DialogTitle>
                                     <DialogDescription>
                                         These values map directly to the supported
-                                        <code className="mx-1">/agent/chat/stream</code>
+                                        <code className="mx-1">/agent/chat/pydantic/stream                                </code>
                                         request fields. Agents with RAG disabled safely ignore
                                         them.
                                     </DialogDescription>
