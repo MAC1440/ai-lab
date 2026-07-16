@@ -6,7 +6,7 @@ import {
   Loader2Icon,
   XIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -35,16 +35,11 @@ function statusClasses(status: ChangeProposal["status"]) {
 }
 
 export function ChangeApprovalPanel({
-  proposal: initialProposal,
+  proposal,
   onResolved,
 }: ChangeApprovalPanelProps) {
-  const [proposal, setProposal] = useState(initialProposal);
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setProposal(initialProposal);
-  }, [initialProposal]);
 
   async function resolve(nextAction: "approve" | "reject") {
     if (proposal.status !== "pending" || action) {
@@ -60,7 +55,6 @@ export function ChangeApprovalPanel({
           ? await approveChangeProposal(proposal.proposal_id)
           : await rejectChangeProposal(proposal.proposal_id);
 
-      setProposal(result);
       onResolved?.(result);
     } catch (requestError) {
       setError(

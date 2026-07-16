@@ -16,6 +16,8 @@ export function ToggleGroup({
   return (
     <ToggleGroupPrimitive.Root
       data-slot="toggle-group"
+      data-variant={variant}
+      data-size={size}
       className={cn("flex items-center gap-1", className)}
       {...props}
     >

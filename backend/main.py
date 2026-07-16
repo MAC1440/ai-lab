@@ -8,8 +8,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes.agents import router as agents_router
-from routes.workspaces import router as workspaces_router
 from routes.changes import router as changes_router
+from routes.verifications import router as verifications_router
+from routes.workspaces import router as workspaces_router
 
 def create_app() -> FastAPI:
 
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(agents_router)
     app.include_router(workspaces_router)
     app.include_router(changes_router)
+    app.include_router(verifications_router)
 
     return app
 

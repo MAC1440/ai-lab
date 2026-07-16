@@ -39,6 +39,11 @@ import {
 import { ChatInput } from "@/features/home/components/chat-input";
 import { ChatMessageBubble } from "@/features/home/components/chat-message-bubble";
 import type { HomeChatMessage } from "@/features/home/types";
+import {
+    VERIFICATION_FIX_REQUEST_EVENT,
+    type VerificationFixRequestDetail,
+    VerificationDialog,
+} from "@/features/verification";
 import { WorkspacePicker } from "@/features/workspaces";
 import { getActiveWorkspace } from "@/features/workspaces/workspace-api";
 
@@ -293,6 +298,36 @@ export function ChatPanel() {
         void loadAgents();
     }, []);
 
+    useEffect(() => {
+        function handleVerificationFixRequest(event: Event) {
+            const customEvent = event as CustomEvent<VerificationFixRequestDetail>;
+            const prompt = customEvent.detail?.prompt;
+
+            if (!prompt) {
+                return;
+            }
+
+            setInput(prompt);
+            setError(null);
+
+            if (agents.some((agent) => agent.id === "coding")) {
+                setSelectedAgentId("coding");
+            }
+        }
+
+        window.addEventListener(
+            VERIFICATION_FIX_REQUEST_EVENT,
+            handleVerificationFixRequest,
+        );
+
+        return () => {
+            window.removeEventListener(
+                VERIFICATION_FIX_REQUEST_EVENT,
+                handleVerificationFixRequest,
+            );
+        };
+    }, [agents]);
+
     async function handleSend() {
         const content = input.trim();
 
@@ -480,6 +515,10 @@ export function ChatPanel() {
                                     />
                                 </DialogContent>
                             </Dialog>
+
+                            <VerificationDialog
+                                disabled={!activeWorkspace || isSending}
+                            />
 
                             {agentsLoading ? (
                                 <div className="flex items-center gap-2 px-2 text-xs text-zinc-500">

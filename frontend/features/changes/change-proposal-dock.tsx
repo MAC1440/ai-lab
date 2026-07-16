@@ -1,6 +1,11 @@
 "use client";
 
-import { FileDiffIcon, Loader2Icon } from "lucide-react";
+import {
+  CheckCircle2Icon,
+  FileDiffIcon,
+  Loader2Icon,
+  XIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +14,7 @@ import {
   listChangeProposals,
 } from "@/features/changes/change-api";
 import { ChangeApprovalPanel } from "@/features/changes/change-approval-panel";
+import { VerificationDialog } from "@/features/verification";
 
 const POLL_INTERVAL_MS = 1500;
 
@@ -17,6 +23,7 @@ export function ChangeProposalDock() {
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastApproved, setLastApproved] = useState<ChangeProposal | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -35,13 +42,18 @@ export function ChangeProposalDock() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    const initialLoadId = window.setTimeout(() => {
+      void refresh();
+    }, 0);
 
     const intervalId = window.setInterval(() => {
       void refresh();
     }, POLL_INTERVAL_MS);
 
-    return () => window.clearInterval(intervalId);
+    return () => {
+      window.clearTimeout(initialLoadId);
+      window.clearInterval(intervalId);
+    };
   }, [refresh]);
 
   function handleResolved(resolvedProposal: ChangeProposal) {
@@ -54,9 +66,14 @@ export function ChangeProposalDock() {
         (proposal) => proposal.proposal_id !== resolvedProposal.proposal_id,
       ),
     );
+
+    if (resolvedProposal.status === "approved") {
+      setLastApproved(resolvedProposal);
+      setCollapsed(false);
+    }
   }
 
-  if (!loading && proposals.length === 0 && !error) {
+  if (!loading && proposals.length === 0 && !error && !lastApproved) {
     return null;
   }
 
@@ -67,12 +84,15 @@ export function ChangeProposalDock() {
           <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-zinc-100">
             {loading ? (
               <Loader2Icon className="size-4 shrink-0 animate-spin" />
+            ) : lastApproved && proposals.length === 0 ? (
+              <CheckCircle2Icon className="size-4 shrink-0 text-emerald-400" />
             ) : (
               <FileDiffIcon className="size-4 shrink-0 text-sky-400" />
             )}
             <span className="truncate">
-              Pending file changes
-              {proposals.length > 0 ? ` (${proposals.length})` : ""}
+              {proposals.length > 0
+                ? `Pending file changes (${proposals.length})`
+                : "File change approved"}
             </span>
           </div>
 
@@ -91,6 +111,38 @@ export function ChangeProposalDock() {
             {error ? (
               <div className="rounded-lg border border-red-900/70 bg-red-950/40 px-3 py-2 text-xs text-red-300">
                 Could not load the change approval queue: {error}
+              </div>
+            ) : null}
+
+            {lastApproved ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-900/70 bg-emerald-950/35 px-3 py-3">
+                <CheckCircle2Icon className="size-5 shrink-0 text-emerald-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-emerald-200">
+                    Change written successfully
+                  </p>
+                  <p
+                    className="truncate text-xs text-emerald-300/70"
+                    title={lastApproved.file_path}
+                  >
+                    {lastApproved.file_path}
+                  </p>
+                </div>
+
+                <VerificationDialog
+                  relatedProposalId={lastApproved.proposal_id}
+                  triggerLabel="Run checks"
+                />
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Dismiss approved change message"
+                  onClick={() => setLastApproved(null)}
+                >
+                  <XIcon className="size-4" />
+                </Button>
               </div>
             ) : null}
 
