@@ -30,7 +30,7 @@ Supported project markers and checks:
 
 | Project | Markers | Checks |
 | --- | --- | --- |
-| Python | `requirements.txt`, `pyproject.toml`, `pytest.ini`, and related files | `python -m pytest -q`, optional Ruff |
+| Python | `requirements.txt`, `pyproject.toml`, `pytest.ini`, and related files | `python -m pytest -q --tb=short`, optional Ruff |
 | Node.js | `package.json` | Declared `test`, `lint`, `typecheck`, and `build` scripts |
 | .NET | `.sln` or `.csproj` | `dotnet test --nologo` |
 | Unity | `Assets` and `ProjectSettings/ProjectVersion.txt` | Optional Unity batch-mode compile check |
@@ -85,6 +85,28 @@ POST /verifications/runs/{run_id}/cancel
 ```
 
 History is filtered to the active workspace.
+
+## Agent repair contract
+
+**Ask agent to fix** is available only for a completed check whose command
+exited with a failure. Runner errors, cancellations, and timeouts need an
+environment or command investigation rather than an automatic code proposal.
+
+The frontend loads the complete persisted output for the selected run, keeps a
+bounded beginning-and-end excerpt for model context, switches to the coding
+agent, and starts the request without unrelated chat history. It sends
+`tool_policy: "propose"` to:
+
+```http
+POST /agent/chat/pydantic/stream
+```
+
+The backend enforces that contract with per-run state and a Pydantic AI output
+validator. A repair run must read a target file and successfully call
+`propose_file_change`; a text-only answer is rejected and retried within the
+configured model request limit. The proposal remains review-only. The user must
+still approve it and run verification again before the issue can be considered
+fixed.
 
 ## Persistence
 

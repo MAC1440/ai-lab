@@ -8,17 +8,23 @@ from pydantic_ai import (
     PartDeltaEvent,
     PartStartEvent,
     TextPartDelta,
+    UsageLimits,
 )
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    RetryPromptPart,
     TextPart,
     UserPromptPart,
 )
 
 from services.agent_service import AgentService
-from services.pydantic_agent import get_pydantic_agent
+from services.pydantic_agent import (
+    AgentRunDeps,
+    ToolPolicy,
+    get_pydantic_agent,
+)
 from services.rag import RAGService
 
 
@@ -32,10 +38,15 @@ class PydanticAgentRunner:
         agent_service: Optional[AgentService] = None,
         rag_service: Optional[RAGService] = None,
         max_rag_context_chars: int = 8000,
+        max_model_requests: int = 10,
     ) -> None:
+        if max_model_requests < 2:
+            raise ValueError("max_model_requests must be at least 2")
+
         self.agent_service = agent_service or AgentService()
         self.rag_service = rag_service
         self.max_rag_context_chars = max_rag_context_chars
+        self.max_model_requests = max_model_requests
 
     async def run_events(
         self,
@@ -45,6 +56,7 @@ class PydanticAgentRunner:
         history: Optional[List[Message]] = None,
         rag_top_k: int = 3,
         rag_distance_threshold: Optional[float] = 1.0,
+        tool_policy: ToolPolicy = "auto",
     ) -> AsyncIterator[AgentEvent]:
         clean_prompt = prompt.strip()
 
@@ -52,6 +64,30 @@ class PydanticAgentRunner:
             raise ValueError("Prompt cannot be empty")
 
         config = self.agent_service.get_agent(agent_id)
+        allowed_tool_names = self.agent_service.get_allowed_tool_names(
+            agent_id
+        )
+
+        if (
+            tool_policy == "propose"
+            and "propose_file_change" not in allowed_tool_names
+        ):
+            raise ValueError(
+                "Enforced repair mode requires an agent with the "
+                "propose_file_change tool"
+            )
+        if (
+            tool_policy == "inspect"
+            and not {
+                "read_file",
+                "read_file_range",
+            }.intersection(allowed_tool_names)
+        ):
+            raise ValueError(
+                "Enforced inspection mode requires an agent with a "
+                "file-reading tool"
+            )
+
         agent = get_pydantic_agent(agent_id)
 
         yield {
@@ -92,6 +128,16 @@ class PydanticAgentRunner:
         }
 
         message_history = self._convert_history(history)
+        run_deps = AgentRunDeps(tool_policy=tool_policy)
+        policy_instructions = self._build_tool_policy_instructions(
+            tool_policy
+        )
+        run_instructions = "\n\n".join(
+            instruction
+            for instruction in (rag_instructions, policy_instructions)
+            if instruction
+        )
+        stream_answer_text = tool_policy == "auto"
 
         answer = ""
         tools_used: List[Dict[str, Any]] = []
@@ -101,7 +147,12 @@ class PydanticAgentRunner:
         async with agent.run_stream_events(
             clean_prompt,
             message_history=message_history,
-            instructions=rag_instructions or None,
+            instructions=run_instructions or None,
+            deps=run_deps,
+            usage_limits=UsageLimits(
+                request_limit=self.max_model_requests,
+                tool_calls_limit=self.max_model_requests * 2,
+            ),
         ) as events:
             async for event in events:
                 if isinstance(event, PartStartEvent):
@@ -111,11 +162,12 @@ class PydanticAgentRunner:
                         if content:
                             answer += content
 
-                            yield {
-                                "type": "answer_delta",
-                                "content": content,
-                                "step": 1,
-                            }
+                            if stream_answer_text:
+                                yield {
+                                    "type": "answer_delta",
+                                    "content": content,
+                                    "step": 1,
+                                }
 
                 elif isinstance(event, PartDeltaEvent):
                     if isinstance(event.delta, TextPartDelta):
@@ -124,21 +176,23 @@ class PydanticAgentRunner:
                         if content:
                             answer += content
 
-                            yield {
-                                "type": "answer_delta",
-                                "content": content,
-                                "step": 1,
-                            }
+                            if stream_answer_text:
+                                yield {
+                                    "type": "answer_delta",
+                                    "content": content,
+                                    "step": 1,
+                                }
 
                 elif isinstance(event, FunctionToolCallEvent):
                     # Text produced before a tool call is provisional.
                     if answer:
                         answer = ""
 
-                        yield {
-                            "type": "answer_reset",
-                            "step": 1,
-                        }
+                        if stream_answer_text:
+                            yield {
+                                "type": "answer_reset",
+                                "step": 1,
+                            }
 
                     call_id = (
                         event.part.tool_call_id
@@ -179,7 +233,10 @@ class PydanticAgentRunner:
 
                     result_content = event.part.content
 
-                    if (
+                    if isinstance(event.part, RetryPromptPart):
+                        tool_record["status"] = "error"
+                        tool_record["error"] = str(result_content)
+                    elif (
                         isinstance(result_content, dict)
                         and "error" in result_content
                     ):
@@ -234,6 +291,30 @@ class PydanticAgentRunner:
                 "rag": rag_trace,
             },
         }
+
+    @staticmethod
+    def _build_tool_policy_instructions(tool_policy: ToolPolicy) -> str:
+        if tool_policy == "auto":
+            return ""
+
+        if tool_policy == "inspect":
+            return """
+This request is in enforced inspection mode.
+- Inspect at least one relevant workspace file with read_file or
+  read_file_range before answering.
+- If the prompt names an exact path, read that path before searching broadly.
+- Do not invent symbols, files, or behavior that were not inspected.
+            """.strip()
+
+        return """
+This request is in enforced repair mode.
+- Treat the failure output as the primary evidence.
+- Read files explicitly named in the traceback before searching broadly.
+- Diagnose only the reported failure; do not explain unrelated architecture.
+- Call propose_file_change one or more times for the required repair.
+- A text-only solution is not accepted as a completed repair.
+- The proposal is review-only and still requires human approval.
+        """.strip()
 
     def _get_rag_service(self) -> RAGService:
         if self.rag_service is None:

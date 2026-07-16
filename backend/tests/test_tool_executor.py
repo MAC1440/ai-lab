@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import pytest
 
 from services.agent_service import AgentService
@@ -43,15 +45,14 @@ def test_unknown_unpermitted_tool_is_rejected():
 
 
 def test_allowed_but_unavailable_tool_is_rejected():
+    permissive_agent_service = Mock(spec=AgentService)
     executor = ToolExecutor(
-        agent_service=AgentService()
+        agent_service=permissive_agent_service
     )
 
-    # The coding profile still has write_file permission, but
-    # write_file is intentionally not registered as model-callable.
-    #
-    # It passes permission validation and then fails the executor
-    # registry lookup with ValueError.
+    # Isolate the executor registry branch by making permission validation
+    # succeed. The real coding profile deliberately does not permit
+    # write_file; model-authored edits must use propose_file_change.
     with pytest.raises(
         ValueError,
         match="Tool 'write_file' is not available",
@@ -64,3 +65,8 @@ def test_allowed_but_unavailable_tool_is_rejected():
                 "content": "print('hello')",
             },
         )
+
+    permissive_agent_service.ensure_tool_allowed.assert_called_once_with(
+        agent_id="coding",
+        tool_name="write_file",
+    )

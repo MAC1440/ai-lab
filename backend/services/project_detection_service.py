@@ -206,8 +206,14 @@ class ProjectDetectionService:
                     description="Run the Python test suite with pytest.",
                     project_type="python",
                     working_directory=relative,
-                    command=(sys.executable, "-m", "pytest", "-q"),
-                    display_command="python -m pytest -q",
+                    command=(
+                        sys.executable,
+                        "-m",
+                        "pytest",
+                        "-q",
+                        "--tb=short",
+                    ),
+                    display_command="python -m pytest -q --tb=short",
                     timeout_seconds=300,
                     available=pytest_available,
                     unavailable_reason=(

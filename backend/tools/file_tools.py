@@ -241,13 +241,11 @@ def propose_file_change(
             ) from error
 
         if old_text:
-            occurrence_count = current_content.count(old_text)
-            if occurrence_count != 1:
-                raise ValueError(
-                    "old_text must occur exactly once in the current file; "
-                    f"found {occurrence_count} occurrences"
-                )
-            proposed_content = current_content.replace(old_text, new_text, 1)
+            proposed_content = _replace_unique_text(
+                current_content=current_content,
+                old_text=old_text,
+                new_text=new_text,
+            )
         else:
             proposed_content = new_text
 
@@ -257,6 +255,69 @@ def propose_file_change(
         summary=summary,
     )
     return {"proposal": proposal}
+
+
+def _replace_unique_text(
+    *,
+    current_content: str,
+    old_text: str,
+    new_text: str,
+) -> str:
+    """Replace one exact snippet while tolerating Windows line endings.
+
+    Tool arguments are JSON strings, so small models commonly send ``\n``
+    even when the selected Windows file contains ``\r\n``. The match remains
+    strict apart from newline representation: the adapted snippet must still
+    occur exactly once. Replacement text adopts the file's dominant newline
+    style so an accepted proposal does not create mixed line endings.
+    """
+
+    newline = _dominant_newline(current_content)
+    replacement_text = (
+        _convert_newlines(new_text, newline)
+        if newline is not None
+        else new_text
+    )
+
+    occurrence_count = current_content.count(old_text)
+    matched_old_text = old_text
+
+    if occurrence_count == 0 and newline is not None:
+        adapted_old_text = _convert_newlines(old_text, newline)
+        if adapted_old_text != old_text:
+            matched_old_text = adapted_old_text
+            occurrence_count = current_content.count(matched_old_text)
+
+    if occurrence_count != 1:
+        raise ValueError(
+            "old_text must occur exactly once in the current file; "
+            f"found {occurrence_count} occurrences"
+        )
+
+    return current_content.replace(
+        matched_old_text,
+        replacement_text,
+        1,
+    )
+
+
+def _dominant_newline(content: str) -> str | None:
+    crlf_count = content.count("\r\n")
+    lf_count = content.count("\n") - crlf_count
+    cr_count = content.count("\r") - crlf_count
+
+    counts = (
+        (crlf_count, "\r\n"),
+        (lf_count, "\n"),
+        (cr_count, "\r"),
+    )
+    count, newline = max(counts, key=lambda item: item[0])
+    return newline if count > 0 else None
+
+
+def _convert_newlines(text: str, newline: str) -> str:
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    return normalized.replace("\n", newline)
 
 
 def write_file(

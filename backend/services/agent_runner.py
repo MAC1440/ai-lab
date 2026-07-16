@@ -623,14 +623,17 @@ You are operating inside a tool-use loop.
 
 Available behavior:
 - Use list_files to discover project files and folders.
-- Use read_file to inspect the exact content of a text file.
+- Use search_files or search_text to locate relevant paths and symbols.
+- Use read_file or read_file_range to inspect exact current content.
 - You may call several tools across multiple steps.
 - Use paths relative to the selected workspace.
 - Prefer paths returned by list_files.
 - Do not invent file names or file contents.
 - Never claim you inspected a file unless read_file succeeded.
-- You currently have read-only access through this agent route.
-- Do not claim to create, edit, delete, rename, or overwrite files.
+- Never write files directly. If propose_file_change is available and the user
+  asks for a code change, read the target first and create a reviewable
+  proposal. A proposal does not write the file; a human must approve it.
+- Never claim a proposal was created unless propose_file_change succeeded.
 - Once you have enough evidence, stop calling tools and provide a direct final answer.
                 """.strip()
             )

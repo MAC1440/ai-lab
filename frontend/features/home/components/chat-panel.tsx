@@ -33,6 +33,7 @@ import {
     type AgentChatResponse,
     type AgentProfile,
     type AgentStreamEvent,
+    type AgentToolPolicy,
     getAgents,
     streamAgentChat,
 } from "@/features/agents/agent-api";
@@ -231,6 +232,8 @@ export function ChatPanel() {
         useState<AgentChatSettings>(defaultAgentSettings);
 
     const bottomRef = useRef<HTMLDivElement>(null);
+    const nextToolPolicyRef = useRef<AgentToolPolicy>("auto");
+    const freshHistoryForNextRequestRef = useRef(false);
 
     const selectedAgent = useMemo(
         () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
@@ -309,6 +312,9 @@ export function ChatPanel() {
 
             setInput(prompt);
             setError(null);
+            nextToolPolicyRef.current = customEvent.detail.toolPolicy;
+            freshHistoryForNextRequestRef.current =
+                customEvent.detail.freshContext;
 
             if (agents.some((agent) => agent.id === "coding")) {
                 setSelectedAgentId("coding");
@@ -365,8 +371,14 @@ export function ChatPanel() {
             ),
         };
 
-        const history = buildHistory(messages);
+        const history = freshHistoryForNextRequestRef.current
+            ? []
+            : buildHistory(messages);
+        const toolPolicy = nextToolPolicyRef.current;
         const pendingMessages = [...messages, userMessage];
+
+        nextToolPolicyRef.current = "auto";
+        freshHistoryForNextRequestRef.current = false;
 
         setMessages([...pendingMessages, assistantPlaceholder]);
         setInput("");
@@ -394,6 +406,7 @@ export function ChatPanel() {
                 history: history.length > 0 ? history : null,
                 rag_top_k: settings.ragTopK,
                 rag_distance_threshold: distanceThreshold,
+                tool_policy: toolPolicy,
             })) {
                 if (event.type === "error") {
                     updateAssistantMessage((message) =>
@@ -436,6 +449,8 @@ export function ChatPanel() {
     function handleClear() {
         setMessages([]);
         setError(null);
+        nextToolPolicyRef.current = "auto";
+        freshHistoryForNextRequestRef.current = false;
     }
 
     const inputDisabled =
@@ -510,6 +525,8 @@ export function ChatPanel() {
                                             setActiveWorkspace(workspace);
                                             setMessages([]);
                                             setError(null);
+                                            nextToolPolicyRef.current = "auto";
+                                            freshHistoryForNextRequestRef.current = false;
                                             setWorkspaceDialogOpen(false);
                                         }}
                                     />
@@ -532,6 +549,8 @@ export function ChatPanel() {
                                         setSelectedAgentId(agentId);
                                         setMessages([]);
                                         setError(null);
+                                        nextToolPolicyRef.current = "auto";
+                                        freshHistoryForNextRequestRef.current = false;
                                     }}
                                 >
                                     <SelectTrigger className="w-[180px]">
@@ -560,7 +579,9 @@ export function ChatPanel() {
                                     <DialogTitle>Agent retrieval settings</DialogTitle>
                                     <DialogDescription>
                                         These values map directly to the supported
-                                        <code className="mx-1">/agent/chat/pydantic/stream                                </code>
+                                        <code className="mx-1">
+                                            /agent/chat/pydantic/stream
+                                        </code>
                                         request fields. Agents with RAG disabled safely ignore
                                         them.
                                     </DialogDescription>

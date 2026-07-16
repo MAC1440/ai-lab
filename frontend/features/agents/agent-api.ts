@@ -17,6 +17,8 @@ export type AgentChatHistoryMessage = {
     content: string;
 };
 
+export type AgentToolPolicy = "auto" | "inspect" | "propose";
+
 export type AgentToolExecution = {
     id?: string;
     name: string;
@@ -47,6 +49,7 @@ export type AgentChatRequest = {
     history?: AgentChatHistoryMessage[] | null;
     rag_top_k?: number;
     rag_distance_threshold?: number | null;
+    tool_policy?: AgentToolPolicy;
 };
 
 export type AgentChatResponse = {
@@ -177,33 +180,22 @@ export async function getAgents(): Promise<AgentProfile[]> {
     return data.agents;
 }
 
-export async function sendAgentChat(
-    request: AgentChatRequest,
-): Promise<AgentChatResponse> {
-    const response = await fetch(`${API_BASE_URL}/agent/chat`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(request),
-    });
-
-    return parseResponse<AgentChatResponse>(response);
-}
-
 export async function* streamAgentChat(
     request: AgentChatRequest,
     signal?: AbortSignal,
 ): AsyncGenerator<AgentStreamEvent, void, void> {
-    const response = await fetch(`${API_BASE_URL}/agent/chat/pydantic/stream`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Accept: "application/x-ndjson",
+    const response = await fetch(
+        `${API_BASE_URL}/agent/chat/pydantic/stream`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/x-ndjson",
+            },
+            body: JSON.stringify(request),
+            signal,
         },
-        body: JSON.stringify(request),
-        signal,
-    });
+    );
 
     if (!response.ok) {
         throw new Error(await getErrorMessage(response));

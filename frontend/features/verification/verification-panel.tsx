@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import {
   cancelVerificationRun,
   getVerificationOverview,
+  getVerificationRun,
   listVerificationRuns,
   streamVerificationRun,
 } from "@/features/verification/verification-api";
@@ -70,7 +71,17 @@ function formatDuration(durationMs: number | null): string {
 }
 
 function canRequestFix(run: VerificationRun): boolean {
-  return ["failed", "error", "timed_out"].includes(run.status);
+  return run.status === "failed";
+}
+
+function verificationOutput(run: VerificationRun): string {
+  const output = (run.output ?? run.output_excerpt).trim();
+  const sections = [
+    output || null,
+    run.error ? `Verification runner error:\n${run.error}` : null,
+  ].filter((section): section is string => Boolean(section));
+
+  return sections.join("\n\n") || "No command output was captured.";
 }
 
 export function VerificationPanel({
@@ -89,6 +100,7 @@ export function VerificationPanel({
   const [liveOutput, setLiveOutput] = useState("");
   const [liveStatus, setLiveStatus] = useState("Ready");
   const [selectedRun, setSelectedRun] = useState<VerificationRun | null>(null);
+  const [fixRequestRunId, setFixRequestRunId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const outputRef = useRef<HTMLPreElement>(null);
 
@@ -236,9 +248,30 @@ export function VerificationPanel({
     }
   }
 
-  function handleRequestFix(run: VerificationRun) {
-    requestAgentFix(run);
-    onRequestAgentFix?.();
+  async function handleRequestFix(run: VerificationRun) {
+    if (!canRequestFix(run) || fixRequestRunId) {
+      return;
+    }
+
+    setFixRequestRunId(run.run_id);
+    setError(null);
+
+    try {
+      const completeRun = run.output === undefined
+        ? await getVerificationRun(run.run_id)
+        : run;
+
+      requestAgentFix(completeRun);
+      onRequestAgentFix?.();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "The complete verification output could not be loaded.",
+      );
+    } finally {
+      setFixRequestRunId(null);
+    }
   }
 
   if (loading && !overview) {
@@ -401,7 +434,10 @@ export function VerificationPanel({
             ref={outputRef}
             className="h-72 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-xs leading-5 text-zinc-300"
           >
-            {liveOutput || selectedRun?.output_excerpt || "Command output will appear here."}
+            {liveOutput ||
+              (selectedRun
+                ? verificationOutput(selectedRun)
+                : "Command output will appear here.")}
           </pre>
 
           {selectedRun ? (
@@ -419,10 +455,17 @@ export function VerificationPanel({
                   size="sm"
                   variant="outline"
                   className="ml-auto"
-                  onClick={() => handleRequestFix(selectedRun)}
+                  disabled={fixRequestRunId !== null}
+                  onClick={() => void handleRequestFix(selectedRun)}
                 >
-                  <WrenchIcon className="size-4" />
-                  Ask agent to fix
+                  {fixRequestRunId === selectedRun.run_id ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <WrenchIcon className="size-4" />
+                  )}
+                  {fixRequestRunId === selectedRun.run_id
+                    ? "Loading output"
+                    : "Ask agent to fix"}
                 </Button>
               ) : null}
             </footer>

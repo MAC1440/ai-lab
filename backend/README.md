@@ -1,10 +1,11 @@
 # AI Lab Backend
 
 This backend provides a small FastAPI service for:
-- chat completions via Ollama
-- streamed chat responses
-- embeddings
-- simple RAG-style context retrieval
+
+- Pydantic AI and legacy agent streams through Ollama
+- coding, Unity, and general agent profiles
+- workspace-confined file inspection and search
+- ChromaDB-backed RAG for enabled agents
 - reviewable workspace file changes
 - safe streamed workspace verification with persistent run history
 
@@ -31,41 +32,51 @@ Copy [.env.example](.env.example) to [.env](.env) and adjust as needed.
 
 ```env
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=granite4.1:3b and qwen2.5-coder:3b
+PYDANTIC_AI_OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_MODEL=granite4.1:3b
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 HOST=0.0.0.0
 PORT=8000
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 VERIFICATION_DB_PATH=data/verification.sqlite3
 VERIFICATION_MAX_OUTPUT_CHARS=200000
 ```
+
+The current agent profile model names live in
+[`services/agent_service.py`](services/agent_service.py). `OLLAMA_MODEL` is the
+fallback for direct `OllamaClient` use; it does not override those profiles.
 
 Set `UNITY_EDITOR_PATH` to the full Unity executable path to enable optional
 Unity batch-mode checks.
 
 ## Example endpoints
 
-### Chat
+### List agents
 
 ```bash
-curl -X POST http://127.0.0.1:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"prompt":"Explain RAG","use_rag":true,"documents":["RAG retrieves relevant context before answering."]}'
+curl http://127.0.0.1:8000/agent/list
 ```
 
-### Stream chat
+### Stream a Pydantic AI agent
 
 ```bash
-curl -N -X POST http://127.0.0.1:8000/chat/stream \
+curl -N -X POST http://127.0.0.1:8000/agent/chat/pydantic/stream \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"Write a short summary"}'
+  -H "Accept: application/x-ndjson" \
+  -d '{"agent_id":"coding","prompt":"List the workspace root","tool_policy":"inspect"}'
 ```
 
-### Embed
+`tool_policy` may be `auto`, `inspect`, or `propose`. Use `propose` only with
+the coding agent. It requires a successful file read and reviewable file-change
+proposal before the run can complete. The legacy endpoint remains available at
+`/agent/chat/stream`, but it does not accept enforced tool policies.
+
+### Select a workspace
 
 ```bash
-curl -X POST http://127.0.0.1:8000/embed \
+curl -X POST http://127.0.0.1:8000/workspaces/select \
   -H "Content-Type: application/json" \
-  -d '{"text":"Hello world"}'
+  -d '{"path":"D:\\Projects\\example"}'
 ```
 
 ### Workspace verification

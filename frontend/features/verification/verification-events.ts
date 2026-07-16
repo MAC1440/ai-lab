@@ -1,33 +1,61 @@
 import type { VerificationRun } from "./verification-types";
 
-
 export const VERIFICATION_FIX_REQUEST_EVENT =
   "ai-lab:verification-fix-request";
 
 export type VerificationFixRequestDetail = {
   prompt: string;
+  toolPolicy: "propose";
+  freshContext: true;
 };
 
+const MAX_FIX_OUTPUT_CHARS = 12_000;
+
+function compactVerificationOutput(run: VerificationRun): string {
+  const rawOutput = (run.output ?? run.output_excerpt).trim();
+  const output = rawOutput || "No command output was captured.";
+
+  if (output.length <= MAX_FIX_OUTPUT_CHARS) {
+    return output;
+  }
+
+  const sectionLength = Math.floor(MAX_FIX_OUTPUT_CHARS / 2);
+  return [
+    output.slice(0, sectionLength),
+    "\n... verification output shortened for model context ...\n",
+    output.slice(-sectionLength),
+  ].join("");
+}
+
 export function buildVerificationFixPrompt(run: VerificationRun): string {
-  const output = run.output_excerpt.trim() || "No command output was captured.";
+  const output = compactVerificationOutput(run);
+  const errorLine = run.error ? `Runner error: ${run.error}` : null;
 
   return [
-    `The workspace verification check \"${run.profile_name}\" failed.`,
+    "Repair the failing workspace verification check below.",
+    `Check: ${run.profile_name}`,
     `Command: ${run.display_command}`,
     `Exit code: ${run.exit_code ?? "unknown"}`,
-    "Inspect the relevant files, identify the cause, and propose a reviewable file change.",
-    "Do not claim the issue is fixed until you have used the file-change tool.",
+    errorLine,
+    "Read the exact files named in the traceback before searching broadly.",
+    "Identify only the reported cause and call propose_file_change for each required fix.",
+    "A chat-only explanation is not a completed repair. Do not discuss unrelated architecture.",
+    "Do not claim the issue is fixed; the proposal still requires approval and another verification run.",
     "",
     "Verification output:",
     "```text",
     output,
     "```",
-  ].join("\n");
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }
 
 export function requestAgentFix(run: VerificationRun): void {
   const detail: VerificationFixRequestDetail = {
     prompt: buildVerificationFixPrompt(run),
+    toolPolicy: "propose",
+    freshContext: true,
   };
   window.dispatchEvent(
     new CustomEvent<VerificationFixRequestDetail>(

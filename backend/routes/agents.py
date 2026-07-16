@@ -7,8 +7,9 @@ from pydantic import BaseModel, Field
 
 from services.agent_runner import AgentRunner
 from services.agent_service import AgentService
-from services.pydantic_agent import get_pydantic_agent
 from services.pydantic_runner import PydanticAgentRunner
+
+
 router = APIRouter(
     prefix="/agent",
     tags=["Agent"],
@@ -20,6 +21,8 @@ agent_runner = AgentRunner(agent_service=agent_service)
 pydantic_runner = PydanticAgentRunner(
     agent_service=agent_service
 )
+
+
 class HistoryMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1)
@@ -34,6 +37,7 @@ class AgentChatRequest(BaseModel):
         default=1.0,
         ge=0.0,
     )
+    tool_policy: Literal["auto", "inspect", "propose"] = "auto"
 
 
 @router.get("/list")
@@ -41,6 +45,7 @@ def list_agents():
     return {
         "agents": agent_service.list_agents(),
     }
+
 
 @router.post("/chat/pydantic/stream")
 async def pydantic_agent_chat_stream(
@@ -56,9 +61,34 @@ async def pydantic_agent_chat_stream(
                 history=history,
                 rag_top_k=request.rag_top_k,
                 rag_distance_threshold=request.rag_distance_threshold,
+                tool_policy=request.tool_policy,
             ):
                 yield _encode_ndjson(event)
 
+        except PermissionError as error:
+            yield _encode_ndjson(
+                {
+                    "type": "error",
+                    "message": str(error),
+                    "status_code": 403,
+                }
+            )
+        except ValueError as error:
+            yield _encode_ndjson(
+                {
+                    "type": "error",
+                    "message": str(error),
+                    "status_code": 400,
+                }
+            )
+        except RuntimeError as error:
+            yield _encode_ndjson(
+                {
+                    "type": "error",
+                    "message": str(error),
+                    "status_code": 502,
+                }
+            )
         except Exception as error:
             yield _encode_ndjson(
                 {
@@ -76,6 +106,8 @@ async def pydantic_agent_chat_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
+
 @router.post("/chat/stream")
 def agent_chat_stream(request: AgentChatRequest):
     """Stream agent lifecycle events as newline-delimited JSON.
@@ -84,6 +116,15 @@ def agent_chat_stream(request: AgentChatRequest):
     failures happen after the response headers are sent, so they are returned
     as a final ``error`` event rather than as a new HTTP status code.
     """
+
+    if request.tool_policy != "auto":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "tool_policy is enforced only by "
+                "/agent/chat/pydantic/stream"
+            ),
+        )
 
     history = _serialize_history(request.history)
 

@@ -47,7 +47,7 @@ class ProjectDetectionServiceTests(unittest.TestCase):
             for profile in result["profiles"]
             if profile["project_type"] == "python"
         }
-        self.assertIn("python -m pytest -q", commands)
+        self.assertIn("python -m pytest -q --tb=short", commands)
         self.assertIn("python -m ruff check .", commands)
 
     def test_detects_only_declared_node_scripts(self):

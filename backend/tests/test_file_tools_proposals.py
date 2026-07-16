@@ -79,6 +79,31 @@ class FileProposalToolTests(unittest.TestCase):
                 new_text="changed",
             )
 
+    def test_lf_tool_text_matches_crlf_file_without_mixing_newlines(self):
+        target = self.root / "windows.py"
+        target.write_bytes(b"def answer():\r\n    return 41\r\n")
+
+        result = file_tools.propose_file_change(
+            file_path="windows.py",
+            old_text="    return 41\n",
+            new_text="    return 42\n",
+            summary="Correct the answer",
+        )
+
+        proposal = result["proposal"]
+        self.assertIn("-    return 41", proposal["diff"])
+        self.assertIn("+    return 42", proposal["diff"])
+        self.assertEqual(
+            target.read_bytes(),
+            b"def answer():\r\n    return 41\r\n",
+        )
+
+        self.change_service.approve(proposal["proposal_id"])
+        self.assertEqual(
+            target.read_bytes(),
+            b"def answer():\r\n    return 42\r\n",
+        )
+
     def test_empty_old_text_creates_new_file_proposal(self):
         result = file_tools.propose_file_change(
             file_path="new.txt",

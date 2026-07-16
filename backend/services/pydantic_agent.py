@@ -1,7 +1,8 @@
+from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Literal
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, ModelRetry, RunContext
 
 from services.agent_service import AgentService
 from services.pydantic_model import get_ollama_model
@@ -15,8 +16,16 @@ from tools.file_tools import (
 )
 
 ToolFunction = Callable[..., Any]
+ToolPolicy = Literal["auto", "inspect", "propose"]
 
 
+@dataclass
+class AgentRunDeps:
+    """Mutable state that belongs to one Pydantic AI run."""
+
+    tool_policy: ToolPolicy = "auto"
+    inspected_paths: set[str] = field(default_factory=set)
+    proposed_paths: set[str] = field(default_factory=set)
 
 EXPECTED_TOOL_ERRORS = (
     FileNotFoundError,
@@ -37,8 +46,23 @@ def _tool_error(error: Exception) -> Dict[str, str]:
     }
 
 
-def list_files(folder: str = ".") -> Any:
+def _normalized_path(path: str) -> str:
+    normalized = path.strip().replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def _run_deps(ctx: RunContext[AgentRunDeps]) -> AgentRunDeps | None:
+    return ctx.deps if isinstance(ctx.deps, AgentRunDeps) else None
+
+
+def list_files(
+    ctx: RunContext[AgentRunDeps],
+    folder: str = ".",
+) -> Any:
     """List files and folders in a workspace directory."""
+    del ctx
     try:
         return _list_files(folder or ".")
     except EXPECTED_TOOL_ERRORS as error:
@@ -46,11 +70,13 @@ def list_files(folder: str = ".") -> Any:
 
 
 def search_files(
+    ctx: RunContext[AgentRunDeps],
     query: str,
     folder: str = ".",
     max_results: int = 50,
 ) -> Any:
-    """Find workspace paths containing the supplied name fragment."""
+    """Find path names; read a returned file before drawing conclusions."""
+    del ctx
     try:
         return _search_files(
             query=query,
@@ -61,37 +87,55 @@ def search_files(
         return _tool_error(error)
 
 
-def read_file(file_path: str) -> Any:
+def read_file(
+    ctx: RunContext[AgentRunDeps],
+    file_path: str,
+) -> Any:
     """Read a UTF-8 workspace file using its exact relative path."""
     try:
-        return _read_file(file_path)
+        result = _read_file(file_path)
+        deps = _run_deps(ctx)
+        if deps is not None and isinstance(result, dict):
+            result_path = result.get("path")
+            if isinstance(result_path, str):
+                deps.inspected_paths.add(_normalized_path(result_path))
+        return result
     except EXPECTED_TOOL_ERRORS as error:
         return _tool_error(error)
 
 
 def read_file_range(
+    ctx: RunContext[AgentRunDeps],
     file_path: str,
     start_line: int = 1,
     end_line: int = 200,
 ) -> Any:
     """Read an inclusive line range from a workspace file."""
     try:
-        return _read_file_range(
+        result = _read_file_range(
             file_path=file_path,
             start_line=start_line,
             end_line=end_line,
         )
+        deps = _run_deps(ctx)
+        if deps is not None and isinstance(result, dict):
+            result_path = result.get("path")
+            if isinstance(result_path, str):
+                deps.inspected_paths.add(_normalized_path(result_path))
+        return result
     except EXPECTED_TOOL_ERRORS as error:
         return _tool_error(error)
 
 
 def search_text(
+    ctx: RunContext[AgentRunDeps],
     query: str,
     folder: str = ".",
     file_glob: str = "*",
     max_results: int = 50,
 ) -> Any:
-    """Search text inside workspace files."""
+    """Search file contents; read relevant results before proposing changes."""
+    del ctx
     try:
         return _search_text(
             query=query,
@@ -104,22 +148,73 @@ def search_text(
 
 
 def propose_file_change(
+    ctx: RunContext[AgentRunDeps],
     file_path: str,
     new_text: str,
     old_text: str = "",
     summary: str = "",
 ) -> Any:
-    """Create a reviewable file-change proposal without writing it."""
+    """Create a reviewable proposal after reading the exact target file."""
+    deps = _run_deps(ctx)
+    normalized_target = _normalized_path(file_path)
+
+    if (
+        deps is not None
+        and deps.tool_policy == "propose"
+        and normalized_target not in deps.inspected_paths
+    ):
+        raise ModelRetry(
+            "Before proposing a change, call read_file or read_file_range "
+            f"for the exact target path: {file_path}"
+        )
+
     try:
-        return _propose_file_change(
+        result = _propose_file_change(
             file_path=file_path,
             new_text=new_text,
             old_text=old_text,
             summary=summary,
         )
+        if deps is not None:
+            deps.proposed_paths.add(normalized_target)
+        return result
     except EXPECTED_TOOL_ERRORS as error:
         return _tool_error(error)
-    
+
+
+def enforce_tool_policy(
+    ctx: RunContext[AgentRunDeps],
+    output: str,
+) -> str:
+    """Reject a final answer that did not satisfy the requested tool policy."""
+
+    deps = _run_deps(ctx)
+    if deps is None or deps.tool_policy == "auto":
+        return output
+
+    if deps.tool_policy == "inspect" and not deps.inspected_paths:
+        raise ModelRetry(
+            "This request requires workspace inspection. Call read_file or "
+            "read_file_range on a relevant file before answering."
+        )
+
+    if deps.tool_policy == "propose" and not deps.proposed_paths:
+        if not deps.inspected_paths:
+            raise ModelRetry(
+                "This is an enforced repair request. Read the files named in "
+                "the failure output, then call propose_file_change. A text-only "
+                "solution is not accepted."
+            )
+
+        inspected = ", ".join(sorted(deps.inspected_paths))
+        raise ModelRetry(
+            "You inspected workspace files but did not create a reviewable "
+            "change. Call propose_file_change for the required fix before "
+            f"answering. Inspected paths: {inspected}"
+        )
+
+    return output
+
 
 TOOL_FUNCTIONS: Dict[str, ToolFunction] = {
     "list_files": list_files,
@@ -129,6 +224,8 @@ TOOL_FUNCTIONS: Dict[str, ToolFunction] = {
     "search_text": search_text,
     "propose_file_change": propose_file_change,
 }
+
+
 @lru_cache(maxsize=10)
 def get_pydantic_agent(agent_id: str) -> Agent:
     """Build a Pydantic AI agent from the existing agent configuration."""
@@ -146,12 +243,16 @@ def get_pydantic_agent(agent_id: str) -> Agent:
 
     model = get_ollama_model(config["model"])
 
-    return Agent(
+    agent = Agent(
         model=model,
         instructions=config["system_prompt"],
+        deps_type=AgentRunDeps,
         tools=tools,
+        retries={"tools": 2, "output": 2},
         model_settings={
             "temperature": 0.1,
-            "max_tokens": 1024,
+            "max_tokens": 2048,
         },
     )
+    agent.output_validator(enforce_tool_policy)
+    return agent
