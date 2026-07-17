@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
 from typing import Any, Dict, Iterator, List, Optional
-from contextlib import closing
+
 
 class RepairTaskNotFoundError(LookupError):
     """Raised when a repair task ID does not exist."""

@@ -4,15 +4,15 @@ import hashlib
 import os
 import sqlite3
 import tempfile
+from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from difflib import unified_diff
 from pathlib import Path
 from threading import RLock
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, Iterator, List, Literal, Optional
 from uuid import uuid4
-from contextlib import closing
 
 from services.workspace_service import WorkspaceService
 
@@ -403,12 +403,16 @@ class ChangeService:
             }
         )
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         if self.database_path is None:
             raise RuntimeError("Change persistence is not configured")
         connection = sqlite3.connect(self.database_path, timeout=10)
         connection.row_factory = sqlite3.Row
-        return connection
+        try:
+            yield connection
+        finally:
+            connection.close()
 
     def _initialize_database(self) -> None:
         with self._connect() as connection:
