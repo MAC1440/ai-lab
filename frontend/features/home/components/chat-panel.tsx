@@ -37,6 +37,7 @@ import {
     getAgents,
     streamAgentChat,
 } from "@/features/agents/agent-api";
+import { RepairDialog } from "@/features/repairs";
 import { ChatInput } from "@/features/home/components/chat-input";
 import { ChatMessageBubble } from "@/features/home/components/chat-message-bubble";
 import type { HomeChatMessage } from "@/features/home/types";
@@ -234,6 +235,7 @@ export function ChatPanel() {
     const bottomRef = useRef<HTMLDivElement>(null);
     const nextToolPolicyRef = useRef<AgentToolPolicy>("auto");
     const freshHistoryForNextRequestRef = useRef(false);
+    const nextRepairTaskIdRef = useRef<string | null>(null);
 
     const selectedAgent = useMemo(
         () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
@@ -315,6 +317,7 @@ export function ChatPanel() {
             nextToolPolicyRef.current = customEvent.detail.toolPolicy;
             freshHistoryForNextRequestRef.current =
                 customEvent.detail.freshContext;
+            nextRepairTaskIdRef.current = customEvent.detail.repairTaskId;
 
             if (agents.some((agent) => agent.id === "coding")) {
                 setSelectedAgentId("coding");
@@ -375,10 +378,12 @@ export function ChatPanel() {
             ? []
             : buildHistory(messages);
         const toolPolicy = nextToolPolicyRef.current;
+        const repairTaskId = nextRepairTaskIdRef.current;
         const pendingMessages = [...messages, userMessage];
 
         nextToolPolicyRef.current = "auto";
         freshHistoryForNextRequestRef.current = false;
+        nextRepairTaskIdRef.current = null;
 
         setMessages([...pendingMessages, assistantPlaceholder]);
         setInput("");
@@ -407,6 +412,7 @@ export function ChatPanel() {
                 rag_top_k: settings.ragTopK,
                 rag_distance_threshold: distanceThreshold,
                 tool_policy: toolPolicy,
+                repair_task_id: repairTaskId,
             })) {
                 if (event.type === "error") {
                     updateAssistantMessage((message) =>
@@ -451,6 +457,7 @@ export function ChatPanel() {
         setError(null);
         nextToolPolicyRef.current = "auto";
         freshHistoryForNextRequestRef.current = false;
+        nextRepairTaskIdRef.current = null;
     }
 
     const inputDisabled =
@@ -534,6 +541,10 @@ export function ChatPanel() {
                             </Dialog>
 
                             <VerificationDialog
+                                disabled={!activeWorkspace || isSending}
+                            />
+
+                            <RepairDialog
                                 disabled={!activeWorkspace || isSending}
                             />
 

@@ -7,6 +7,7 @@ export type VerificationFixRequestDetail = {
   prompt: string;
   toolPolicy: "propose";
   freshContext: true;
+  repairTaskId: string;
 };
 
 const MAX_FIX_OUTPUT_CHARS = 12_000;
@@ -51,11 +52,15 @@ export function buildVerificationFixPrompt(run: VerificationRun): string {
     .join("\n");
 }
 
-export function requestAgentFix(run: VerificationRun): void {
+export function requestAgentFix(
+  run: VerificationRun,
+  repairTaskId: string,
+): void {
   const detail: VerificationFixRequestDetail = {
     prompt: buildVerificationFixPrompt(run),
     toolPolicy: "propose",
     freshContext: true,
+    repairTaskId,
   };
   window.dispatchEvent(
     new CustomEvent<VerificationFixRequestDetail>(

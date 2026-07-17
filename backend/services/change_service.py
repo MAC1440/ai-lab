@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import sqlite3
 import tempfile
 from copy import deepcopy
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
+from contextlib import closing
 
 from services.workspace_service import WorkspaceService
 
@@ -45,13 +47,16 @@ class _StoredProposal:
     base_exists: bool
     base_sha256: str
     proposed_content: str
+    change_set_id: Optional[str]
+    repair_task_id: Optional[str]
 
 
 class ChangeService:
     """Create reviewable file changes and apply them only after approval.
 
-    Proposals are stored in memory in this milestone. Restarting the backend
-    clears pending and resolved proposal history.
+    Proposals can be persisted to SQLite so review state survives backend
+    restarts. Tests and small embedded uses may omit ``database_path`` to keep
+    the original in-memory behaviour.
     """
 
     def __init__(
@@ -59,6 +64,7 @@ class ChangeService:
         workspace_service: WorkspaceService,
         *,
         max_file_bytes: int = 1_000_000,
+        database_path: Optional[Path] = None,
     ) -> None:
         if max_file_bytes < 1:
             raise ValueError("max_file_bytes must be positive")
@@ -67,6 +73,11 @@ class ChangeService:
         self.max_file_bytes = max_file_bytes
         self._proposals: Dict[str, _StoredProposal] = {}
         self._lock = RLock()
+        self.database_path = database_path.resolve() if database_path else None
+        if self.database_path is not None:
+            self.database_path.parent.mkdir(parents=True, exist_ok=True)
+            self._initialize_database()
+            self._load_proposals()
 
     def propose(
         self,
@@ -74,6 +85,8 @@ class ChangeService:
         file_path: str,
         content: str,
         summary: str = "",
+        change_set_id: Optional[str] = None,
+        repair_task_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         clean_path = self._validate_path(file_path)
 
@@ -124,10 +137,13 @@ class ChangeService:
             base_exists=base_exists,
             base_sha256=self._hash_text(before_content),
             proposed_content=content,
+            change_set_id=self._optional_id(change_set_id, "change_set_id"),
+            repair_task_id=self._optional_id(repair_task_id, "repair_task_id"),
         )
 
         with self._lock:
             self._proposals[proposal.proposal_id] = proposal
+            self._save(proposal)
 
         return self._public(proposal)
 
@@ -135,6 +151,8 @@ class ChangeService:
         self,
         *,
         status: Optional[ChangeProposalStatus] = None,
+        change_set_id: Optional[str] = None,
+        repair_task_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         if status is not None and status not in _VALID_STATUSES:
             raise ValueError(
@@ -146,6 +164,10 @@ class ChangeService:
                 proposal
                 for proposal in self._proposals.values()
                 if status is None or proposal.status == status
+                if change_set_id is None
+                or proposal.change_set_id == change_set_id
+                if repair_task_id is None
+                or proposal.repair_task_id == repair_task_id
             ]
             proposals.sort(
                 key=lambda proposal: proposal.created_at,
@@ -204,6 +226,7 @@ class ChangeService:
             self._atomic_write(target, proposal.proposed_content)
             proposal.status = "approved"
             proposal.resolved_at = self._utc_now()
+            self._save(proposal)
             return self._public(proposal)
 
     def reject(self, proposal_id: str) -> Dict[str, Any]:
@@ -212,7 +235,39 @@ class ChangeService:
             self._require_pending(proposal)
             proposal.status = "rejected"
             proposal.resolved_at = self._utc_now()
+            self._save(proposal)
             return self._public(proposal)
+
+    def approve_change_set(self, change_set_id: str) -> List[Dict[str, Any]]:
+        """Approve every pending proposal in a model turn.
+
+        Each proposal still performs the normal workspace and stale-file
+        checks. The method stops on the first conflict so an unsafe proposal is
+        never silently skipped.
+        """
+
+        clean_id = self._required_id(change_set_id, "change_set_id")
+        proposals = self.list_proposals(
+            status="pending",
+            change_set_id=clean_id,
+        )
+        if not proposals:
+            raise ChangeProposalNotFoundError(
+                f"No pending proposals found for change set: {clean_id}"
+            )
+        return [self.approve(item["proposal_id"]) for item in proposals]
+
+    def reject_change_set(self, change_set_id: str) -> List[Dict[str, Any]]:
+        clean_id = self._required_id(change_set_id, "change_set_id")
+        proposals = self.list_proposals(
+            status="pending",
+            change_set_id=clean_id,
+        )
+        if not proposals:
+            raise ChangeProposalNotFoundError(
+                f"No pending proposals found for change set: {clean_id}"
+            )
+        return [self.reject(item["proposal_id"]) for item in proposals]
 
     def _get_stored(self, proposal_id: str) -> _StoredProposal:
         if not isinstance(proposal_id, str) or not proposal_id.strip():
@@ -311,6 +366,22 @@ class ChangeService:
         return file_path.strip()
 
     @staticmethod
+    def _required_id(value: str, field_name: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{field_name} must be a non-empty string")
+        return value.strip()
+
+    @classmethod
+    def _optional_id(
+        cls,
+        value: Optional[str],
+        field_name: str,
+    ) -> Optional[str]:
+        if value is None:
+            return None
+        return cls._required_id(value, field_name)
+
+    @staticmethod
     def _utc_now() -> str:
         return datetime.now(timezone.utc).isoformat()
 
@@ -327,5 +398,106 @@ class ChangeService:
                 "diff": proposal.diff,
                 "created_at": proposal.created_at,
                 "resolved_at": proposal.resolved_at,
+                "change_set_id": proposal.change_set_id,
+                "repair_task_id": proposal.repair_task_id,
             }
         )
+
+    def _connect(self) -> sqlite3.Connection:
+        if self.database_path is None:
+            raise RuntimeError("Change persistence is not configured")
+        connection = sqlite3.connect(self.database_path, timeout=10)
+        connection.row_factory = sqlite3.Row
+        return connection
+
+    def _initialize_database(self) -> None:
+        with self._connect() as connection:
+            connection.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS change_proposals (
+                    proposal_id TEXT PRIMARY KEY,
+                    workspace TEXT NOT NULL,
+                    file_path TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    operation TEXT NOT NULL,
+                    diff TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    resolved_at TEXT,
+                    base_exists INTEGER NOT NULL,
+                    base_sha256 TEXT NOT NULL,
+                    proposed_content TEXT NOT NULL,
+                    change_set_id TEXT,
+                    repair_task_id TEXT
+                );
+                CREATE INDEX IF NOT EXISTS change_proposals_workspace_created
+                ON change_proposals (workspace, created_at DESC);
+                CREATE INDEX IF NOT EXISTS change_proposals_change_set
+                ON change_proposals (change_set_id);
+                CREATE INDEX IF NOT EXISTS change_proposals_repair_task
+                ON change_proposals (repair_task_id);
+                """
+            )
+
+    def _load_proposals(self) -> None:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM change_proposals"
+            ).fetchall()
+        with self._lock:
+            for row in rows:
+                proposal = _StoredProposal(
+                    proposal_id=row["proposal_id"],
+                    workspace=row["workspace"],
+                    file_path=row["file_path"],
+                    summary=row["summary"],
+                    status=row["status"],
+                    operation=row["operation"],
+                    diff=row["diff"],
+                    created_at=row["created_at"],
+                    resolved_at=row["resolved_at"],
+                    base_exists=bool(row["base_exists"]),
+                    base_sha256=row["base_sha256"],
+                    proposed_content=row["proposed_content"],
+                    change_set_id=row["change_set_id"],
+                    repair_task_id=row["repair_task_id"],
+                )
+                self._proposals[proposal.proposal_id] = proposal
+
+    def _save(self, proposal: _StoredProposal) -> None:
+        if self.database_path is None:
+            return
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO change_proposals (
+                    proposal_id, workspace, file_path, summary, status,
+                    operation, diff, created_at, resolved_at, base_exists,
+                    base_sha256, proposed_content, change_set_id,
+                    repair_task_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(proposal_id) DO UPDATE SET
+                    status = excluded.status,
+                    resolved_at = excluded.resolved_at,
+                    proposed_content = excluded.proposed_content,
+                    change_set_id = excluded.change_set_id,
+                    repair_task_id = excluded.repair_task_id
+                """,
+                (
+                    proposal.proposal_id,
+                    proposal.workspace,
+                    proposal.file_path,
+                    proposal.summary,
+                    proposal.status,
+                    proposal.operation,
+                    proposal.diff,
+                    proposal.created_at,
+                    proposal.resolved_at,
+                    int(proposal.base_exists),
+                    proposal.base_sha256,
+                    proposal.proposed_content,
+                    proposal.change_set_id,
+                    proposal.repair_task_id,
+                ),
+            )
+            connection.commit()

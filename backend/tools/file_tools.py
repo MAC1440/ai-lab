@@ -201,6 +201,8 @@ def propose_file_change(
     new_text: str,
     old_text: str = "",
     summary: str = "",
+    change_set_id: str | None = None,
+    repair_task_id: str | None = None,
 ) -> Dict[str, Any]:
     """Create a reviewable proposal without writing the file.
 
@@ -253,6 +255,8 @@ def propose_file_change(
         file_path=clean_path,
         content=proposed_content,
         summary=summary,
+        change_set_id=change_set_id,
+        repair_task_id=repair_task_id,
     )
     return {"proposal": proposal}
 

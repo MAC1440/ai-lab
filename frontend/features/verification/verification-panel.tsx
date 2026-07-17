@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { createRepairTask } from "@/features/repairs/repair-api";
 import {
   cancelVerificationRun,
   getVerificationOverview,
@@ -39,6 +40,7 @@ const MAX_LIVE_OUTPUT_CHARS = 100_000;
 
 type VerificationPanelProps = {
   relatedProposalId?: string | null;
+  relatedRepairTaskId?: string | null;
   onRequestAgentFix?: () => void;
 };
 
@@ -86,6 +88,7 @@ function verificationOutput(run: VerificationRun): string {
 
 export function VerificationPanel({
   relatedProposalId = null,
+  relatedRepairTaskId = null,
   onRequestAgentFix,
 }: VerificationPanelProps) {
   const [overview, setOverview] = useState<VerificationOverview | null>(null);
@@ -165,6 +168,7 @@ export function VerificationPanel({
         {
           profile_id: profile.profile_id,
           proposal_id: relatedProposalId,
+          repair_task_id: relatedRepairTaskId,
         },
         controller.signal,
       )) {
@@ -261,7 +265,8 @@ export function VerificationPanel({
         ? await getVerificationRun(run.run_id)
         : run;
 
-      requestAgentFix(completeRun);
+      const repairTask = await createRepairTask(completeRun.run_id);
+      requestAgentFix(completeRun, repairTask.task_id);
       onRequestAgentFix?.();
     } catch (requestError) {
       setError(

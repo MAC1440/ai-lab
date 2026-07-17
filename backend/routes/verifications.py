@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from dependencies import (
     project_detection_service,
+    repair_service,
     verification_service,
     verification_store,
     workspace_service,
@@ -31,6 +32,11 @@ class VerificationRunRequest(BaseModel):
         default=None,
         min_length=1,
         max_length=200,
+    )
+    repair_task_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
     )
 
 
@@ -92,6 +98,14 @@ async def stream_verification_run(request: VerificationRunRequest):
                 profile_id=request.profile_id,
                 proposal_id=request.proposal_id,
             ):
+                if (
+                    request.repair_task_id
+                    and event.get("type") == "verification_done"
+                ):
+                    repair_service.record_verification(
+                        request.repair_task_id,
+                        event["result"],
+                    )
                 yield _encode_ndjson(event)
         except PermissionError as error:
             yield _error_event(str(error), 403)

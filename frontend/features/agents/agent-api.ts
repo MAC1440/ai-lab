@@ -50,6 +50,7 @@ export type AgentChatRequest = {
     rag_top_k?: number;
     rag_distance_threshold?: number | null;
     tool_policy?: AgentToolPolicy;
+    repair_task_id?: string | null;
 };
 
 export type AgentChatResponse = {
@@ -59,6 +60,8 @@ export type AgentChatResponse = {
     steps: number;
     tools_used: AgentToolExecution[];
     rag: AgentRagTrace;
+    change_set_id?: string | null;
+    repair_task_id?: string | null;
 };
 
 export type AgentStatusEvent = {

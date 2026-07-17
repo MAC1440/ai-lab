@@ -38,6 +38,11 @@ class AgentChatRequest(BaseModel):
         ge=0.0,
     )
     tool_policy: Literal["auto", "inspect", "propose"] = "auto"
+    repair_task_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+    )
 
 
 @router.get("/list")
@@ -62,6 +67,7 @@ async def pydantic_agent_chat_stream(
                 rag_top_k=request.rag_top_k,
                 rag_distance_threshold=request.rag_distance_threshold,
                 tool_policy=request.tool_policy,
+                repair_task_id=request.repair_task_id,
             ):
                 yield _encode_ndjson(event)
 

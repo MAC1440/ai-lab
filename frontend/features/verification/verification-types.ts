@@ -106,4 +106,5 @@ export type VerificationStreamEvent =
 export type StartVerificationRequest = {
   profile_id: string;
   proposal_id?: string | null;
+  repair_task_id?: string | null;
 };

@@ -26,6 +26,8 @@ class AgentRunDeps:
     tool_policy: ToolPolicy = "auto"
     inspected_paths: set[str] = field(default_factory=set)
     proposed_paths: set[str] = field(default_factory=set)
+    change_set_id: str | None = None
+    repair_task_id: str | None = None
 
 EXPECTED_TOOL_ERRORS = (
     FileNotFoundError,
@@ -174,6 +176,8 @@ def propose_file_change(
             new_text=new_text,
             old_text=old_text,
             summary=summary,
+            change_set_id=deps.change_set_id if deps is not None else None,
+            repair_task_id=deps.repair_task_id if deps is not None else None,
         )
         if deps is not None:
             deps.proposed_paths.add(normalized_target)

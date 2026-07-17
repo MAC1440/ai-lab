@@ -109,6 +109,71 @@ class ChangeServiceTests(unittest.TestCase):
                 content="nope",
             )
 
+    def test_proposals_survive_service_restart_with_sqlite(self):
+        database_path = self.root / "changes.sqlite3"
+        first = ChangeService(self.workspace, database_path=database_path)
+        proposal = first.propose(
+            file_path="persistent.txt",
+            content="hello\n",
+            change_set_id="set-1",
+            repair_task_id="repair-1",
+        )
+
+        second = ChangeService(self.workspace, database_path=database_path)
+        restored = second.get(proposal["proposal_id"])
+
+        self.assertEqual(restored["file_path"], "persistent.txt")
+        self.assertEqual(restored["change_set_id"], "set-1")
+        self.assertEqual(restored["repair_task_id"], "repair-1")
+
+    def test_list_can_filter_change_set_and_repair_task(self):
+        self.service.propose(
+            file_path="one.txt",
+            content="one\n",
+            change_set_id="set-a",
+            repair_task_id="repair-a",
+        )
+        self.service.propose(
+            file_path="two.txt",
+            content="two\n",
+            change_set_id="set-b",
+            repair_task_id="repair-b",
+        )
+
+        self.assertEqual(
+            len(self.service.list_proposals(change_set_id="set-a")),
+            1,
+        )
+        self.assertEqual(
+            len(self.service.list_proposals(repair_task_id="repair-b")),
+            1,
+        )
+
+    def test_approve_change_set_writes_every_file(self):
+        for name in ("one.txt", "two.txt"):
+            self.service.propose(
+                file_path=name,
+                content=f"{name}\n",
+                change_set_id="set-a",
+            )
+
+        resolved = self.service.approve_change_set("set-a")
+
+        self.assertEqual({item["status"] for item in resolved}, {"approved"})
+        self.assertEqual((self.root / "one.txt").read_text(), "one.txt\n")
+        self.assertEqual((self.root / "two.txt").read_text(), "two.txt\n")
+
+    def test_reject_change_set_keeps_files_unchanged(self):
+        self.service.propose(
+            file_path="one.txt",
+            content="one\n",
+            change_set_id="set-a",
+        )
+        resolved = self.service.reject_change_set("set-a")
+
+        self.assertEqual(resolved[0]["status"], "rejected")
+        self.assertFalse((self.root / "one.txt").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

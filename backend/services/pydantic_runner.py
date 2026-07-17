@@ -1,5 +1,6 @@
 import json
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from uuid import uuid4
 
 from pydantic_ai import (
     AgentRunResultEvent,
@@ -57,6 +58,7 @@ class PydanticAgentRunner:
         rag_top_k: int = 3,
         rag_distance_threshold: Optional[float] = 1.0,
         tool_policy: ToolPolicy = "auto",
+        repair_task_id: Optional[str] = None,
     ) -> AsyncIterator[AgentEvent]:
         clean_prompt = prompt.strip()
 
@@ -128,7 +130,11 @@ class PydanticAgentRunner:
         }
 
         message_history = self._convert_history(history)
-        run_deps = AgentRunDeps(tool_policy=tool_policy)
+        run_deps = AgentRunDeps(
+            tool_policy=tool_policy,
+            change_set_id=uuid4().hex,
+            repair_task_id=repair_task_id,
+        )
         policy_instructions = self._build_tool_policy_instructions(
             tool_policy
         )
@@ -289,6 +295,8 @@ class PydanticAgentRunner:
                 "steps": steps,
                 "tools_used": tools_used,
                 "rag": rag_trace,
+                "change_set_id": run_deps.change_set_id,
+                "repair_task_id": run_deps.repair_task_id,
             },
         }
 

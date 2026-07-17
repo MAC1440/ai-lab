@@ -10,6 +10,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
+  approveChangeSet,
+  rejectChangeSet,
   type ChangeProposal,
   listChangeProposals,
 } from "@/features/changes/change-api";
@@ -24,6 +26,7 @@ export function ChangeProposalDock() {
   const [collapsed, setCollapsed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastApproved, setLastApproved] = useState<ChangeProposal | null>(null);
+  const [setAction, setSetAction] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -70,6 +73,35 @@ export function ChangeProposalDock() {
     if (resolvedProposal.status === "approved") {
       setLastApproved(resolvedProposal);
       setCollapsed(false);
+    }
+  }
+
+  const groupedProposals = proposals.reduce<
+    Array<{ id: string; proposals: ChangeProposal[] }>
+  >((groups, proposal) => {
+    const id = proposal.change_set_id ?? proposal.proposal_id;
+    const existing = groups.find((group) => group.id === id);
+    if (existing) existing.proposals.push(proposal);
+    else groups.push({ id, proposals: [proposal] });
+    return groups;
+  }, []);
+
+  async function resolveSet(
+    group: { id: string; proposals: ChangeProposal[] },
+    action: "approve" | "reject",
+  ) {
+    if (!group.proposals[0]?.change_set_id) return;
+    setSetAction(`${action}:${group.id}`);
+    try {
+      const resolved = action === "approve"
+        ? await approveChangeSet(group.id)
+        : await rejectChangeSet(group.id);
+      resolved.forEach(handleResolved);
+      setError(null);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "The change set could not be resolved.");
+    } finally {
+      setSetAction(null);
     }
   }
 
@@ -146,12 +178,30 @@ export function ChangeProposalDock() {
               </div>
             ) : null}
 
-            {proposals.map((proposal) => (
-              <ChangeApprovalPanel
-                key={proposal.proposal_id}
-                proposal={proposal}
-                onResolved={handleResolved}
-              />
+            {groupedProposals.map((group) => (
+              <section key={group.id} className="space-y-3">
+                {group.proposals.length > 1 ? (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-violet-900/60 bg-violet-950/25 px-3 py-2">
+                    <p className="mr-auto text-xs text-violet-200">
+                      One agent turn proposed {group.proposals.length} related files.
+                    </p>
+                    <Button type="button" size="sm" variant="outline" disabled={setAction !== null} onClick={() => void resolveSet(group, "reject")}>
+                      Reject set
+                    </Button>
+                    <Button type="button" size="sm" disabled={setAction !== null} onClick={() => void resolveSet(group, "approve")}>
+                      {setAction === `approve:${group.id}` ? <Loader2Icon className="size-4 animate-spin" /> : null}
+                      Approve set
+                    </Button>
+                  </div>
+                ) : null}
+                {group.proposals.map((proposal) => (
+                  <ChangeApprovalPanel
+                    key={proposal.proposal_id}
+                    proposal={proposal}
+                    onResolved={handleResolved}
+                  />
+                ))}
+              </section>
             ))}
           </div>
         ) : null}

@@ -17,12 +17,14 @@ import { VerificationPanel } from "@/features/verification/verification-panel";
 type VerificationDialogProps = {
   disabled?: boolean;
   relatedProposalId?: string | null;
+  relatedRepairTaskId?: string | null;
   triggerLabel?: string;
 };
 
 export function VerificationDialog({
   disabled = false,
   relatedProposalId = null,
+  relatedRepairTaskId = null,
   triggerLabel = "Verify workspace",
 }: VerificationDialogProps) {
   const [open, setOpen] = useState(false);
@@ -44,8 +46,9 @@ export function VerificationDialog({
         </DialogDescription>
 
         <VerificationPanel
-          key={`${relatedProposalId ?? "manual"}:${String(open)}`}
+          key={`${relatedProposalId ?? "manual"}:${relatedRepairTaskId ?? "no-repair"}:${String(open)}`}
           relatedProposalId={relatedProposalId}
+          relatedRepairTaskId={relatedRepairTaskId}
           onRequestAgentFix={() => setOpen(false)}
         />
       </DialogContent>

@@ -10,6 +10,8 @@ export type ChangeProposal = {
   diff: string;
   created_at: string;
   resolved_at: string | null;
+  change_set_id: string | null;
+  repair_task_id: string | null;
 };
 
 type ChangeProposalListResponse = {
@@ -37,10 +39,17 @@ async function parseJson<T>(response: Response): Promise<T> {
 
 export async function listChangeProposals(
   status?: ChangeProposalStatus,
+  filters?: { changeSetId?: string; repairTaskId?: string },
 ): Promise<ChangeProposal[]> {
   const params = new URLSearchParams();
   if (status) {
     params.set("status", status);
+  }
+  if (filters?.changeSetId) {
+    params.set("change_set_id", filters.changeSetId);
+  }
+  if (filters?.repairTaskId) {
+    params.set("repair_task_id", filters.repairTaskId);
   }
 
   const query = params.toString();
@@ -50,6 +59,26 @@ export async function listChangeProposals(
   );
   const result = await parseJson<ChangeProposalListResponse>(response);
   return result.proposals;
+}
+
+async function resolveChangeSet(
+  changeSetId: string,
+  action: "approve" | "reject",
+): Promise<ChangeProposal[]> {
+  const result = await parseJson<ChangeProposalListResponse>(
+    await fetch(`${API_BASE_URL}/changes/sets/${changeSetId}/${action}`, {
+      method: "POST",
+    }),
+  );
+  return result.proposals;
+}
+
+export function approveChangeSet(changeSetId: string) {
+  return resolveChangeSet(changeSetId, "approve");
+}
+
+export function rejectChangeSet(changeSetId: string) {
+  return resolveChangeSet(changeSetId, "reject");
 }
 
 export async function getChangeProposal(
