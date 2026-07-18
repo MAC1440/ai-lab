@@ -6,6 +6,7 @@ from services.project_detection_service import ProjectDetectionService
 from services.project_context_service import ProjectContextService
 from services.repair_service import RepairService
 from services.repair_store import RepairStore
+from services.scaffold_service import ScaffoldService
 from services.verification_service import VerificationService
 from services.verification_store import VerificationStore
 from services.workspace_service import WorkspaceService
@@ -38,6 +39,7 @@ change_service = ChangeService(
     workspace_service,
     database_path=_changes_database_path,
 )
+scaffold_service = ScaffoldService(workspace_service, change_service)
 
 _repairs_database_path = Path(
     os.getenv("REPAIR_DB_PATH", "data/repairs.sqlite3")

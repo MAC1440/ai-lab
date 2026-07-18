@@ -39,6 +39,7 @@ import {
     streamAgentChat,
 } from "@/features/agents/agent-api";
 import { RepairDialog } from "@/features/repairs";
+import { ScaffoldDialog } from "@/features/scaffolds";
 import { ChatInput } from "@/features/home/components/chat-input";
 import { ChatMessageBubble } from "@/features/home/components/chat-message-bubble";
 import type { HomeChatMessage } from "@/features/home/types";
@@ -605,6 +606,10 @@ export function ChatPanel() {
                             />
 
                             <RepairDialog
+                                disabled={!activeWorkspace || isSending}
+                            />
+
+                            <ScaffoldDialog
                                 disabled={!activeWorkspace || isSending}
                             />
 
