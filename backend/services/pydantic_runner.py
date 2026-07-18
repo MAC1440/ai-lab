@@ -26,6 +26,10 @@ from services.pydantic_agent import (
     ToolPolicy,
     get_pydantic_agent,
 )
+from services.project_context_service import (
+    ProjectContextService,
+    build_project_context_instructions,
+)
 from services.rag import RAGService
 
 
@@ -38,6 +42,7 @@ class PydanticAgentRunner:
         self,
         agent_service: Optional[AgentService] = None,
         rag_service: Optional[RAGService] = None,
+        project_context_service: Optional[ProjectContextService] = None,
         max_rag_context_chars: int = 8000,
         max_model_requests: int = 10,
     ) -> None:
@@ -46,6 +51,7 @@ class PydanticAgentRunner:
 
         self.agent_service = agent_service or AgentService()
         self.rag_service = rag_service
+        self.project_context_service = project_context_service
         self.max_rag_context_chars = max_rag_context_chars
         self.max_model_requests = max_model_requests
 
@@ -98,6 +104,26 @@ class PydanticAgentRunner:
             "message": "Preparing the Pydantic AI agent",
         }
 
+        project_context_trace = self._empty_project_context_trace()
+        project_context = ""
+        if allowed_tool_names and self.project_context_service is not None:
+            yield {
+                "type": "status",
+                "stage": "context",
+                "message": "Collecting bounded project context",
+            }
+            project_context_trace, project_context = (
+                self.project_context_service.build(
+                    prompt=clean_prompt,
+                    agent_id=agent_id,
+                )
+            )
+
+        yield {
+            "type": "context",
+            "context": project_context_trace,
+        }
+
         if config.get("use_rag", False):
             yield {
                 "type": "status",
@@ -121,6 +147,9 @@ class PydanticAgentRunner:
             rag_trace=rag_trace,
             rag_context=rag_context,
         )
+        project_context_instructions = build_project_context_instructions(
+            project_context
+        )
 
         yield {
             "type": "status",
@@ -140,7 +169,11 @@ class PydanticAgentRunner:
         )
         run_instructions = "\n\n".join(
             instruction
-            for instruction in (rag_instructions, policy_instructions)
+            for instruction in (
+                project_context_instructions,
+                rag_instructions,
+                policy_instructions,
+            )
             if instruction
         )
         stream_answer_text = tool_policy == "auto"
@@ -295,6 +328,7 @@ class PydanticAgentRunner:
                 "steps": steps,
                 "tools_used": tools_used,
                 "rag": rag_trace,
+                "context": project_context_trace,
                 "change_set_id": run_deps.change_set_id,
                 "repair_task_id": run_deps.repair_task_id,
             },
@@ -329,6 +363,23 @@ This request is in enforced repair mode.
             self.rag_service = RAGService()
 
         return self.rag_service
+
+    @staticmethod
+    def _empty_project_context_trace() -> Dict[str, Any]:
+        return {
+            "enabled": False,
+            "workspace": None,
+            "project_types": [],
+            "selected_project_root": None,
+            "files_included": [],
+            "file_count": 0,
+            "prompt_paths_found": [],
+            "tree_entries": 0,
+            "tree_truncated": False,
+            "characters": 0,
+            "max_characters": 0,
+            "skipped_paths": [],
+        }
 
     def _retrieve_rag_context(
         self,

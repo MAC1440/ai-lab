@@ -86,6 +86,30 @@ class RepairServiceTests(unittest.TestCase):
         result = self.service.record_verification(repair["task_id"], follow_up)
         self.assertEqual(result["status"], "passed")
         self.assertEqual(result["latest_run_id"], "run-2")
+        self.assertEqual(result["attempts"][0]["kind"], "verification")
+        self.assertEqual(result["attempts"][0]["status"], "passed")
+
+    def test_agent_attempts_are_counted_and_bounded(self):
+        repair = self.service.create_from_verification("run-1")
+
+        for expected_count in range(1, 4):
+            result = self.service.start_agent_attempt(repair["task_id"])
+            self.assertEqual(result["agent_attempt_count"], expected_count)
+
+        self.assertFalse(result["can_start_agent_attempt"])
+        with self.assertRaisesRegex(RepairTaskStateError, "limit of 3"):
+            self.service.start_agent_attempt(repair["task_id"])
+
+    def test_pending_proposal_blocks_another_agent_attempt(self):
+        repair = self.service.create_from_verification("run-1")
+        self.changes.propose(
+            file_path="fix.py",
+            content="fixed = True\n",
+            repair_task_id=repair["task_id"],
+        )
+
+        with self.assertRaisesRegex(RepairTaskStateError, "pending proposals"):
+            self.service.start_agent_attempt(repair["task_id"])
 
 
 if __name__ == "__main__":

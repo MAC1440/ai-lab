@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from dependencies import project_detection_service
+from dependencies import project_context_service, project_detection_service
 from services.agent_runner import AgentRunner
 from services.agent_service import AgentService
 from services.pydantic_runner import PydanticAgentRunner
@@ -20,7 +20,8 @@ agent_service = AgentService()
 agent_runner = AgentRunner(agent_service=agent_service)
 
 pydantic_runner = PydanticAgentRunner(
-    agent_service=agent_service
+    agent_service=agent_service,
+    project_context_service=project_context_service,
 )
 
 

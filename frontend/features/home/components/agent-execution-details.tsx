@@ -41,6 +41,8 @@ export function AgentExecutionDetails({
 }) {
     const hasTools = result.tools_used.length > 0;
     const hasRagDetails = result.rag.enabled;
+    const projectContext = result.context;
+    const hasProjectContext = projectContext?.enabled === true;
 
     return (
         <details className="group rounded-lg border border-zinc-200 bg-white/70 text-xs dark:border-zinc-800 dark:bg-zinc-950/50">
@@ -78,6 +80,13 @@ export function AgentExecutionDetails({
                     </span>
                 ) : null}
 
+                {hasProjectContext ? (
+                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                        {projectContext.file_count} context file
+                        {projectContext.file_count === 1 ? "" : "s"}
+                    </span>
+                ) : null}
+
                 <span className="ml-auto text-[10px] uppercase tracking-wide text-zinc-400 group-open:hidden">
                     Show
                 </span>
@@ -101,6 +110,61 @@ export function AgentExecutionDetails({
                         <dt>Loop steps</dt>
                         <dd>{result.steps}</dd>
                     </dl>
+                </section>
+
+                <section>
+                    <h4 className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        Project context
+                    </h4>
+
+                    {!hasProjectContext ? (
+                        <p className="mt-2 text-zinc-500">
+                            Deterministic project context was disabled for this agent.
+                        </p>
+                    ) : (
+                        <div className="mt-2 space-y-2">
+                            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-zinc-600 dark:text-zinc-400">
+                                <dt>Project types</dt>
+                                <dd>{projectContext.project_types.join(", ") || "unknown"}</dd>
+
+                                <dt>Selected root</dt>
+                                <dd className="font-mono">
+                                    {projectContext.selected_project_root ?? "."}
+                                </dd>
+
+                                <dt>Tree entries</dt>
+                                <dd>
+                                    {projectContext.tree_entries}
+                                    {projectContext.tree_truncated ? " (truncated)" : ""}
+                                </dd>
+
+                                <dt>Context size</dt>
+                                <dd>
+                                    {projectContext.characters.toLocaleString()} /{" "}
+                                    {projectContext.max_characters.toLocaleString()} characters
+                                </dd>
+                            </dl>
+
+                            {projectContext.files_included.length > 0 ? (
+                                <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-900">
+                                    <p className="font-medium text-zinc-700 dark:text-zinc-300">
+                                        Preloaded files
+                                    </p>
+                                    <ul className="mt-1 space-y-1 font-mono text-[11px] text-zinc-600 dark:text-zinc-400">
+                                        {projectContext.files_included.map((path) => (
+                                            <li key={path} className="break-all">
+                                                {path}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : (
+                                <p className="text-zinc-500">
+                                    No files were preloaded; the project tree is still available.
+                                </p>
+                            )}
+                        </div>
+                    )}
                 </section>
 
                 <section>

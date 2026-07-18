@@ -24,6 +24,7 @@ import {
   dismissRepairTask,
   listRepairTasks,
   reopenRepairTask,
+  startRepairAttempt,
 } from "@/features/repairs/repair-api";
 import type { RepairTask } from "@/features/repairs/repair-types";
 import { getVerificationRun } from "@/features/verification/verification-api";
@@ -83,6 +84,10 @@ export function RepairDialog({ disabled = false }: { disabled?: boolean }) {
   async function continueRepair(task: RepairTask) {
     setActionId(task.task_id);
     try {
+      const updated = await startRepairAttempt(task.task_id);
+      setTasks((current) => current.map((item) =>
+        item.task_id === updated.task_id ? updated : item,
+      ));
       const run = await getVerificationRun(task.latest_run_id ?? task.source_run_id);
       requestAgentFix(run, task.task_id);
       setOpen(false);
@@ -144,13 +149,33 @@ export function RepairDialog({ disabled = false }: { disabled?: boolean }) {
                   <p className="mt-2 text-xs text-zinc-400">
                     {task.proposal_count} linked proposal{task.proposal_count === 1 ? "" : "s"} · Updated {new Date(task.updated_at).toLocaleString()}
                   </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Agent attempts: {task.agent_attempt_count}/{task.max_agent_attempts}
+                    {task.attempt_count > task.agent_attempt_count
+                      ? ` · ${task.attempt_count - task.agent_attempt_count} follow-up check${task.attempt_count - task.agent_attempt_count === 1 ? "" : "s"}`
+                      : ""}
+                  </p>
+                  {task.attempts.length > 0 ? (
+                    <details className="mt-2 text-xs text-zinc-500">
+                      <summary className="cursor-pointer">Attempt history</summary>
+                      <ol className="mt-2 space-y-1 border-l border-zinc-800 pl-3">
+                        {task.attempts.map((attempt) => (
+                          <li key={attempt.attempt_id}>
+                            #{attempt.sequence} {attempt.kind === "agent" ? "Agent requested" : "Verification"}
+                            {attempt.kind === "verification" ? `: ${attempt.status}` : ""}
+                            {" · "}{new Date(attempt.created_at).toLocaleString()}
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {task.status === "ready_to_verify" || task.status === "failed" ? (
                     <VerificationDialog relatedRepairTaskId={task.task_id} triggerLabel="Run checks" />
                   ) : null}
                   {task.status !== "passed" && task.status !== "awaiting_review" ? (
-                    <Button type="button" size="sm" onClick={() => void continueRepair(task)} disabled={actionId !== null}>
+                    <Button type="button" size="sm" onClick={() => void continueRepair(task)} disabled={actionId !== null || !task.can_start_agent_attempt}>
                       {actionId === task.task_id ? <Loader2Icon className="size-4 animate-spin" /> : <WrenchIcon className="size-4" />}
                       Ask coding agent
                     </Button>

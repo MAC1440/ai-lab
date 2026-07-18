@@ -14,6 +14,67 @@ from services.pydantic_runner import PydanticAgentRunner
 
 
 class PydanticAgentRunnerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_project_context_is_streamed_and_added_to_result(self):
+        class DummyContextService:
+            def build(self, *, prompt, agent_id):
+                self.call = {"prompt": prompt, "agent_id": agent_id}
+                return (
+                    {
+                        "enabled": True,
+                        "workspace": "C:/workspace",
+                        "project_types": ["python"],
+                        "selected_project_root": "backend",
+                        "files_included": ["backend/app.py"],
+                        "file_count": 1,
+                        "prompt_paths_found": ["backend/app.py"],
+                        "tree_entries": 5,
+                        "tree_truncated": False,
+                        "characters": 100,
+                        "max_characters": 7000,
+                        "skipped_paths": [],
+                    },
+                    '<workspace_file path="backend/app.py">pass</workspace_file>',
+                )
+
+        captured_messages = []
+
+        async def model_stream(messages, info):
+            del info
+            captured_messages.extend(messages)
+            yield "Context received."
+
+        agent = Agent(
+            model=FunctionModel(stream_function=model_stream),
+            deps_type=AgentRunDeps,
+            tools=[read_file, propose_file_change],
+        )
+        context_service = DummyContextService()
+
+        with patch(
+            "services.pydantic_runner.get_pydantic_agent",
+            return_value=agent,
+        ):
+            events = [
+                event
+                async for event in PydanticAgentRunner(
+                    project_context_service=context_service,
+                ).run_events(
+                    agent_id="coding",
+                    prompt="Inspect backend/app.py",
+                )
+            ]
+
+        context_event = next(
+            event for event in events if event["type"] == "context"
+        )
+        self.assertTrue(context_event["context"]["enabled"])
+        self.assertEqual(
+            events[-1]["result"]["context"]["files_included"],
+            ["backend/app.py"],
+        )
+        self.assertEqual(context_service.call["agent_id"], "coding")
+        self.assertIn("project_context", str(captured_messages))
+
     async def test_enforced_repair_stream_reads_then_proposes(self):
         request_count = 0
 

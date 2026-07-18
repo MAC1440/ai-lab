@@ -45,3 +45,11 @@ export async function reopenRepairTask(taskId: string) {
     await fetch(`${API_BASE_URL}/repairs/${taskId}/reopen`, { method: "POST" }),
   );
 }
+
+export async function startRepairAttempt(taskId: string) {
+  return parseJson<RepairTask>(
+    await fetch(`${API_BASE_URL}/repairs/${taskId}/attempts`, {
+      method: "POST",
+    }),
+  );
+}

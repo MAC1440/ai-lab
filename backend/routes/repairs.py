@@ -71,3 +71,15 @@ def reopen_repair_task(task_id: str):
         raise HTTPException(status_code=404, detail=str(error)) from error
     except RepairTaskStateError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.post("/{task_id}/attempts")
+def start_repair_attempt(task_id: str):
+    try:
+        return repair_service.start_agent_attempt(task_id)
+    except RepairTaskNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except RepairTaskStateError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error

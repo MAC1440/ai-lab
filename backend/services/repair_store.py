@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
 from typing import Any, Dict, Iterator, List, Optional
+from uuid import uuid4
 
 
 class RepairTaskNotFoundError(LookupError):
@@ -133,6 +134,57 @@ class RepairStore:
             connection.commit()
         return self.get(task_id)
 
+    def add_attempt(
+        self,
+        task_id: str,
+        *,
+        kind: str,
+        status: str,
+        created_at: str,
+        run_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        attempt_id = uuid4().hex
+        with self._lock, self._connect() as connection:
+            if connection.execute(
+                "SELECT 1 FROM repair_tasks WHERE task_id = ?",
+                (task_id,),
+            ).fetchone() is None:
+                raise RepairTaskNotFoundError(
+                    f"Repair task not found: {task_id}"
+                )
+            connection.execute(
+                """
+                INSERT INTO repair_attempts (
+                    attempt_id, task_id, kind, status, run_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (attempt_id, task_id, kind, status, run_id, created_at),
+            )
+            connection.commit()
+        return self.get_attempt(attempt_id)
+
+    def get_attempt(self, attempt_id: str) -> Dict[str, Any]:
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM repair_attempts WHERE attempt_id = ?",
+                (attempt_id,),
+            ).fetchone()
+        if row is None:
+            raise LookupError(f"Repair attempt not found: {attempt_id}")
+        return dict(row)
+
+    def list_attempts(self, task_id: str) -> List[Dict[str, Any]]:
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM repair_attempts
+                WHERE task_id = ?
+                ORDER BY created_at ASC, attempt_id ASC
+                """,
+                (task_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def _initialize(self) -> None:
         with self._lock, self._connect() as connection:
             connection.executescript(
@@ -154,6 +206,17 @@ class RepairStore:
                 );
                 CREATE INDEX IF NOT EXISTS repair_tasks_workspace_updated
                 ON repair_tasks (workspace, updated_at DESC);
+                CREATE TABLE IF NOT EXISTS repair_attempts (
+                    attempt_id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    run_id TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (task_id) REFERENCES repair_tasks(task_id)
+                );
+                CREATE INDEX IF NOT EXISTS repair_attempts_task_created
+                ON repair_attempts (task_id, created_at ASC);
                 """
             )
             connection.commit()

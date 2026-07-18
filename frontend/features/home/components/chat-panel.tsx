@@ -92,6 +92,20 @@ function createInitialAgentResult(
             distances: [],
             distance_threshold: distanceThreshold,
         },
+        context: {
+            enabled: false,
+            workspace: null,
+            project_types: [],
+            selected_project_root: null,
+            files_included: [],
+            file_count: 0,
+            prompt_paths_found: [],
+            tree_entries: 0,
+            tree_truncated: false,
+            characters: 0,
+            max_characters: 0,
+            skipped_paths: [],
+        },
     };
 }
 
@@ -121,6 +135,17 @@ function applyAgentStreamEvent(
                     agentResult: {
                         ...currentResult,
                         rag: event.rag,
+                    },
+                }
+                : message;
+
+        case "context":
+            return currentResult
+                ? {
+                    ...message,
+                    agentResult: {
+                        ...currentResult,
+                        context: event.context,
                     },
                 }
                 : message;

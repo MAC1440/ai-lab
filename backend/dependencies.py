@@ -3,6 +3,7 @@ from pathlib import Path
 
 from services.change_service import ChangeService
 from services.project_detection_service import ProjectDetectionService
+from services.project_context_service import ProjectContextService
 from services.repair_service import RepairService
 from services.repair_store import RepairStore
 from services.verification_service import VerificationService
@@ -12,6 +13,10 @@ from services.workspace_service import WorkspaceService
 
 workspace_service = WorkspaceService()
 project_detection_service = ProjectDetectionService(workspace_service)
+project_context_service = ProjectContextService(
+    workspace_service,
+    project_detection_service,
+)
 
 _backend_root = Path(__file__).resolve().parent
 _configured_database_path = os.getenv(

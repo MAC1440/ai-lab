@@ -14,6 +14,7 @@ from services.workspace_service import WorkspaceService
 REPAIRABLE_RUN_STATUSES = {"failed", "error", "timed_out"}
 TERMINAL_TASK_STATUSES = {"passed", "dismissed"}
 MAX_FAILURE_EXCERPT_CHARS = 20_000
+MAX_AGENT_ATTEMPTS = 3
 
 
 class RepairTaskStateError(RuntimeError):
@@ -132,12 +133,49 @@ class RepairService:
             )
         status = "passed" if run.get("status") == "passed" else "failed"
         now = self._utc_now()
+        self.store.add_attempt(
+            task["task_id"],
+            kind="verification",
+            status=str(run.get("status") or "unknown"),
+            run_id=run.get("run_id"),
+            created_at=now,
+        )
         updated = self.store.update(
             task["task_id"],
             status=status,
             updated_at=now,
             latest_run_id=run.get("run_id"),
             resolved_at=now if status == "passed" else None,
+        )
+        return self._enrich(updated)
+
+    def start_agent_attempt(self, task_id: str) -> Dict[str, Any]:
+        task = self.get_task(task_id)
+        if task["status"] in TERMINAL_TASK_STATUSES:
+            raise RepairTaskStateError(
+                "Resolved repair tasks cannot start another agent attempt"
+            )
+        if task["status"] == "awaiting_review":
+            raise RepairTaskStateError(
+                "Review the pending proposals before asking the agent again"
+            )
+        if task["agent_attempt_count"] >= MAX_AGENT_ATTEMPTS:
+            raise RepairTaskStateError(
+                f"This repair reached the limit of {MAX_AGENT_ATTEMPTS} "
+                "agent attempts. Run the check again to create a new failure "
+                "cycle or inspect the issue manually."
+            )
+        self.store.add_attempt(
+            task["task_id"],
+            kind="agent",
+            status="requested",
+            created_at=self._utc_now(),
+        )
+        updated = self.store.update(
+            task["task_id"],
+            status="open",
+            updated_at=self._utc_now(),
+            resolved_at=None,
         )
         return self._enrich(updated)
 
@@ -148,6 +186,21 @@ class RepairService:
         )
         result["proposals"] = proposals
         result["proposal_count"] = len(proposals)
+        attempts = self.store.list_attempts(task["task_id"])
+        for index, attempt in enumerate(attempts, start=1):
+            attempt["sequence"] = index
+        agent_attempt_count = sum(
+            1 for attempt in attempts if attempt["kind"] == "agent"
+        )
+        result["attempts"] = attempts
+        result["attempt_count"] = len(attempts)
+        result["agent_attempt_count"] = agent_attempt_count
+        result["max_agent_attempts"] = MAX_AGENT_ATTEMPTS
+        result["can_start_agent_attempt"] = (
+            task["status"] not in TERMINAL_TASK_STATUSES
+            and task["status"] != "awaiting_review"
+            and agent_attempt_count < MAX_AGENT_ATTEMPTS
+        )
 
         if task["status"] not in TERMINAL_TASK_STATUSES and proposals:
             statuses = {proposal["status"] for proposal in proposals}

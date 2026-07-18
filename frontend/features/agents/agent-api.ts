@@ -52,6 +52,21 @@ export type AgentRagTrace = {
     distance_threshold: number | null;
 };
 
+export type AgentProjectContextTrace = {
+    enabled: boolean;
+    workspace: string | null;
+    project_types: string[];
+    selected_project_root: string | null;
+    files_included: string[];
+    file_count: number;
+    prompt_paths_found: string[];
+    tree_entries: number;
+    tree_truncated: boolean;
+    characters: number;
+    max_characters: number;
+    skipped_paths: Array<{ path: string; reason: string }>;
+};
+
 export type AgentChatRequest = {
     agent_id: string;
     prompt: string;
@@ -69,6 +84,8 @@ export type AgentChatResponse = {
     steps: number;
     tools_used: AgentToolExecution[];
     rag: AgentRagTrace;
+    // Optional for backward compatibility with legacy/cached backend results.
+    context?: AgentProjectContextTrace;
     change_set_id?: string | null;
     repair_task_id?: string | null;
 };
@@ -83,6 +100,11 @@ export type AgentStatusEvent = {
 export type AgentRagEvent = {
     type: "rag";
     rag: AgentRagTrace;
+};
+
+export type AgentContextEvent = {
+    type: "context";
+    context: AgentProjectContextTrace;
 };
 
 export type AgentAnswerDeltaEvent = {
@@ -125,6 +147,7 @@ export type AgentErrorEvent = {
 export type AgentStreamEvent =
     | AgentStatusEvent
     | AgentRagEvent
+    | AgentContextEvent
     | AgentAnswerDeltaEvent
     | AgentAnswerResetEvent
     | AgentToolStartEvent

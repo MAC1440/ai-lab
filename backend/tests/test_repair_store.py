@@ -61,6 +61,29 @@ class RepairStoreTests(unittest.TestCase):
         with self.assertRaises(RepairTaskNotFoundError):
             self.store.get("missing")
 
+    def test_attempts_are_persisted_in_order(self):
+        self.store.create(task())
+        first = self.store.add_attempt(
+            "task-1",
+            kind="agent",
+            status="requested",
+            created_at="2026-01-01T01:00:00+00:00",
+        )
+        second = self.store.add_attempt(
+            "task-1",
+            kind="verification",
+            status="failed",
+            run_id="run-2",
+            created_at="2026-01-01T02:00:00+00:00",
+        )
+
+        attempts = self.store.list_attempts("task-1")
+        self.assertEqual(
+            [attempt["attempt_id"] for attempt in attempts],
+            [first["attempt_id"], second["attempt_id"]],
+        )
+        self.assertEqual(attempts[1]["run_id"], "run-2")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,4 +24,19 @@ export type RepairTask = {
   resolved_at: string | null;
   proposal_count: number;
   proposals: ChangeProposal[];
+  attempts: RepairAttempt[];
+  attempt_count: number;
+  agent_attempt_count: number;
+  max_agent_attempts: number;
+  can_start_agent_attempt: boolean;
+};
+
+export type RepairAttempt = {
+  attempt_id: string;
+  task_id: string;
+  kind: "agent" | "verification";
+  status: string;
+  run_id: string | null;
+  created_at: string;
+  sequence: number;
 };
