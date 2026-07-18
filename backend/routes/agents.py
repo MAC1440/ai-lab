@@ -5,9 +5,15 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from dependencies import project_context_service, project_detection_service
+from dependencies import (
+    conversation_service,
+    project_context_service,
+    project_detection_service,
+)
 from services.agent_runner import AgentRunner
 from services.agent_service import AgentService
+from services.conversation_service import ConversationStateError
+from services.conversation_store import ConversationNotFoundError
 from services.pydantic_runner import PydanticAgentRunner
 
 
@@ -45,6 +51,11 @@ class AgentChatRequest(BaseModel):
         min_length=1,
         max_length=100,
     )
+    session_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+    )
 
 
 @router.get("/list")
@@ -75,15 +86,30 @@ async def pydantic_agent_chat_stream(
 
     async def generate_events():
         try:
+            run_history = history
+            if request.session_id:
+                run_history = conversation_service.prepare_run(
+                    session_id=request.session_id,
+                    agent_id=request.agent_id,
+                    prompt=request.prompt,
+                    rag_top_k=request.rag_top_k,
+                    rag_distance_threshold=request.rag_distance_threshold,
+                )
             async for event in pydantic_runner.run_events(
                 agent_id=request.agent_id,
                 prompt=request.prompt,
-                history=history,
+                history=run_history,
                 rag_top_k=request.rag_top_k,
                 rag_distance_threshold=request.rag_distance_threshold,
                 tool_policy=request.tool_policy,
                 repair_task_id=request.repair_task_id,
             ):
+                if event.get("type") == "done" and request.session_id:
+                    event["result"]["session_id"] = request.session_id
+                    conversation_service.complete_run(
+                        session_id=request.session_id,
+                        result=event["result"],
+                    )
                 yield _encode_ndjson(event)
 
         except PermissionError as error:
@@ -100,6 +126,22 @@ async def pydantic_agent_chat_stream(
                     "type": "error",
                     "message": str(error),
                     "status_code": 400,
+                }
+            )
+        except ConversationNotFoundError as error:
+            yield _encode_ndjson(
+                {
+                    "type": "error",
+                    "message": str(error),
+                    "status_code": 404,
+                }
+            )
+        except ConversationStateError as error:
+            yield _encode_ndjson(
+                {
+                    "type": "error",
+                    "message": str(error),
+                    "status_code": 409,
                 }
             )
         except RuntimeError as error:

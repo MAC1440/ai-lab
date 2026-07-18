@@ -1,7 +1,10 @@
 import os
 from pathlib import Path
 
+from services.agent_service import AgentService
 from services.change_service import ChangeService
+from services.conversation_service import ConversationService
+from services.conversation_store import ConversationStore
 from services.project_detection_service import ProjectDetectionService
 from services.project_context_service import ProjectContextService
 from services.repair_service import RepairService
@@ -40,6 +43,18 @@ change_service = ChangeService(
     database_path=_changes_database_path,
 )
 scaffold_service = ScaffoldService(workspace_service, change_service)
+
+_conversations_database_path = Path(
+    os.getenv("CONVERSATION_DB_PATH", "data/conversations.sqlite3")
+).expanduser()
+if not _conversations_database_path.is_absolute():
+    _conversations_database_path = _backend_root / _conversations_database_path
+conversation_store = ConversationStore(_conversations_database_path)
+conversation_service = ConversationService(
+    workspace_service,
+    AgentService(),
+    conversation_store,
+)
 
 _repairs_database_path = Path(
     os.getenv("REPAIR_DB_PATH", "data/repairs.sqlite3")

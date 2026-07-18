@@ -7,7 +7,7 @@ import {
     Settings2Icon,
     SparklesIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +40,15 @@ import {
 } from "@/features/agents/agent-api";
 import { RepairDialog } from "@/features/repairs";
 import { ScaffoldDialog } from "@/features/scaffolds";
+import {
+    createConversation,
+    deleteConversation,
+    getConversation,
+    listConversations,
+    SessionSidebar,
+    type ConversationSummary,
+    updateConversation,
+} from "@/features/sessions";
 import { ChatInput } from "@/features/home/components/chat-input";
 import { ChatMessageBubble } from "@/features/home/components/chat-message-bubble";
 import type { HomeChatMessage } from "@/features/home/types";
@@ -246,6 +255,10 @@ export function ChatPanel() {
     const [input, setInput] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isSending, setIsSending] = useState(false);
+    const [sessions, setSessions] = useState<ConversationSummary[]>([]);
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [sessionsLoading, setSessionsLoading] = useState(false);
+    const [showArchived, setShowArchived] = useState(false);
 
     const [agents, setAgents] = useState<AgentProfile[]>([]);
     const [selectedAgentId, setSelectedAgentId] = useState("general");
@@ -273,6 +286,90 @@ export function ChatPanel() {
     );
 
     const selectedAgentUsesTools = Boolean(selectedAgent?.tools.length);
+
+    const refreshSessions = useCallback(async () => {
+        if (!activeWorkspace) {
+            setSessions([]);
+            return;
+        }
+        setSessionsLoading(true);
+        try {
+            setSessions(await listConversations(showArchived));
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Could not load conversations.");
+        } finally {
+            setSessionsLoading(false);
+        }
+    }, [activeWorkspace, showArchived]);
+
+    useEffect(() => {
+        const loadId = window.setTimeout(() => {
+            void refreshSessions();
+        }, 0);
+        return () => window.clearTimeout(loadId);
+    }, [refreshSessions]);
+
+    async function selectSession(session: ConversationSummary) {
+        if (isSending) return;
+        try {
+            const conversation = await getConversation(session.session_id);
+            setSessionId(conversation.session_id);
+            setSelectedAgentId(conversation.agent_id);
+            setSettings({
+                ragTopK: conversation.rag_top_k,
+                ragDistanceThreshold: conversation.rag_distance_threshold ?? "",
+            });
+            setMessages(conversation.messages.map((message) => ({
+                id: message.message_id,
+                role: message.role,
+                content: message.content,
+                agentResult: message.agent_result ?? undefined,
+            })));
+            setError(null);
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Conversation could not be opened.");
+        }
+    }
+
+    function newConversation() {
+        if (isSending) return;
+        setSessionId(null);
+        setMessages([]);
+        setInput("");
+        setError(null);
+    }
+
+    async function changeSessionStatus(session: ConversationSummary, status: "active" | "archived") {
+        try {
+            await updateConversation(session.session_id, { status });
+            if (sessionId === session.session_id && status === "archived") newConversation();
+            await refreshSessions();
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Conversation could not be updated.");
+        }
+    }
+
+    async function renameSession(session: ConversationSummary) {
+        const title = window.prompt("Conversation title", session.title)?.trim();
+        if (!title || title === session.title) return;
+        try {
+            await updateConversation(session.session_id, { title });
+            await refreshSessions();
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Conversation could not be renamed.");
+        }
+    }
+
+    async function removeSession(session: ConversationSummary) {
+        if (!window.confirm(`Permanently delete “${session.title}”?`)) return;
+        try {
+            await deleteConversation(session.session_id);
+            if (sessionId === session.session_id) newConversation();
+            await refreshSessions();
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Conversation could not be deleted.");
+        }
+    }
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({
@@ -341,6 +438,7 @@ export function ChatPanel() {
             .then((recommendation) => {
                 if (agents.some((agent) => agent.id === recommendation.agent_id)) {
                     setSelectedAgentId(recommendation.agent_id);
+                    setSessionId(null);
                     setMessages([]);
                     setRecommendationReason(recommendation.reason);
                 }
@@ -369,6 +467,10 @@ export function ChatPanel() {
             nextToolPolicyRef.current = customEvent.detail.toolPolicy;
             freshHistoryForNextRequestRef.current =
                 customEvent.detail.freshContext;
+            if (customEvent.detail.freshContext) {
+                setSessionId(null);
+                setMessages([]);
+            }
             nextRepairTaskIdRef.current = customEvent.detail.repairTaskId;
 
             if (
@@ -417,6 +519,22 @@ export function ChatPanel() {
                 ? null
                 : settings.ragDistanceThreshold;
 
+        let requestSessionId = sessionId;
+        if (!requestSessionId) {
+            try {
+                const created = await createConversation({
+                    agentId: selectedAgent.id,
+                    ragTopK: settings.ragTopK,
+                    ragDistanceThreshold: distanceThreshold,
+                });
+                requestSessionId = created.session_id;
+                setSessionId(created.session_id);
+            } catch (requestError) {
+                setError(requestError instanceof Error ? requestError.message : "Conversation could not be created.");
+                return;
+            }
+        }
+
         const userMessage: HomeChatMessage = {
             id: crypto.randomUUID(),
             role: "user",
@@ -434,7 +552,7 @@ export function ChatPanel() {
             ),
         };
 
-        const history = freshHistoryForNextRequestRef.current
+        const history = requestSessionId || freshHistoryForNextRequestRef.current
             ? []
             : buildHistory(messages);
         const toolPolicy = nextToolPolicyRef.current;
@@ -473,6 +591,7 @@ export function ChatPanel() {
                 rag_distance_threshold: distanceThreshold,
                 tool_policy: toolPolicy,
                 repair_task_id: repairTaskId,
+                session_id: requestSessionId,
             })) {
                 if (event.type === "error") {
                     updateAssistantMessage((message) =>
@@ -495,6 +614,7 @@ export function ChatPanel() {
                     "The agent stream ended before sending a final result.",
                 );
             }
+            await refreshSessions();
         } catch (requestError) {
             const message =
                 requestError instanceof Error
@@ -513,6 +633,7 @@ export function ChatPanel() {
     }
 
     function handleClear() {
+        setSessionId(null);
         setMessages([]);
         setError(null);
         nextToolPolicyRef.current = "auto";
@@ -528,7 +649,22 @@ export function ChatPanel() {
 
     return (
         <TooltipProvider>
-            <div className="flex h-screen min-h-0 flex-col bg-white dark:bg-zinc-950">
+            <div className="flex h-screen min-h-0 bg-white dark:bg-zinc-950">
+                <SessionSidebar
+                    sessions={sessions}
+                    selectedId={sessionId}
+                    loading={sessionsLoading}
+                    disabled={isSending || !activeWorkspace}
+                    showArchived={showArchived}
+                    onShowArchivedChange={setShowArchived}
+                    onNew={newConversation}
+                    onSelect={(session) => void selectSession(session)}
+                    onArchive={(session) => void changeSessionStatus(session, "archived")}
+                    onRename={(session) => void renameSession(session)}
+                    onRestore={(session) => void changeSessionStatus(session, "active")}
+                    onDelete={(session) => void removeSession(session)}
+                />
+                <div className="flex min-w-0 flex-1 flex-col">
                 <header className="border-b border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
                     <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
@@ -591,6 +727,7 @@ export function ChatPanel() {
                                         onWorkspaceSelected={(workspace) => {
                                             setActiveWorkspace(workspace);
                                             recommendedWorkspaceRef.current = null;
+                                            setSessionId(null);
                                             setMessages([]);
                                             setError(null);
                                             nextToolPolicyRef.current = "auto";
@@ -623,6 +760,7 @@ export function ChatPanel() {
                                     value={selectedAgentId}
                                     onValueChange={(agentId) => {
                                         setSelectedAgentId(agentId);
+                                        setSessionId(null);
                                         setRecommendationReason(null);
                                         setMessages([]);
                                         setError(null);
@@ -861,6 +999,7 @@ export function ChatPanel() {
                         </p>
                     </div>
                 </footer>
+                </div>
             </div>
         </TooltipProvider>
     );
