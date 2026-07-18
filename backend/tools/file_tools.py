@@ -261,6 +261,46 @@ def propose_file_change(
     return {"proposal": proposal}
 
 
+def propose_path_operation(
+    operation: str,
+    file_path: str,
+    destination_path: str = "",
+    summary: str = "",
+    change_set_id: str | None = None,
+    repair_task_id: str | None = None,
+) -> Dict[str, Any]:
+    """Propose a delete, move/rename, or directory creation operation."""
+    clean_operation = _require_non_empty_string(operation, "operation").lower()
+    clean_path = _require_non_empty_string(file_path, "file_path")
+    if clean_operation == "delete":
+        proposal = change_service.propose_delete(
+            file_path=clean_path,
+            summary=summary,
+            change_set_id=change_set_id,
+            repair_task_id=repair_task_id,
+        )
+    elif clean_operation == "move":
+        proposal = change_service.propose_move(
+            file_path=clean_path,
+            destination_path=_require_non_empty_string(
+                destination_path, "destination_path"
+            ),
+            summary=summary,
+            change_set_id=change_set_id,
+            repair_task_id=repair_task_id,
+        )
+    elif clean_operation == "mkdir":
+        proposal = change_service.propose_directory(
+            directory_path=clean_path,
+            summary=summary,
+            change_set_id=change_set_id,
+            repair_task_id=repair_task_id,
+        )
+    else:
+        raise ValueError("operation must be one of: delete, move, mkdir")
+    return {"proposal": proposal}
+
+
 def _replace_unique_text(
     *,
     current_content: str,

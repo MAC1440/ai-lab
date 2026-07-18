@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from dependencies import project_detection_service
 from services.agent_runner import AgentRunner
 from services.agent_service import AgentService
 from services.pydantic_runner import PydanticAgentRunner
@@ -50,6 +51,19 @@ def list_agents():
     return {
         "agents": agent_service.list_agents(),
     }
+
+
+@router.get("/recommendation")
+def recommend_agent():
+    try:
+        overview = project_detection_service.inspect_workspace()
+        recommendation = agent_service.recommend_agent(
+            project["type"] for project in overview["projects"]
+        )
+        recommendation["projects"] = overview["projects"]
+        return recommendation
+    except RuntimeError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @router.post("/chat/pydantic/stream")

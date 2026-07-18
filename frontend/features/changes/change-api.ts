@@ -6,12 +6,13 @@ export type ChangeProposal = {
   file_path: string;
   summary: string;
   status: ChangeProposalStatus;
-  operation: "create" | "update";
+  operation: "create" | "update" | "delete" | "move" | "mkdir";
   diff: string;
   created_at: string;
   resolved_at: string | null;
   change_set_id: string | null;
   repair_task_id: string | null;
+  destination_path: string | null;
 };
 
 type ChangeProposalListResponse = {

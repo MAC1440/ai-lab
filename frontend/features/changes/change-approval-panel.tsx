@@ -75,6 +75,9 @@ export function ChangeApprovalPanel({
             <FileDiffIcon className="size-4 shrink-0 text-sky-400" />
             <span className="truncate" title={proposal.file_path}>
               Proposed {proposal.operation}: {proposal.file_path}
+              {proposal.destination_path
+                ? ` → ${proposal.destination_path}`
+                : ""}
             </span>
           </div>
 
@@ -101,7 +104,7 @@ export function ChangeApprovalPanel({
       {proposal.status === "pending" ? (
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-800 bg-zinc-900/70 px-4 py-3">
           <p className="mr-auto text-xs text-zinc-500">
-            Review every changed line before writing it to disk.
+            Review this operation before changing the workspace.
           </p>
 
           <Button
@@ -132,7 +135,7 @@ export function ChangeApprovalPanel({
             ) : (
               <CheckIcon className="size-4" />
             )}
-            Approve and write
+            Approve operation
           </Button>
         </footer>
       ) : null}

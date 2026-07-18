@@ -115,6 +115,23 @@ class FileProposalToolTests(unittest.TestCase):
         self.assertEqual(proposal["operation"], "create")
         self.assertFalse((self.root / "new.txt").exists())
 
+    def test_path_operation_creates_reviewable_delete(self):
+        target = self.root / "remove.txt"
+        target.write_text("remove me\n", encoding="utf-8")
+        result = file_tools.propose_path_operation(
+            operation="delete",
+            file_path="remove.txt",
+        )
+        self.assertEqual(result["proposal"]["operation"], "delete")
+        self.assertTrue(target.exists())
+
+    def test_path_operation_rejects_unknown_operation(self):
+        with self.assertRaisesRegex(ValueError, "delete, move, mkdir"):
+            file_tools.propose_path_operation(
+                operation="destroy",
+                file_path="anything.txt",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

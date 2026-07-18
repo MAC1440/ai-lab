@@ -174,6 +174,56 @@ class ChangeServiceTests(unittest.TestCase):
         self.assertEqual(resolved[0]["status"], "rejected")
         self.assertFalse((self.root / "one.txt").exists())
 
+    def test_approved_delete_removes_file(self):
+        target = self.root / "obsolete.txt"
+        target.write_text("old\n", encoding="utf-8")
+        proposal = self.service.propose_delete(file_path="obsolete.txt")
+        self.service.approve(proposal["proposal_id"])
+        self.assertFalse(target.exists())
+
+    def test_stale_delete_is_blocked(self):
+        target = self.root / "obsolete.txt"
+        target.write_text("old\n", encoding="utf-8")
+        proposal = self.service.propose_delete(file_path="obsolete.txt")
+        target.write_text("changed\n", encoding="utf-8")
+        with self.assertRaises(ChangeProposalConflictError):
+            self.service.approve(proposal["proposal_id"])
+
+    def test_approved_move_renames_file(self):
+        source = self.root / "old.txt"
+        source.write_text("content\n", encoding="utf-8")
+        proposal = self.service.propose_move(
+            file_path="old.txt",
+            destination_path="nested/new.txt",
+        )
+        self.service.approve(proposal["proposal_id"])
+        self.assertFalse(source.exists())
+        self.assertEqual(
+            (self.root / "nested/new.txt").read_text(encoding="utf-8"),
+            "content\n",
+        )
+
+    def test_move_rejects_existing_destination(self):
+        (self.root / "old.txt").write_text("old\n", encoding="utf-8")
+        (self.root / "new.txt").write_text("new\n", encoding="utf-8")
+        with self.assertRaises(FileExistsError):
+            self.service.propose_move(
+                file_path="old.txt",
+                destination_path="new.txt",
+            )
+
+    def test_approved_mkdir_creates_directory(self):
+        proposal = self.service.propose_directory(
+            directory_path="src/generated"
+        )
+        self.service.approve(proposal["proposal_id"])
+        self.assertTrue((self.root / "src/generated").is_dir())
+
+    def test_directory_delete_is_not_supported(self):
+        (self.root / "folder").mkdir()
+        with self.assertRaises(IsADirectoryError):
+            self.service.propose_delete(file_path="folder")
+
 
 if __name__ == "__main__":
     unittest.main()

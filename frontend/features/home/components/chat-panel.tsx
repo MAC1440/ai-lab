@@ -34,6 +34,7 @@ import {
     type AgentProfile,
     type AgentStreamEvent,
     type AgentToolPolicy,
+    getAgentRecommendation,
     getAgents,
     streamAgentChat,
 } from "@/features/agents/agent-api";
@@ -223,6 +224,8 @@ export function ChatPanel() {
     const [agents, setAgents] = useState<AgentProfile[]>([]);
     const [selectedAgentId, setSelectedAgentId] = useState("general");
     const [agentsLoading, setAgentsLoading] = useState(true);
+    const [recommendationReason, setRecommendationReason] =
+        useState<string | null>(null);
 
     const [activeWorkspace, setActiveWorkspace] = useState<string | null>(null);
     const [workspaceLoading, setWorkspaceLoading] = useState(true);
@@ -236,6 +239,7 @@ export function ChatPanel() {
     const nextToolPolicyRef = useRef<AgentToolPolicy>("auto");
     const freshHistoryForNextRequestRef = useRef(false);
     const nextRepairTaskIdRef = useRef<string | null>(null);
+    const recommendedWorkspaceRef = useRef<string | null>(null);
 
     const selectedAgent = useMemo(
         () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
@@ -304,6 +308,28 @@ export function ChatPanel() {
     }, []);
 
     useEffect(() => {
+        if (!activeWorkspace || agents.length === 0) return;
+        if (recommendedWorkspaceRef.current === activeWorkspace) return;
+        recommendedWorkspaceRef.current = activeWorkspace;
+        void getAgentRecommendation()
+            .then((recommendation) => {
+                if (agents.some((agent) => agent.id === recommendation.agent_id)) {
+                    setSelectedAgentId(recommendation.agent_id);
+                    setMessages([]);
+                    setRecommendationReason(recommendation.reason);
+                }
+            })
+            .catch((requestError: unknown) => {
+                recommendedWorkspaceRef.current = null;
+                setError(
+                    requestError instanceof Error
+                        ? requestError.message
+                        : "Could not recommend an agent for this workspace.",
+                );
+            });
+    }, [activeWorkspace, agents]);
+
+    useEffect(() => {
         function handleVerificationFixRequest(event: Event) {
             const customEvent = event as CustomEvent<VerificationFixRequestDetail>;
             const prompt = customEvent.detail?.prompt;
@@ -319,8 +345,16 @@ export function ChatPanel() {
                 customEvent.detail.freshContext;
             nextRepairTaskIdRef.current = customEvent.detail.repairTaskId;
 
-            if (agents.some((agent) => agent.id === "coding")) {
-                setSelectedAgentId("coding");
+            if (
+                agents.some(
+                    (agent) =>
+                        agent.id === customEvent.detail.recommendedAgentId,
+                )
+            ) {
+                setSelectedAgentId(customEvent.detail.recommendedAgentId);
+                setRecommendationReason(
+                    "Selected for the failed verification's project type.",
+                );
             }
         }
 
@@ -530,6 +564,7 @@ export function ChatPanel() {
                                         activeWorkspace={activeWorkspace}
                                         onWorkspaceSelected={(workspace) => {
                                             setActiveWorkspace(workspace);
+                                            recommendedWorkspaceRef.current = null;
                                             setMessages([]);
                                             setError(null);
                                             nextToolPolicyRef.current = "auto";
@@ -558,6 +593,7 @@ export function ChatPanel() {
                                     value={selectedAgentId}
                                     onValueChange={(agentId) => {
                                         setSelectedAgentId(agentId);
+                                        setRecommendationReason(null);
                                         setMessages([]);
                                         setError(null);
                                         nextToolPolicyRef.current = "auto";
@@ -700,6 +736,14 @@ export function ChatPanel() {
                                     ? `Tools: ${selectedAgent.tools.join(", ")}`
                                     : "No tools"}
                             </span>
+                            {recommendationReason ? (
+                                <>
+                                    <span>•</span>
+                                    <span className="text-emerald-600 dark:text-emerald-400">
+                                        {recommendationReason}
+                                    </span>
+                                </>
+                            ) : null}
                         </div>
                     ) : null}
                 </header>

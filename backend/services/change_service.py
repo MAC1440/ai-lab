@@ -18,6 +18,7 @@ from services.workspace_service import WorkspaceService
 
 
 ChangeProposalStatus = Literal["pending", "approved", "rejected"]
+ChangeOperation = Literal["create", "update", "delete", "move", "mkdir"]
 _VALID_STATUSES = {"pending", "approved", "rejected"}
 
 
@@ -40,7 +41,7 @@ class _StoredProposal:
     file_path: str
     summary: str
     status: ChangeProposalStatus
-    operation: Literal["create", "update"]
+    operation: ChangeOperation
     diff: str
     created_at: str
     resolved_at: Optional[str]
@@ -49,6 +50,7 @@ class _StoredProposal:
     proposed_content: str
     change_set_id: Optional[str]
     repair_task_id: Optional[str]
+    destination_path: Optional[str]
 
 
 class ChangeService:
@@ -139,12 +141,159 @@ class ChangeService:
             proposed_content=content,
             change_set_id=self._optional_id(change_set_id, "change_set_id"),
             repair_task_id=self._optional_id(repair_task_id, "repair_task_id"),
+            destination_path=None,
         )
 
         with self._lock:
             self._proposals[proposal.proposal_id] = proposal
             self._save(proposal)
 
+        return self._public(proposal)
+
+    def propose_delete(
+        self,
+        *,
+        file_path: str,
+        summary: str = "",
+        change_set_id: Optional[str] = None,
+        repair_task_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        workspace_root = self.workspace_service.get_workspace()
+        target = self.workspace_service.resolve_workspace_path(
+            self._validate_path(file_path)
+        )
+        if not target.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+        if not target.is_file():
+            raise IsADirectoryError(
+                "Directory deletion is intentionally unsupported"
+            )
+        current_content = self._read_current_content(target, file_path)
+        relative_path = str(target.relative_to(workspace_root))
+        return self._store_operation(
+            workspace_root=workspace_root,
+            file_path=relative_path,
+            summary=summary,
+            operation="delete",
+            diff=self._build_delete_diff(relative_path, current_content),
+            base_exists=True,
+            base_content=current_content,
+            proposed_content="",
+            destination_path=None,
+            change_set_id=change_set_id,
+            repair_task_id=repair_task_id,
+        )
+
+    def propose_move(
+        self,
+        *,
+        file_path: str,
+        destination_path: str,
+        summary: str = "",
+        change_set_id: Optional[str] = None,
+        repair_task_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        workspace_root = self.workspace_service.get_workspace()
+        source = self.workspace_service.resolve_workspace_path(
+            self._validate_path(file_path)
+        )
+        destination = self.workspace_service.resolve_workspace_path(
+            self._validate_path(destination_path)
+        )
+        if not source.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+        if not source.is_file():
+            raise IsADirectoryError("Only files can be moved or renamed")
+        if destination.exists():
+            raise FileExistsError(
+                f"Move destination already exists: {destination_path}"
+            )
+        current_content = self._read_current_content(source, file_path)
+        relative_source = str(source.relative_to(workspace_root))
+        relative_destination = str(destination.relative_to(workspace_root))
+        return self._store_operation(
+            workspace_root=workspace_root,
+            file_path=relative_source,
+            summary=summary,
+            operation="move",
+            diff=(
+                f"rename from {relative_source}\n"
+                f"rename to {relative_destination}\n"
+            ),
+            base_exists=True,
+            base_content=current_content,
+            proposed_content=current_content,
+            destination_path=relative_destination,
+            change_set_id=change_set_id,
+            repair_task_id=repair_task_id,
+        )
+
+    def propose_directory(
+        self,
+        *,
+        directory_path: str,
+        summary: str = "",
+        change_set_id: Optional[str] = None,
+        repair_task_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        workspace_root = self.workspace_service.get_workspace()
+        target = self.workspace_service.resolve_workspace_path(
+            self._validate_path(directory_path)
+        )
+        if target.exists():
+            raise FileExistsError(f"Path already exists: {directory_path}")
+        relative_path = str(target.relative_to(workspace_root))
+        return self._store_operation(
+            workspace_root=workspace_root,
+            file_path=relative_path,
+            summary=summary,
+            operation="mkdir",
+            diff=f"create directory {relative_path}\n",
+            base_exists=False,
+            base_content="",
+            proposed_content="",
+            destination_path=None,
+            change_set_id=change_set_id,
+            repair_task_id=repair_task_id,
+        )
+
+    def _store_operation(
+        self,
+        *,
+        workspace_root: Path,
+        file_path: str,
+        summary: str,
+        operation: ChangeOperation,
+        diff: str,
+        base_exists: bool,
+        base_content: str,
+        proposed_content: str,
+        destination_path: Optional[str],
+        change_set_id: Optional[str],
+        repair_task_id: Optional[str],
+    ) -> Dict[str, Any]:
+        if not isinstance(summary, str):
+            raise ValueError("summary must be a string")
+        proposal = _StoredProposal(
+            proposal_id=uuid4().hex,
+            workspace=str(workspace_root.resolve()),
+            file_path=file_path,
+            summary=summary.strip(),
+            status="pending",
+            operation=operation,
+            diff=diff,
+            created_at=self._utc_now(),
+            resolved_at=None,
+            base_exists=base_exists,
+            base_sha256=self._hash_text(base_content),
+            proposed_content=proposed_content,
+            change_set_id=self._optional_id(change_set_id, "change_set_id"),
+            repair_task_id=self._optional_id(repair_task_id, "repair_task_id"),
+            destination_path=destination_path,
+        )
+        with self._lock:
+            self._proposals[proposal.proposal_id] = proposal
+            self._save(proposal)
         return self._public(proposal)
 
     def list_proposals(
@@ -223,7 +372,30 @@ class ChangeService:
                     "proposal."
                 )
 
-            self._atomic_write(target, proposal.proposed_content)
+            if proposal.operation in {"create", "update"}:
+                self._atomic_write(target, proposal.proposed_content)
+            elif proposal.operation == "delete":
+                target.unlink()
+            elif proposal.operation == "move":
+                if not proposal.destination_path:
+                    raise ChangeProposalConflictError(
+                        "Move proposal has no destination path"
+                    )
+                destination = self.workspace_service.resolve_workspace_path(
+                    proposal.destination_path
+                )
+                if destination.exists():
+                    raise ChangeProposalConflictError(
+                        "The move destination now exists"
+                    )
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(target, destination)
+            elif proposal.operation == "mkdir":
+                if current_exists:
+                    raise ChangeProposalConflictError(
+                        "The proposed directory path now exists"
+                    )
+                target.mkdir(parents=True, exist_ok=False)
             proposal.status = "approved"
             proposal.resolved_at = self._utc_now()
             self._save(proposal)
@@ -326,6 +498,18 @@ class ChangeService:
         )
 
     @staticmethod
+    def _build_delete_diff(file_path: str, content: str) -> str:
+        return "".join(
+            unified_diff(
+                content.splitlines(keepends=True),
+                [],
+                fromfile=f"a/{file_path}",
+                tofile="/dev/null",
+                lineterm="\n",
+            )
+        )
+
+    @staticmethod
     def _atomic_write(target: Path, content: str) -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
         existing_mode = target.stat().st_mode if target.exists() else None
@@ -400,6 +584,7 @@ class ChangeService:
                 "resolved_at": proposal.resolved_at,
                 "change_set_id": proposal.change_set_id,
                 "repair_task_id": proposal.repair_task_id,
+                "destination_path": proposal.destination_path,
             }
         )
 
@@ -432,7 +617,8 @@ class ChangeService:
                     base_sha256 TEXT NOT NULL,
                     proposed_content TEXT NOT NULL,
                     change_set_id TEXT,
-                    repair_task_id TEXT
+                    repair_task_id TEXT,
+                    destination_path TEXT
                 );
                 CREATE INDEX IF NOT EXISTS change_proposals_workspace_created
                 ON change_proposals (workspace, created_at DESC);
@@ -442,6 +628,18 @@ class ChangeService:
                 ON change_proposals (repair_task_id);
                 """
             )
+            columns = {
+                row["name"]
+                for row in connection.execute(
+                    "PRAGMA table_info(change_proposals)"
+                ).fetchall()
+            }
+            if "destination_path" not in columns:
+                connection.execute(
+                    "ALTER TABLE change_proposals "
+                    "ADD COLUMN destination_path TEXT"
+                )
+            connection.commit()
 
     def _load_proposals(self) -> None:
         with self._connect() as connection:
@@ -465,6 +663,7 @@ class ChangeService:
                     proposed_content=row["proposed_content"],
                     change_set_id=row["change_set_id"],
                     repair_task_id=row["repair_task_id"],
+                    destination_path=row["destination_path"],
                 )
                 self._proposals[proposal.proposal_id] = proposal
 
@@ -478,14 +677,15 @@ class ChangeService:
                     proposal_id, workspace, file_path, summary, status,
                     operation, diff, created_at, resolved_at, base_exists,
                     base_sha256, proposed_content, change_set_id,
-                    repair_task_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    repair_task_id, destination_path
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(proposal_id) DO UPDATE SET
                     status = excluded.status,
                     resolved_at = excluded.resolved_at,
                     proposed_content = excluded.proposed_content,
                     change_set_id = excluded.change_set_id,
-                    repair_task_id = excluded.repair_task_id
+                    repair_task_id = excluded.repair_task_id,
+                    destination_path = excluded.destination_path
                 """,
                 (
                     proposal.proposal_id,
@@ -502,6 +702,7 @@ class ChangeService:
                     proposal.proposed_content,
                     proposal.change_set_id,
                     proposal.repair_task_id,
+                    proposal.destination_path,
                 ),
             )
             connection.commit()

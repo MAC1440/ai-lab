@@ -169,6 +169,35 @@ TOOL_SCHEMAS: Dict[str, ToolSchema] = {
             },
         },
     },
+    "propose_path_operation": {
+        "type": "function",
+        "function": {
+            "name": "propose_path_operation",
+            "description": (
+                "Create a reviewable proposal to delete a file, move or rename "
+                "a file, or create a directory. This never changes the workspace "
+                "until a human approves it. Directory deletion is unsupported."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["delete", "move", "mkdir"],
+                    },
+                    "file_path": {"type": "string"},
+                    "destination_path": {
+                        "type": "string",
+                        "description": "Required only for move operations.",
+                        "default": "",
+                    },
+                    "summary": {"type": "string", "default": ""},
+                },
+                "required": ["operation", "file_path"],
+                "additionalProperties": False,
+            },
+        },
+    },
 }
 
 

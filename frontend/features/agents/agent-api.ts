@@ -6,6 +6,15 @@ export type AgentProfile = {
     system_prompt: string;
     use_rag: boolean;
     tools: string[];
+    project_types: string[];
+};
+
+export type AgentRecommendation = {
+    agent_id: string;
+    agent: AgentProfile;
+    project_types: string[];
+    reason: string;
+    projects: Array<{ type: string; name: string; root: string }>;
 };
 
 type AgentsResponse = {
@@ -181,6 +190,13 @@ export async function getAgents(): Promise<AgentProfile[]> {
 
     const data = await parseResponse<AgentsResponse>(response);
     return data.agents;
+}
+
+export async function getAgentRecommendation(): Promise<AgentRecommendation> {
+    const response = await fetch(`${API_BASE_URL}/agent/recommendation`, {
+        cache: "no-store",
+    });
+    return parseResponse<AgentRecommendation>(response);
 }
 
 export async function* streamAgentChat(

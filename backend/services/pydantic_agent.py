@@ -9,6 +9,7 @@ from services.pydantic_model import get_ollama_model
 from tools.file_tools import (
     list_files as _list_files,
     propose_file_change as _propose_file_change,
+    propose_path_operation as _propose_path_operation,
     read_file as _read_file,
     read_file_range as _read_file_range,
     search_files as _search_files,
@@ -159,10 +160,18 @@ def propose_file_change(
     """Create a reviewable proposal after reading the exact target file."""
     deps = _run_deps(ctx)
     normalized_target = _normalized_path(file_path)
+    target_exists = True
+    try:
+        _read_file(file_path)
+    except FileNotFoundError:
+        target_exists = False
+    except EXPECTED_TOOL_ERRORS:
+        pass
 
     if (
         deps is not None
         and deps.tool_policy == "propose"
+        and target_exists
         and normalized_target not in deps.inspected_paths
     ):
         raise ModelRetry(
@@ -175,6 +184,41 @@ def propose_file_change(
             file_path=file_path,
             new_text=new_text,
             old_text=old_text,
+            summary=summary,
+            change_set_id=deps.change_set_id if deps is not None else None,
+            repair_task_id=deps.repair_task_id if deps is not None else None,
+        )
+        if deps is not None:
+            deps.proposed_paths.add(normalized_target)
+        return result
+    except EXPECTED_TOOL_ERRORS as error:
+        return _tool_error(error)
+
+
+def propose_path_operation(
+    ctx: RunContext[AgentRunDeps],
+    operation: Literal["delete", "move", "mkdir"],
+    file_path: str,
+    destination_path: str = "",
+    summary: str = "",
+) -> Any:
+    """Create a reviewed delete, move/rename, or mkdir proposal."""
+    deps = _run_deps(ctx)
+    normalized_target = _normalized_path(file_path)
+    if (
+        operation in {"delete", "move"}
+        and deps is not None
+        and normalized_target not in deps.inspected_paths
+    ):
+        raise ModelRetry(
+            "Read the exact source file before proposing this operation: "
+            f"{file_path}"
+        )
+    try:
+        result = _propose_path_operation(
+            operation=operation,
+            file_path=file_path,
+            destination_path=destination_path,
             summary=summary,
             change_set_id=deps.change_set_id if deps is not None else None,
             repair_task_id=deps.repair_task_id if deps is not None else None,
@@ -206,14 +250,14 @@ def enforce_tool_policy(
         if not deps.inspected_paths:
             raise ModelRetry(
                 "This is an enforced repair request. Read the files named in "
-                "the failure output, then call propose_file_change. A text-only "
-                "solution is not accepted."
+                "the failure output, then call propose_file_change or "
+                "propose_path_operation. A text-only solution is not accepted."
             )
 
         inspected = ", ".join(sorted(deps.inspected_paths))
         raise ModelRetry(
             "You inspected workspace files but did not create a reviewable "
-            "change. Call propose_file_change for the required fix before "
+            "change. Call the appropriate proposal tool before "
             f"answering. Inspected paths: {inspected}"
         )
 
@@ -227,6 +271,7 @@ TOOL_FUNCTIONS: Dict[str, ToolFunction] = {
     "read_file_range": read_file_range,
     "search_text": search_text,
     "propose_file_change": propose_file_change,
+    "propose_path_operation": propose_path_operation,
 }
 
 

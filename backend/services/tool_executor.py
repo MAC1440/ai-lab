@@ -4,6 +4,7 @@ from services.agent_service import AgentService
 from tools.file_tools import (
     list_files,
     propose_file_change,
+    propose_path_operation,
     read_file,
     read_file_range,
     search_files,
@@ -26,6 +27,7 @@ class ToolExecutor:
             "read_file_range": read_file_range,
             "search_text": search_text,
             "propose_file_change": propose_file_change,
+            "propose_path_operation": propose_path_operation,
         }
 
     def execute(
@@ -144,6 +146,24 @@ class ToolExecutor:
                 "file_path": self._file_path(arguments),
                 "old_text": old_text,
                 "new_text": new_text,
+                "summary": self._string(
+                    arguments,
+                    "summary",
+                    default="",
+                    allow_empty=True,
+                ),
+            }
+
+        if tool_name == "propose_path_operation":
+            return {
+                "operation": self._string(arguments, "operation"),
+                "file_path": self._file_path(arguments),
+                "destination_path": self._string(
+                    arguments,
+                    "destination_path",
+                    default="",
+                    allow_empty=True,
+                ),
                 "summary": self._string(
                     arguments,
                     "summary",

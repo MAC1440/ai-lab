@@ -8,6 +8,7 @@ export type VerificationFixRequestDetail = {
   toolPolicy: "propose";
   freshContext: true;
   repairTaskId: string;
+  recommendedAgentId: "web" | "unity" | "coding";
 };
 
 const MAX_FIX_OUTPUT_CHARS = 12_000;
@@ -61,6 +62,12 @@ export function requestAgentFix(
     toolPolicy: "propose",
     freshContext: true,
     repairTaskId,
+    recommendedAgentId:
+      run.project_type === "unity"
+        ? "unity"
+        : run.project_type === "node" || run.project_type === "python"
+          ? "web"
+          : "coding",
   };
   window.dispatchEvent(
     new CustomEvent<VerificationFixRequestDetail>(
