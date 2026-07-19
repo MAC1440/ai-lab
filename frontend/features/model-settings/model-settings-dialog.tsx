@@ -68,6 +68,7 @@ export function ModelSettingsDialog({ agents, disabled, onSaved }: Props) {
     const [providerKind, setProviderKind] = useState<ProviderKind>("openai_compatible");
     const [providerUrl, setProviderUrl] = useState("");
     const [providerKey, setProviderKey] = useState("");
+    const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
 
     const agentSettings = snapshot?.agents[selectedAgentId];
     const selectedModel = models.find((item) => item.name === agentSettings?.model);
@@ -171,6 +172,7 @@ export function ModelSettingsDialog({ agents, disabled, onSaved }: Props) {
                 {loading ? (
                     <div className="flex h-60 items-center justify-center text-sm text-zinc-500"><Loader2Icon className="mr-2 size-5 animate-spin" />Loading settings…</div>
                 ) : snapshot ? (
+                    <div ref={setPortalContainer}>
                     <ScrollArea className="max-h-[70vh] pr-4">
                         <div className="grid gap-6 py-3 lg:grid-cols-[280px_1fr]">
                             <section className="space-y-3">
@@ -196,7 +198,7 @@ export function ModelSettingsDialog({ agents, disabled, onSaved }: Props) {
                                     <div className="space-y-3 rounded-lg border border-violet-200 p-3 dark:border-violet-900">
                                         <div><Label htmlFor="provider-id">ID</Label><Input id="provider-id" disabled={editingProviderId !== null} placeholder="lm-studio" value={providerId} onChange={(event) => setProviderId(event.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ""))} /></div>
                                         <div><Label htmlFor="provider-name">Display name</Label><Input id="provider-name" placeholder="LM Studio" value={providerName} onChange={(event) => setProviderName(event.target.value)} /></div>
-                                        <div><Label>Type</Label><Select value={providerKind} onValueChange={(value) => setProviderKind(value as ProviderKind)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="openai_compatible">OpenAI compatible</SelectItem><SelectItem value="ollama">Ollama</SelectItem></SelectContent></Select></div>
+                                        <div><Label>Type</Label><Select value={providerKind} onValueChange={(value) => setProviderKind(value as ProviderKind)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent portalContainer={portalContainer}><SelectItem value="openai_compatible">OpenAI compatible</SelectItem><SelectItem value="ollama">Ollama</SelectItem></SelectContent></Select></div>
                                         <div><Label htmlFor="provider-url">Base URL</Label><Input id="provider-url" placeholder="http://localhost:1234/v1" value={providerUrl} onChange={(event) => setProviderUrl(event.target.value)} /></div>
                                         <div><Label htmlFor="provider-key">API key (optional)</Label><Input id="provider-key" type="password" autoComplete="off" placeholder={editingProviderId ? "Leave blank to keep existing key" : "Not required for most local servers"} value={providerKey} onChange={(event) => setProviderKey(event.target.value)} /></div>
                                         <div className="flex gap-2"><Button className="flex-1" disabled={busy || !providerId || !providerName || !providerUrl} onClick={() => void addProvider()}>Save provider</Button><Button variant="outline" onClick={() => { setNewProvider(false); setEditingProviderId(null); }}>Cancel</Button></div>
@@ -204,10 +206,10 @@ export function ModelSettingsDialog({ agents, disabled, onSaved }: Props) {
                                 ) : null}
                             </section>
                             <section className="space-y-4">
-                                <div><Label>Agent</Label><Select value={selectedAgentId} onValueChange={setSelectedAgentId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{agents.map((agent) => <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>)}</SelectContent></Select></div>
+                                <div><Label>Agent</Label><Select value={selectedAgentId} onValueChange={setSelectedAgentId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent portalContainer={portalContainer}>{agents.map((agent) => <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>)}</SelectContent></Select></div>
                                 {agentSettings ? <>
-                                    <div><Label>Provider</Label><Select value={agentSettings.provider_id} disabled={busy} onValueChange={(provider_id) => void updateAgent({ provider_id })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{snapshot.providers.map((provider) => <SelectItem key={provider.id} value={provider.id}>{provider.name}</SelectItem>)}</SelectContent></Select></div>
-                                    <div><Label>Model</Label><div className="flex gap-2"><Input list="available-models" value={agentSettings.model} onChange={(event) => setSnapshot((current) => current ? { ...current, agents: { ...current.agents, [selectedAgentId]: { ...agentSettings, model: event.target.value } } } : current)} /><datalist id="available-models">{models.map((model) => <option key={model.name} value={model.name} />)}</datalist><Button disabled={busy || !agentSettings.model.trim()} onClick={() => void updateAgent({ model: agentSettings.model.trim() })}>Save</Button></div><p className="mt-1 text-xs text-zinc-500">{models.length ? `${models.length} discovered model(s)` : "Type an exact model name or test/discover the provider."}</p></div>
+                                    <div><Label>Provider</Label><Select value={agentSettings.provider_id} disabled={busy} onValueChange={(provider_id) => void updateAgent({ provider_id })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent portalContainer={portalContainer}>{snapshot.providers.map((provider) => <SelectItem key={provider.id} value={provider.id}>{provider.name}</SelectItem>)}</SelectContent></Select></div>
+                                    <div><Label>Model</Label><Select value={agentSettings.model} disabled={busy || models.length === 0} onValueChange={(model) => void updateAgent({ model })}><SelectTrigger><SelectValue placeholder={models.length ? "Select an installed model" : "No discovered models"} /></SelectTrigger><SelectContent portalContainer={portalContainer}>{models.map((model) => <SelectItem key={model.name} value={model.name}>{model.name} · {readableBytes(model.size)}</SelectItem>)}</SelectContent></Select><p className="mt-1 text-xs text-zinc-500">{models.length ? `${models.length} installed model(s) found. Selection saves immediately.` : "Test the provider or confirm Ollama is running."}</p></div>
                                     {selectedModel?.warnings.map((warning) => <div key={warning} className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"><AlertTriangleIcon className="size-4 shrink-0" />{warning}</div>)}
                                     {selectedModel ? <p className="text-xs text-zinc-500">Installed size: {readableBytes(selectedModel.size)}</p> : null}
                                     <div className="grid gap-4 sm:grid-cols-3">
@@ -220,6 +222,7 @@ export function ModelSettingsDialog({ agents, disabled, onSaved }: Props) {
                             </section>
                         </div>
                     </ScrollArea>
+                    </div>
                 ) : null}
                 {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{error}</div> : null}
                 {notice ? <div className="flex gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"><CheckCircle2Icon className="size-4" />{notice}</div> : null}

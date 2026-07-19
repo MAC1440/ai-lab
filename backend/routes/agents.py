@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from dependencies import (
     conversation_service,
     provider_settings_service,
+    mcp_service,
     project_context_service,
     project_detection_service,
 )
@@ -30,6 +31,7 @@ pydantic_runner = PydanticAgentRunner(
     agent_service=agent_service,
     project_context_service=project_context_service,
     provider_settings_service=provider_settings_service,
+    mcp_service=mcp_service,
 )
 
 

@@ -8,6 +8,7 @@ from services.conversation_store import ConversationStore
 from services.project_detection_service import ProjectDetectionService
 from services.project_context_service import ProjectContextService
 from services.provider_settings_service import ProviderSettingsService
+from services.mcp_service import MCPService
 from services.repair_service import RepairService
 from services.repair_store import RepairStore
 from services.scaffold_service import ScaffoldService
@@ -30,6 +31,13 @@ _provider_settings_path = Path(
 if not _provider_settings_path.is_absolute():
     _provider_settings_path = _backend_root / _provider_settings_path
 provider_settings_service = ProviderSettingsService(_provider_settings_path)
+
+_mcp_settings_path = Path(
+    os.getenv("MCP_SETTINGS_PATH", "data/mcp-settings.json")
+).expanduser()
+if not _mcp_settings_path.is_absolute():
+    _mcp_settings_path = _backend_root / _mcp_settings_path
+mcp_service = MCPService(_mcp_settings_path)
 
 _configured_database_path = os.getenv(
     "VERIFICATION_DB_PATH",

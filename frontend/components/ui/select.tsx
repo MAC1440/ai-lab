@@ -4,6 +4,10 @@ import { type ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
 
+type SelectContentProps = ComponentProps<typeof SelectPrimitive.Content> & {
+  portalContainer?: HTMLElement | null;
+};
+
 export function Select({
   ...props
 }: ComponentProps<typeof SelectPrimitive.Root>) {
@@ -51,10 +55,11 @@ export function SelectContent({
   className,
   children,
   position = "popper",
+  portalContainer,
   ...props
-}: ComponentProps<typeof SelectPrimitive.Content>) {
+}: SelectContentProps) {
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={portalContainer}>
       <SelectPrimitive.Content
         data-slot="select-content"
         position={position}

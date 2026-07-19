@@ -31,6 +31,7 @@ from services.project_context_service import (
     build_project_context_instructions,
 )
 from services.provider_settings_service import ProviderSettingsService
+from services.mcp_service import MCPService
 from services.rag import RAGService
 
 
@@ -47,6 +48,7 @@ class PydanticAgentRunner:
         max_rag_context_chars: int = 8000,
         max_model_requests: int = 10,
         provider_settings_service: Optional[ProviderSettingsService] = None,
+        mcp_service: Optional[MCPService] = None,
     ) -> None:
         if max_model_requests < 2:
             raise ValueError("max_model_requests must be at least 2")
@@ -57,6 +59,7 @@ class PydanticAgentRunner:
         self.max_rag_context_chars = max_rag_context_chars
         self.max_model_requests = max_model_requests
         self.provider_settings_service = provider_settings_service
+        self.mcp_service = mcp_service
 
     async def run_events(
         self,
@@ -106,7 +109,12 @@ class PydanticAgentRunner:
             if self.provider_settings_service is not None
             else None
         )
-        agent = get_pydantic_agent(agent_id, runtime)
+        mcp_toolsets = (
+            self.mcp_service.build_toolsets(agent_id)
+            if self.mcp_service is not None and tool_policy == "auto"
+            else []
+        )
+        agent = get_pydantic_agent(agent_id, runtime, mcp_toolsets)
 
         yield {
             "type": "status",

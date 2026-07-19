@@ -278,6 +278,7 @@ TOOL_FUNCTIONS: Dict[str, ToolFunction] = {
 def _build_pydantic_agent(
     agent_id: str,
     runtime: Dict[str, Any] | None = None,
+    toolsets: list[Any] | None = None,
 ) -> Agent:
     """Build a Pydantic AI agent from the existing agent configuration."""
 
@@ -316,6 +317,7 @@ def _build_pydantic_agent(
         instructions=config["system_prompt"],
         deps_type=AgentRunDeps,
         tools=tools,
+        toolsets=toolsets or [],
         retries={"tools": 2, "output": 2},
         model_settings=model_settings,
     )
@@ -331,12 +333,13 @@ def _get_default_pydantic_agent(agent_id: str) -> Agent:
 def get_pydantic_agent(
     agent_id: str,
     runtime: Dict[str, Any] | None = None,
+    toolsets: list[Any] | None = None,
 ) -> Agent:
     """Use cached defaults, but rebuild when runtime settings are supplied."""
 
-    if runtime is None:
+    if runtime is None and not toolsets:
         return _get_default_pydantic_agent(agent_id)
-    return _build_pydantic_agent(agent_id, runtime)
+    return _build_pydantic_agent(agent_id, runtime, toolsets)
 
 
 get_pydantic_agent.cache_clear = _get_default_pydantic_agent.cache_clear  # type: ignore[attr-defined]
