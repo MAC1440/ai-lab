@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from dependencies import (
     conversation_service,
+    provider_settings_service,
     project_context_service,
     project_detection_service,
 )
@@ -28,6 +29,7 @@ agent_runner = AgentRunner(agent_service=agent_service)
 pydantic_runner = PydanticAgentRunner(
     agent_service=agent_service,
     project_context_service=project_context_service,
+    provider_settings_service=provider_settings_service,
 )
 
 
@@ -60,8 +62,15 @@ class AgentChatRequest(BaseModel):
 
 @router.get("/list")
 def list_agents():
+    agents = agent_service.list_agents()
+    for agent in agents:
+        runtime = provider_settings_service.resolve_agent(
+            agent["id"], fallback_model=agent["model"]
+        )
+        agent["model"] = runtime["model"]
+        agent["provider_id"] = runtime["provider_id"]
     return {
-        "agents": agent_service.list_agents(),
+        "agents": agents,
     }
 
 

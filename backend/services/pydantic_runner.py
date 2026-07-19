@@ -30,6 +30,7 @@ from services.project_context_service import (
     ProjectContextService,
     build_project_context_instructions,
 )
+from services.provider_settings_service import ProviderSettingsService
 from services.rag import RAGService
 
 
@@ -45,6 +46,7 @@ class PydanticAgentRunner:
         project_context_service: Optional[ProjectContextService] = None,
         max_rag_context_chars: int = 8000,
         max_model_requests: int = 10,
+        provider_settings_service: Optional[ProviderSettingsService] = None,
     ) -> None:
         if max_model_requests < 2:
             raise ValueError("max_model_requests must be at least 2")
@@ -54,6 +56,7 @@ class PydanticAgentRunner:
         self.project_context_service = project_context_service
         self.max_rag_context_chars = max_rag_context_chars
         self.max_model_requests = max_model_requests
+        self.provider_settings_service = provider_settings_service
 
     async def run_events(
         self,
@@ -96,7 +99,14 @@ class PydanticAgentRunner:
                 "file-reading tool"
             )
 
-        agent = get_pydantic_agent(agent_id)
+        runtime = (
+            self.provider_settings_service.runtime_config(
+                agent_id, config.get("model", "granite4.1:3b")
+            )
+            if self.provider_settings_service is not None
+            else None
+        )
+        agent = get_pydantic_agent(agent_id, runtime)
 
         yield {
             "type": "status",
@@ -158,7 +168,14 @@ class PydanticAgentRunner:
             "step": 1,
         }
 
-        message_history = self._convert_history(history)
+        history_budget = (
+            min(12000, int(runtime["generation"]["context_window"]) * 2)
+            if runtime is not None
+            else 12000
+        )
+        message_history = self._convert_history(
+            history, max_characters=history_budget
+        )
         run_deps = AgentRunDeps(
             tool_policy=tool_policy,
             change_set_id=uuid4().hex,
@@ -324,7 +341,14 @@ class PydanticAgentRunner:
             "result": {
                 "answer": answer,
                 "agent_id": agent_id,
-                "model": config.get("model", "unknown"),
+                "model": (
+                    runtime["model"]
+                    if runtime is not None
+                    else config.get("model", "unknown")
+                ),
+                "provider_id": (
+                    runtime["provider_id"] if runtime is not None else "ollama"
+                ),
                 "steps": steps,
                 "tools_used": tools_used,
                 "rag": rag_trace,
@@ -528,13 +552,26 @@ Rules:
     @staticmethod
     def _convert_history(
         history: Optional[List[Message]],
+        max_characters: int = 12000,
     ) -> List[ModelMessage]:
         if not history:
             return []
 
         messages: List[ModelMessage] = []
+        selected: List[Message] = []
+        used_characters = 0
 
-        for message in history[-12:]:
+        for message in reversed(history[-12:]):
+            content = message.get("content")
+            if not isinstance(content, str) or not content.strip():
+                continue
+            remaining = max_characters - used_characters
+            if remaining <= 0:
+                break
+            selected.append({**message, "content": content[-remaining:]})
+            used_characters += min(len(content), remaining)
+
+        for message in reversed(selected):
             role = message.get("role")
             content = message.get("content")
 

@@ -39,6 +39,7 @@ import {
     streamAgentChat,
 } from "@/features/agents/agent-api";
 import { RepairDialog } from "@/features/repairs";
+import { ModelSettingsDialog } from "@/features/model-settings";
 import { ScaffoldDialog } from "@/features/scaffolds";
 import {
     createConversation,
@@ -748,6 +749,15 @@ export function ChatPanel() {
 
                             <ScaffoldDialog
                                 disabled={!activeWorkspace || isSending}
+                            />
+
+                            <ModelSettingsDialog
+                                agents={agents}
+                                disabled={isSending || agentsLoading}
+                                onSaved={async () => {
+                                    const refreshed = await getAgents();
+                                    setAgents(refreshed);
+                                }}
                             />
 
                             {agentsLoading ? (

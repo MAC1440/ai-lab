@@ -3,6 +3,7 @@ export type AgentProfile = {
     name: string;
     description: string;
     model: string;
+    provider_id?: string;
     system_prompt: string;
     use_rag: boolean;
     tools: string[];
@@ -82,6 +83,7 @@ export type AgentChatResponse = {
     answer: string;
     agent_id: string;
     model: string;
+    provider_id?: string;
     steps: number;
     tools_used: AgentToolExecution[];
     rag: AgentRagTrace;

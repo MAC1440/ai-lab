@@ -7,6 +7,7 @@ from services.conversation_service import ConversationService
 from services.conversation_store import ConversationStore
 from services.project_detection_service import ProjectDetectionService
 from services.project_context_service import ProjectContextService
+from services.provider_settings_service import ProviderSettingsService
 from services.repair_service import RepairService
 from services.repair_store import RepairStore
 from services.scaffold_service import ScaffoldService
@@ -16,13 +17,20 @@ from services.workspace_service import WorkspaceService
 
 
 workspace_service = WorkspaceService()
+_backend_root = Path(__file__).resolve().parent
 project_detection_service = ProjectDetectionService(workspace_service)
 project_context_service = ProjectContextService(
     workspace_service,
     project_detection_service,
 )
 
-_backend_root = Path(__file__).resolve().parent
+_provider_settings_path = Path(
+    os.getenv("PROVIDER_SETTINGS_PATH", "data/provider-settings.json")
+).expanduser()
+if not _provider_settings_path.is_absolute():
+    _provider_settings_path = _backend_root / _provider_settings_path
+provider_settings_service = ProviderSettingsService(_provider_settings_path)
+
 _configured_database_path = os.getenv(
     "VERIFICATION_DB_PATH",
     "data/verification.sqlite3",

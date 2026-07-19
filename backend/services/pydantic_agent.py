@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, Literal
 from pydantic_ai import Agent, ModelRetry, RunContext
 
 from services.agent_service import AgentService
-from services.pydantic_model import get_ollama_model
+from services.pydantic_model import build_pydantic_model
 from tools.file_tools import (
     list_files as _list_files,
     propose_file_change as _propose_file_change,
@@ -275,8 +275,10 @@ TOOL_FUNCTIONS: Dict[str, ToolFunction] = {
 }
 
 
-@lru_cache(maxsize=10)
-def get_pydantic_agent(agent_id: str) -> Agent:
+def _build_pydantic_agent(
+    agent_id: str,
+    runtime: Dict[str, Any] | None = None,
+) -> Agent:
     """Build a Pydantic AI agent from the existing agent configuration."""
 
     agent_service = AgentService()
@@ -290,18 +292,51 @@ def get_pydantic_agent(agent_id: str) -> Agent:
         if tool_name in TOOL_FUNCTIONS
     ]
 
-    model = get_ollama_model(config["model"])
+    runtime = runtime or {
+        "model": config["model"],
+        "generation": {
+            "temperature": 0.1,
+            "max_tokens": 2048,
+            "context_window": 8192,
+        },
+        "provider": {
+            "kind": "ollama",
+            "base_url": "http://localhost:11434",
+        },
+    }
+    model = build_pydantic_model(runtime)
+    generation = runtime["generation"]
 
+    model_settings = {
+        "temperature": generation["temperature"],
+        "max_tokens": generation["max_tokens"],
+    }
     agent = Agent(
         model=model,
         instructions=config["system_prompt"],
         deps_type=AgentRunDeps,
         tools=tools,
         retries={"tools": 2, "output": 2},
-        model_settings={
-            "temperature": 0.1,
-            "max_tokens": 2048,
-        },
+        model_settings=model_settings,
     )
     agent.output_validator(enforce_tool_policy)
     return agent
+
+
+@lru_cache(maxsize=10)
+def _get_default_pydantic_agent(agent_id: str) -> Agent:
+    return _build_pydantic_agent(agent_id)
+
+
+def get_pydantic_agent(
+    agent_id: str,
+    runtime: Dict[str, Any] | None = None,
+) -> Agent:
+    """Use cached defaults, but rebuild when runtime settings are supplied."""
+
+    if runtime is None:
+        return _get_default_pydantic_agent(agent_id)
+    return _build_pydantic_agent(agent_id, runtime)
+
+
+get_pydantic_agent.cache_clear = _get_default_pydantic_agent.cache_clear  # type: ignore[attr-defined]

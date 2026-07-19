@@ -12,6 +12,7 @@ from routes.agents import router as agents_router  # noqa: E402
 from routes.changes import router as changes_router  # noqa: E402
 from routes.conversations import router as conversations_router  # noqa: E402
 from routes.repairs import router as repairs_router  # noqa: E402
+from routes.provider_settings import router as provider_settings_router  # noqa: E402
 from routes.scaffolds import router as scaffolds_router  # noqa: E402
 from routes.verifications import router as verifications_router  # noqa: E402
 from routes.workspaces import router as workspaces_router  # noqa: E402
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(changes_router)
     app.include_router(conversations_router)
     app.include_router(repairs_router)
+    app.include_router(provider_settings_router)
     app.include_router(scaffolds_router)
     app.include_router(verifications_router)
 

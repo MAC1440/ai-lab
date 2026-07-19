@@ -13,7 +13,9 @@ frontend/.next/
 frontend/.turbo/
 frontend/.env
 frontend/.env.local
+frontend/package-lock.json
 
 # OS
 .DS_Store
 Thumbs.db
+backend/data/provider-settings.json
