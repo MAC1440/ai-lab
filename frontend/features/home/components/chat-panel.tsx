@@ -41,6 +41,7 @@ import {
 import { RepairDialog } from "@/features/repairs";
 import { ModelSettingsDialog } from "@/features/model-settings";
 import { MCPSettingsDialog } from "@/features/mcp";
+import { SystemDialog } from "@/features/system";
 import { ScaffoldDialog } from "@/features/scaffolds";
 import {
     createConversation,
@@ -765,6 +766,8 @@ export function ChatPanel() {
                                 agents={agents}
                                 disabled={isSending || agentsLoading}
                             />
+
+                            <SystemDialog disabled={isSending} />
 
                             {agentsLoading ? (
                                 <div className="flex items-center gap-2 px-2 text-xs text-zinc-500">

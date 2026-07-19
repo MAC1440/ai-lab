@@ -15,6 +15,7 @@ from services.scaffold_service import ScaffoldService
 from services.verification_service import VerificationService
 from services.verification_store import VerificationStore
 from services.workspace_service import WorkspaceService
+from services.system_service import SystemService
 
 
 workspace_service = WorkspaceService()
@@ -91,4 +92,22 @@ verification_service = VerificationService(
     max_output_chars=int(
         os.getenv("VERIFICATION_MAX_OUTPUT_CHARS", "200000")
     ),
+)
+
+system_service = SystemService(
+    workspace_service=workspace_service,
+    provider_settings_service=provider_settings_service,
+    mcp_service=mcp_service,
+    agent_ids=[agent["id"] for agent in AgentService().list_agents()],
+    database_paths={
+        "verification": _database_path,
+        "changes": _changes_database_path,
+        "conversations": _conversations_database_path,
+        "repairs": _repairs_database_path,
+    },
+    config_paths={
+        "provider-settings": _provider_settings_path,
+        "mcp-settings": _mcp_settings_path,
+    },
+    data_directory=_backend_root / "data",
 )
