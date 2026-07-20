@@ -16,6 +16,7 @@ from services.verification_service import VerificationService
 from services.verification_store import VerificationStore
 from services.workspace_service import WorkspaceService
 from services.system_service import SystemService
+from services.unity_docs_service import UnityDocsService
 
 
 workspace_service = WorkspaceService()
@@ -111,3 +112,5 @@ system_service = SystemService(
     },
     data_directory=_backend_root / "data",
 )
+
+unity_docs_service = UnityDocsService()

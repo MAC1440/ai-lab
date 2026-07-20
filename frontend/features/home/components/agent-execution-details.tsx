@@ -209,6 +209,21 @@ export function AgentExecutionDetails({
                                                 <span>
                                                     Source: <strong>{String(source.source ?? "unknown")}</strong>
                                                 </span>
+                                                {source.title ? (
+                                                    <span>
+                                                        Page: <strong>{source.title}</strong>
+                                                    </span>
+                                                ) : null}
+                                                {source.heading ? (
+                                                    <span>
+                                                        Section: <strong>{source.heading}</strong>
+                                                    </span>
+                                                ) : null}
+                                                {source.unity_version ? (
+                                                    <span>
+                                                        Version: <strong>{source.unity_version}</strong>
+                                                    </span>
+                                                ) : null}
                                                 <span>
                                                     Chunk:{" "}
                                                     <strong>{String(source.chunk_index ?? "unknown")}</strong>
@@ -220,6 +235,16 @@ export function AgentExecutionDetails({
                                                     </strong>
                                                 </span>
                                             </div>
+                                            {source.source_url ? (
+                                                <a
+                                                    href={source.source_url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="mt-1 inline-block text-violet-600 underline underline-offset-2 dark:text-violet-400"
+                                                >
+                                                    Open official Unity documentation
+                                                </a>
+                                            ) : null}
                                         </div>
                                     ))}
                                 </div>

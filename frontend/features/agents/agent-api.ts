@@ -39,6 +39,10 @@ export type AgentToolExecution = {
 
 export type AgentRagSource = {
     source?: string;
+    source_url?: string;
+    title?: string;
+    heading?: string;
+    unity_version?: string;
     chunk_index?: string | number;
     [key: string]: unknown;
 };

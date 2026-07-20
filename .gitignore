@@ -18,3 +18,7 @@ frontend/package-lock.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Local launcher runtime
+backend/data/logs/
+backend/data/launcher-state.json

@@ -12,11 +12,12 @@ class ChromaService:
         chunks: List[str],
         embeddings: List[List[float]],
         metadatas: Optional[List[Dict[str, Any]]] = None,
+        ids: Optional[List[str]] = None,
     ):
-        ids = [f"chunk_{i}" for i in range(len(chunks))]
+        resolved_ids = ids or [f"chunk_{i}" for i in range(len(chunks))]
 
-        self.collection.add(
-            ids=ids,
+        self.collection.upsert(
+            ids=resolved_ids,
             documents=chunks,
             embeddings=embeddings,
             metadatas=metadatas or [{} for _ in chunks],
@@ -24,7 +25,7 @@ class ChromaService:
 
         return {
             "added": len(chunks),
-            "ids": ids,
+            "ids": resolved_ids,
         }
 
     def search(
@@ -38,7 +39,11 @@ class ChromaService:
         )
 
     def clear(self):
-        self.client.delete_collection(name=self.collection.name)
-        self.collection = self.client.get_or_create_collection(name=self.collection.name)
+        collection_name = self.collection.name
+        self.client.delete_collection(name=collection_name)
+        self.collection = self.client.get_or_create_collection(name=collection_name)
 
         return {"cleared": True}
+
+    def count(self) -> int:
+        return self.collection.count()

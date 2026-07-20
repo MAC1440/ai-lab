@@ -18,6 +18,7 @@ from routes.scaffolds import router as scaffolds_router  # noqa: E402
 from routes.verifications import router as verifications_router  # noqa: E402
 from routes.workspaces import router as workspaces_router  # noqa: E402
 from routes.system import router as system_router  # noqa: E402
+from routes.unity_docs import router as unity_docs_router  # noqa: E402
 
 
 def create_app() -> FastAPI:
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(scaffolds_router)
     app.include_router(verifications_router)
     app.include_router(system_router)
+    app.include_router(unity_docs_router)
 
     return app
 
