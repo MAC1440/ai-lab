@@ -81,7 +81,19 @@ export type AgentChatRequest = {
     tool_policy?: AgentToolPolicy;
     repair_task_id?: string | null;
     session_id?: string | null;
+    run_id: string;
+    rag_enabled?: boolean | null;
+    tools_enabled?: boolean | null;
+    enabled_tools?: string[] | null;
 };
+
+export async function cancelAgentRun(runId: string): Promise<boolean> {
+    const response = await fetch(`${API_BASE_URL}/agent/runs/${encodeURIComponent(runId)}/cancel`, {
+        method: "POST",
+    });
+    const result = await parseResponse<{ cancelled: boolean }>(response);
+    return result.cancelled;
+}
 
 export type AgentChatResponse = {
     answer: string;

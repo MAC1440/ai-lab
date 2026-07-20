@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpIcon } from "lucide-react";
+import { ArrowUpIcon, SquareIcon } from "lucide-react";
 import { type FormEvent, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,16 @@ export function ChatInput({
     onSubmit,
     disabled = false,
     placeholder = "Message your local model…",
+    streaming = false,
+    onStop,
 }: {
     value: string;
     onChange: (value: string) => void;
     onSubmit: () => void;
     disabled?: boolean;
     placeholder?: string;
+    streaming?: boolean;
+    onStop?: () => void;
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -62,17 +66,18 @@ export function ChatInput({
                     )}
                 />
                 <Button
-                    type="submit"
+                    type={streaming ? "button" : "submit"}
                     size="icon"
-                    disabled={disabled || !value.trim()}
+                    disabled={streaming ? false : disabled || !value.trim()}
                     className="size-9 shrink-0 rounded-xl"
-                    aria-label="Send message"
+                    aria-label={streaming ? "Stop response" : "Send message"}
+                    onClick={streaming ? onStop : undefined}
                 >
-                    <ArrowUpIcon className="size-4" />
+                    {streaming ? <SquareIcon className="size-3.5 fill-current" /> : <ArrowUpIcon className="size-4" />}
                 </Button>
             </div>
             <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
-                Press Enter to send · Shift+Enter for a new line
+                {streaming ? "Stop closes the active Ollama stream" : "Press Enter to send · Shift+Enter for a new line"}
             </p>
         </form>
     );

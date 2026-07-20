@@ -1,5 +1,7 @@
+import asyncio
 import json
 from typing import Any, Dict, Iterator, List, Literal, Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -11,6 +13,7 @@ from dependencies import (
     mcp_service,
     project_context_service,
     project_detection_service,
+    run_cancellation_service,
 )
 from services.agent_runner import AgentRunner
 from services.agent_service import AgentService
@@ -60,6 +63,10 @@ class AgentChatRequest(BaseModel):
         min_length=1,
         max_length=100,
     )
+    run_id: str = Field(default_factory=lambda: uuid4().hex, min_length=8, max_length=100)
+    rag_enabled: Optional[bool] = None
+    tools_enabled: Optional[bool] = None
+    enabled_tools: Optional[List[str]] = None
 
 
 @router.get("/list")
@@ -97,6 +104,7 @@ async def pydantic_agent_chat_stream(
 
     async def generate_events():
         try:
+            await run_cancellation_service.register(request.run_id)
             run_history = history
             if request.session_id:
                 run_history = conversation_service.prepare_run(
@@ -114,6 +122,9 @@ async def pydantic_agent_chat_stream(
                 rag_distance_threshold=request.rag_distance_threshold,
                 tool_policy=request.tool_policy,
                 repair_task_id=request.repair_task_id,
+                rag_enabled=request.rag_enabled,
+                tools_enabled=request.tools_enabled,
+                enabled_tools=request.enabled_tools,
             ):
                 if event.get("type") == "done" and request.session_id:
                     event["result"]["session_id"] = request.session_id
@@ -122,6 +133,11 @@ async def pydantic_agent_chat_stream(
                         result=event["result"],
                     )
                 yield _encode_ndjson(event)
+
+        except asyncio.CancelledError:
+            # Re-raising is what closes Pydantic AI's model context and the
+            # underlying HTTP stream to Ollama immediately.
+            raise
 
         except PermissionError as error:
             yield _encode_ndjson(
@@ -171,6 +187,8 @@ async def pydantic_agent_chat_stream(
                     "status_code": 500,
                 }
             )
+        finally:
+            await run_cancellation_service.unregister(request.run_id)
 
     return StreamingResponse(
         generate_events(),
@@ -180,6 +198,15 @@ async def pydantic_agent_chat_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/runs/{run_id}/cancel")
+async def cancel_agent_run(run_id: str):
+    result = await run_cancellation_service.cancel(run_id)
+    return {
+        "run_id": result.run_id,
+        "cancelled": result.cancelled,
+    }
 
 
 @router.post("/chat/stream")

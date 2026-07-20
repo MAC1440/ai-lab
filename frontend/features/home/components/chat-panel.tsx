@@ -2,6 +2,7 @@
 
 import {
     AlertCircleIcon,
+    ChevronDownIcon,
     FolderCogIcon,
     Loader2Icon,
     Settings2Icon,
@@ -34,6 +35,7 @@ import {
     type AgentProfile,
     type AgentStreamEvent,
     type AgentToolPolicy,
+    cancelAgentRun,
     getAgentRecommendation,
     getAgents,
     streamAgentChat,
@@ -42,7 +44,7 @@ import { RepairDialog } from "@/features/repairs";
 import { ModelSettingsDialog } from "@/features/model-settings";
 import { MCPSettingsDialog } from "@/features/mcp";
 import { SystemDialog } from "@/features/system";
-import { UnityKnowledgeDialog } from "@/features/unity-knowledge";
+import { KnowledgeSourcesDialog } from "@/features/knowledge-sources";
 import { ScaffoldDialog } from "@/features/scaffolds";
 import {
     createConversation,
@@ -68,11 +70,15 @@ type AgentChatSettings = {
     ragTopK: number;
     // An empty value is sent as null, which disables distance filtering.
     ragDistanceThreshold: number | "";
+    ragMode: "default" | "on" | "off";
+    toolsMode: "default" | "on" | "off";
 };
 
 const defaultAgentSettings: AgentChatSettings = {
     ragTopK: 3,
     ragDistanceThreshold: 1,
+    ragMode: "default",
+    toolsMode: "default",
 };
 
 function buildHistory(
@@ -277,19 +283,24 @@ export function ChatPanel() {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [settings, setSettings] =
         useState<AgentChatSettings>(defaultAgentSettings);
+    const [showAdvanced, setShowAdvanced] = useState(false);
 
     const bottomRef = useRef<HTMLDivElement>(null);
     const nextToolPolicyRef = useRef<AgentToolPolicy>("auto");
     const freshHistoryForNextRequestRef = useRef(false);
     const nextRepairTaskIdRef = useRef<string | null>(null);
     const recommendedWorkspaceRef = useRef<string | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const activeRunIdRef = useRef<string | null>(null);
 
     const selectedAgent = useMemo(
         () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
         [agents, selectedAgentId],
     );
 
-    const selectedAgentUsesTools = Boolean(selectedAgent?.tools.length);
+    const selectedAgentUsesTools = Boolean(
+        selectedAgent?.tools.length && settings.toolsMode !== "off",
+    );
 
     const refreshSessions = useCallback(async () => {
         if (!activeWorkspace) {
@@ -320,6 +331,7 @@ export function ChatPanel() {
             setSessionId(conversation.session_id);
             setSelectedAgentId(conversation.agent_id);
             setSettings({
+                ...defaultAgentSettings,
                 ragTopK: conversation.rag_top_k,
                 ragDistanceThreshold: conversation.rag_distance_threshold ?? "",
             });
@@ -573,6 +585,10 @@ export function ChatPanel() {
         setIsSending(true);
 
         let receivedDoneEvent = false;
+        const runId = crypto.randomUUID();
+        const abortController = new AbortController();
+        activeRunIdRef.current = runId;
+        abortControllerRef.current = abortController;
 
         const updateAssistantMessage = (
             updater: (message: HomeChatMessage) => HomeChatMessage,
@@ -596,7 +612,11 @@ export function ChatPanel() {
                 tool_policy: toolPolicy,
                 repair_task_id: repairTaskId,
                 session_id: requestSessionId,
-            })) {
+                run_id: runId,
+                rag_enabled: settings.ragMode === "default" ? null : settings.ragMode === "on",
+                tools_enabled: settings.toolsMode === "default" ? null : settings.toolsMode === "on",
+                enabled_tools: settings.toolsMode === "on" ? selectedAgent.tools : null,
+            }, abortController.signal)) {
                 if (event.type === "error") {
                     updateAssistantMessage((message) =>
                         applyAgentStreamEvent(message, event),
@@ -620,20 +640,31 @@ export function ChatPanel() {
             }
             await refreshSessions();
         } catch (requestError) {
+            const stopped = requestError instanceof DOMException && requestError.name === "AbortError";
             const message =
-                requestError instanceof Error
+                stopped
+                    ? "Response stopped"
+                    : requestError instanceof Error
                     ? requestError.message
                     : "The message could not be sent.";
 
             updateAssistantMessage((assistantMessage) => ({
                 ...assistantMessage,
                 streamingStatus: undefined,
-                streamError: assistantMessage.streamError ?? message,
+                streamError: stopped ? undefined : assistantMessage.streamError ?? message,
             }));
-            setError(message);
+            setError(stopped ? null : message);
         } finally {
+            abortControllerRef.current = null;
+            activeRunIdRef.current = null;
             setIsSending(false);
         }
+    }
+
+    function handleStop() {
+        const runId = activeRunIdRef.current;
+        abortControllerRef.current?.abort();
+        if (runId) void cancelAgentRun(runId).catch(() => undefined);
     }
 
     function handleClear() {
@@ -742,36 +773,6 @@ export function ChatPanel() {
                                 </DialogContent>
                             </Dialog>
 
-                            <VerificationDialog
-                                disabled={!activeWorkspace || isSending}
-                            />
-
-                            <RepairDialog
-                                disabled={!activeWorkspace || isSending}
-                            />
-
-                            <ScaffoldDialog
-                                disabled={!activeWorkspace || isSending}
-                            />
-
-                            <ModelSettingsDialog
-                                agents={agents}
-                                disabled={isSending || agentsLoading}
-                                onSaved={async () => {
-                                    const refreshed = await getAgents();
-                                    setAgents(refreshed);
-                                }}
-                            />
-
-                            <MCPSettingsDialog
-                                agents={agents}
-                                disabled={isSending || agentsLoading}
-                            />
-
-                            <SystemDialog disabled={isSending} />
-
-                            <UnityKnowledgeDialog disabled={isSending} />
-
                             {agentsLoading ? (
                                 <div className="flex items-center gap-2 px-2 text-xs text-zinc-500">
                                     <Loader2Icon className="size-4 animate-spin" />
@@ -813,7 +814,7 @@ export function ChatPanel() {
                                 </DialogTrigger>
 
                                 <DialogContent className="max-w-lg">
-                                    <DialogTitle>Agent retrieval settings</DialogTitle>
+                                    <DialogTitle>Agent runtime controls</DialogTitle>
                                     <DialogDescription>
                                         These values map directly to the supported
                                         <code className="mx-1">
@@ -824,6 +825,21 @@ export function ChatPanel() {
                                     </DialogDescription>
 
                                     <div className="grid gap-4 py-2 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label>RAG for this message</Label>
+                                            <Select value={settings.ragMode} onValueChange={(value: AgentChatSettings["ragMode"]) => setSettings((current) => ({ ...current, ragMode: value }))}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent><SelectItem value="default">Profile default</SelectItem><SelectItem value="on">Enabled</SelectItem><SelectItem value="off">Disabled</SelectItem></SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Workspace tools for this message</Label>
+                                            <Select value={settings.toolsMode} onValueChange={(value: AgentChatSettings["toolsMode"]) => setSettings((current) => ({ ...current, toolsMode: value }))}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent><SelectItem value="default">Profile default</SelectItem><SelectItem value="on">Enabled</SelectItem><SelectItem value="off">Disabled</SelectItem></SelectContent>
+                                            </Select>
+                                            <p className="text-xs text-zinc-500">Enabling uses only tools already permitted by this profile.</p>
+                                        </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="rag-top-k">RAG top K</Label>
                                             <Input
@@ -906,6 +922,41 @@ export function ChatPanel() {
                             >
                                 Clear
                             </Button>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => setShowAdvanced((value) => !value)}>
+                                Manage
+                                <ChevronDownIcon className={`ml-2 size-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+                            </Button>
+                                                        {showAdvanced ? <div className="flex flex-wrap items-center justify-end gap-2 basis-full rounded-xl border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-900/60">
+                            <VerificationDialog
+                                disabled={!activeWorkspace || isSending}
+                            />
+
+                            <RepairDialog
+                                disabled={!activeWorkspace || isSending}
+                            />
+
+                            <ScaffoldDialog
+                                disabled={!activeWorkspace || isSending}
+                            />
+
+                            <ModelSettingsDialog
+                                agents={agents}
+                                disabled={isSending || agentsLoading}
+                                onSaved={async () => {
+                                    const refreshed = await getAgents();
+                                    setAgents(refreshed);
+                                }}
+                            />
+
+                            <MCPSettingsDialog
+                                agents={agents}
+                                disabled={isSending || agentsLoading}
+                            />
+
+                            <SystemDialog disabled={isSending} />
+
+                            <KnowledgeSourcesDialog disabled={isSending} />
+                            </div> : null}
                         </div>
                     </div>
 
@@ -918,7 +969,7 @@ export function ChatPanel() {
                             <span>{selectedAgent.model}</span>
                             <span>•</span>
                             <span>
-                                {selectedAgent.use_rag ? "RAG enabled" : "RAG disabled"}
+                                {settings.ragMode === "default" ? (selectedAgent.use_rag ? "RAG default: on" : "RAG default: off") : `RAG override: ${settings.ragMode}`}
                             </span>
                             <span>•</span>
                             <span>
@@ -1006,6 +1057,8 @@ export function ChatPanel() {
                             onChange={setInput}
                             onSubmit={handleSend}
                             disabled={inputDisabled}
+                            streaming={isSending}
+                            onStop={handleStop}
                             placeholder={
                                 selectedAgentUsesTools && !activeWorkspace
                                     ? "Select a workspace before using this agent…"

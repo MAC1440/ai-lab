@@ -71,6 +71,9 @@ class PydanticAgentRunner:
         rag_distance_threshold: Optional[float] = 1.0,
         tool_policy: ToolPolicy = "auto",
         repair_task_id: Optional[str] = None,
+        rag_enabled: Optional[bool] = None,
+        tools_enabled: Optional[bool] = None,
+        enabled_tools: Optional[List[str]] = None,
     ) -> AsyncIterator[AgentEvent]:
         clean_prompt = prompt.strip()
 
@@ -78,9 +81,13 @@ class PydanticAgentRunner:
             raise ValueError("Prompt cannot be empty")
 
         config = self.agent_service.get_agent(agent_id)
-        allowed_tool_names = self.agent_service.get_allowed_tool_names(
-            agent_id
+        profile_tool_names = self.agent_service.get_allowed_tool_names(agent_id)
+        allowed_tool_names = self._resolve_tools(
+            profile_tool_names=profile_tool_names,
+            tools_enabled=tools_enabled,
+            enabled_tools=enabled_tools,
         )
+        use_rag = bool(config.get("use_rag", False)) if rag_enabled is None else rag_enabled
 
         if (
             tool_policy == "propose"
@@ -111,10 +118,17 @@ class PydanticAgentRunner:
         )
         mcp_toolsets = (
             self.mcp_service.build_toolsets(agent_id)
-            if self.mcp_service is not None and tool_policy == "auto"
+            if self.mcp_service is not None
+            and tool_policy == "auto"
+            and tools_enabled is not False
             else []
         )
-        agent = get_pydantic_agent(agent_id, runtime, mcp_toolsets)
+        agent = get_pydantic_agent(
+            agent_id,
+            runtime,
+            mcp_toolsets,
+            allowed_tool_names=allowed_tool_names,
+        )
 
         yield {
             "type": "status",
@@ -142,7 +156,7 @@ class PydanticAgentRunner:
             "context": project_context_trace,
         }
 
-        if config.get("use_rag", False):
+        if use_rag:
             yield {
                 "type": "status",
                 "stage": "retrieving",
@@ -150,7 +164,7 @@ class PydanticAgentRunner:
             }
 
         rag_trace, rag_context = self._retrieve_rag_context(
-            enabled=bool(config.get("use_rag", False)),
+            enabled=use_rag,
             query=clean_prompt,
             top_k=rag_top_k,
             distance_threshold=rag_distance_threshold,
@@ -395,6 +409,28 @@ This request is in enforced repair mode.
             self.rag_service = RAGService()
 
         return self.rag_service
+
+    @staticmethod
+    def _resolve_tools(
+        *,
+        profile_tool_names: List[str],
+        tools_enabled: Optional[bool],
+        enabled_tools: Optional[List[str]],
+    ) -> set[str]:
+        if tools_enabled is False:
+            return set()
+        if enabled_tools is None:
+            return set(profile_tool_names)
+
+        requested = {name.strip() for name in enabled_tools if name.strip()}
+        profile_tools = set(profile_tool_names)
+        disallowed = requested - profile_tools
+        if disallowed:
+            names = ", ".join(sorted(disallowed))
+            raise PermissionError(
+                f"The selected agent does not permit these tools: {names}"
+            )
+        return requested
 
     @staticmethod
     def _empty_project_context_trace() -> Dict[str, Any]:

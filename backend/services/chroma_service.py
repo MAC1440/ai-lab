@@ -47,3 +47,6 @@ class ChromaService:
 
     def count(self) -> int:
         return self.collection.count()
+
+    def delete_where(self, where: Dict[str, Any]) -> None:
+        self.collection.delete(where=where)

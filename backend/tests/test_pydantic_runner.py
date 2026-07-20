@@ -14,6 +14,33 @@ from services.pydantic_runner import PydanticAgentRunner
 
 
 class PydanticAgentRunnerTests(unittest.IsolatedAsyncioTestCase):
+    def test_tool_override_can_only_reduce_profile_permissions(self):
+        runner = PydanticAgentRunner()
+        self.assertEqual(
+            runner._resolve_tools(
+                profile_tool_names=["read_file", "search_text"],
+                tools_enabled=True,
+                enabled_tools=["read_file"],
+            ),
+            {"read_file"},
+        )
+        with self.assertRaises(PermissionError):
+            runner._resolve_tools(
+                profile_tool_names=["read_file"],
+                tools_enabled=True,
+                enabled_tools=["propose_file_change"],
+            )
+
+    def test_tools_can_be_disabled_per_run(self):
+        self.assertEqual(
+            PydanticAgentRunner._resolve_tools(
+                profile_tool_names=["read_file"],
+                tools_enabled=False,
+                enabled_tools=None,
+            ),
+            set(),
+        )
+
     async def test_project_context_is_streamed_and_added_to_result(self):
         class DummyContextService:
             def build(self, *, prompt, agent_id):

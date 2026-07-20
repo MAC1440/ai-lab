@@ -17,6 +17,8 @@ from services.verification_store import VerificationStore
 from services.workspace_service import WorkspaceService
 from services.system_service import SystemService
 from services.unity_docs_service import UnityDocsService
+from services.run_cancellation_service import RunCancellationService
+from services.knowledge_source_service import KnowledgeSourceService
 
 
 workspace_service = WorkspaceService()
@@ -114,3 +116,5 @@ system_service = SystemService(
 )
 
 unity_docs_service = UnityDocsService()
+run_cancellation_service = RunCancellationService()
+knowledge_source_service = KnowledgeSourceService(_backend_root / "data/knowledge-sources.json")

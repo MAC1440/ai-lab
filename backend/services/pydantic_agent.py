@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Callable, Dict, Literal
+from typing import Any, Callable, Collection, Dict, Literal
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 
@@ -279,17 +279,22 @@ def _build_pydantic_agent(
     agent_id: str,
     runtime: Dict[str, Any] | None = None,
     toolsets: list[Any] | None = None,
+    allowed_tool_names: Collection[str] | None = None,
 ) -> Agent:
     """Build a Pydantic AI agent from the existing agent configuration."""
 
     agent_service = AgentService()
     config = agent_service.get_agent(agent_id)
 
-    allowed_tool_names = agent_service.get_allowed_tool_names(agent_id)
+    resolved_tool_names = (
+        set(allowed_tool_names)
+        if allowed_tool_names is not None
+        else agent_service.get_allowed_tool_names(agent_id)
+    )
 
     tools = [
         TOOL_FUNCTIONS[tool_name]
-        for tool_name in allowed_tool_names
+        for tool_name in resolved_tool_names
         if tool_name in TOOL_FUNCTIONS
     ]
 
@@ -334,12 +339,18 @@ def get_pydantic_agent(
     agent_id: str,
     runtime: Dict[str, Any] | None = None,
     toolsets: list[Any] | None = None,
+    allowed_tool_names: Collection[str] | None = None,
 ) -> Agent:
     """Use cached defaults, but rebuild when runtime settings are supplied."""
 
-    if runtime is None and not toolsets:
+    if runtime is None and not toolsets and allowed_tool_names is None:
         return _get_default_pydantic_agent(agent_id)
-    return _build_pydantic_agent(agent_id, runtime, toolsets)
+    return _build_pydantic_agent(
+        agent_id,
+        runtime,
+        toolsets,
+        allowed_tool_names,
+    )
 
 
 get_pydantic_agent.cache_clear = _get_default_pydantic_agent.cache_clear  # type: ignore[attr-defined]
