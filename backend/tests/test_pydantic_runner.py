@@ -14,6 +14,25 @@ from services.pydantic_runner import PydanticAgentRunner
 
 
 class PydanticAgentRunnerTests(unittest.IsolatedAsyncioTestCase):
+    def test_rag_mode_overrides_general_profile(self):
+        runner = PydanticAgentRunner()
+        self.assertEqual(
+            runner._resolve_rag(
+                profile_enabled=False,
+                rag_mode="enabled",
+                legacy_override=None,
+            ),
+            (True, "request"),
+        )
+        self.assertEqual(
+            runner._resolve_rag(
+                profile_enabled=True,
+                rag_mode="disabled",
+                legacy_override=None,
+            ),
+            (False, "request"),
+        )
+
     def test_tool_override_can_only_reduce_profile_permissions(self):
         runner = PydanticAgentRunner()
         self.assertEqual(

@@ -63,8 +63,13 @@ class AgentChatRequest(BaseModel):
         min_length=1,
         max_length=100,
     )
-    run_id: str = Field(default_factory=lambda: uuid4().hex, min_length=8, max_length=100)
+    run_id: str = Field(
+        default_factory=lambda: uuid4().hex,
+        min_length=8,
+        max_length=100,
+    )
     rag_enabled: Optional[bool] = None
+    rag_mode: Literal["default", "enabled", "disabled"] = "default"
     tools_enabled: Optional[bool] = None
     enabled_tools: Optional[List[str]] = None
 
@@ -123,6 +128,7 @@ async def pydantic_agent_chat_stream(
                 tool_policy=request.tool_policy,
                 repair_task_id=request.repair_task_id,
                 rag_enabled=request.rag_enabled,
+                rag_mode=request.rag_mode,
                 tools_enabled=request.tools_enabled,
                 enabled_tools=request.enabled_tools,
             ):

@@ -182,6 +182,15 @@ export function AgentExecutionDetails({
                                 <dt>Context found</dt>
                                 <dd>{result.rag.context_found ? "Yes" : "No"}</dd>
 
+                                <dt>Configuration</dt>
+                                <dd>
+                                    {result.rag.resolved_from === "request"
+                                        ? "Frontend override"
+                                        : result.rag.resolved_from === "legacy_request"
+                                            ? "Legacy override"
+                                            : "Agent profile"}
+                                </dd>
+
                                 <dt>Retrieved</dt>
                                 <dd>{result.rag.retrieved_count}</dd>
 

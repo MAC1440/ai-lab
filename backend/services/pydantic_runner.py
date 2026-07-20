@@ -72,6 +72,7 @@ class PydanticAgentRunner:
         tool_policy: ToolPolicy = "auto",
         repair_task_id: Optional[str] = None,
         rag_enabled: Optional[bool] = None,
+        rag_mode: str = "default",
         tools_enabled: Optional[bool] = None,
         enabled_tools: Optional[List[str]] = None,
     ) -> AsyncIterator[AgentEvent]:
@@ -87,7 +88,11 @@ class PydanticAgentRunner:
             tools_enabled=tools_enabled,
             enabled_tools=enabled_tools,
         )
-        use_rag = bool(config.get("use_rag", False)) if rag_enabled is None else rag_enabled
+        use_rag, rag_resolved_from = self._resolve_rag(
+            profile_enabled=bool(config.get("use_rag", False)),
+            rag_mode=rag_mode,
+            legacy_override=rag_enabled,
+        )
 
         if (
             tool_policy == "propose"
@@ -169,6 +174,8 @@ class PydanticAgentRunner:
             top_k=rag_top_k,
             distance_threshold=rag_distance_threshold,
         )
+        rag_trace["resolved_from"] = rag_resolved_from
+        rag_trace["requested_mode"] = rag_mode
 
         yield {
             "type": "rag",
@@ -431,6 +438,23 @@ This request is in enforced repair mode.
                 f"The selected agent does not permit these tools: {names}"
             )
         return requested
+
+    @staticmethod
+    def _resolve_rag(
+        *,
+        profile_enabled: bool,
+        rag_mode: str,
+        legacy_override: Optional[bool],
+    ) -> tuple[bool, str]:
+        if rag_mode == "enabled":
+            return True, "request"
+        if rag_mode == "disabled":
+            return False, "request"
+        if rag_mode != "default":
+            raise ValueError("rag_mode must be default, enabled, or disabled")
+        if legacy_override is not None:
+            return legacy_override, "legacy_request"
+        return profile_enabled, "profile"
 
     @staticmethod
     def _empty_project_context_trace() -> Dict[str, Any]:

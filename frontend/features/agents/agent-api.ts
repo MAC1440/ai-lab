@@ -49,6 +49,8 @@ export type AgentRagSource = {
 
 export type AgentRagTrace = {
     enabled: boolean;
+    resolved_from?: "profile" | "request" | "legacy_request";
+    requested_mode?: "default" | "enabled" | "disabled";
     context_found: boolean;
     retrieved_count: number;
     included_count: number;
@@ -83,6 +85,7 @@ export type AgentChatRequest = {
     session_id?: string | null;
     run_id: string;
     rag_enabled?: boolean | null;
+    rag_mode?: "default" | "enabled" | "disabled";
     tools_enabled?: boolean | null;
     enabled_tools?: string[] | null;
 };

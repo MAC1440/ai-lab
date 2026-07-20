@@ -2,50 +2,22 @@
 
 import {
     AlertCircleIcon,
-    ChevronDownIcon,
     FolderCogIcon,
-    Loader2Icon,
-    Settings2Icon,
     SparklesIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
-    type AgentChatHistoryMessage,
-    type AgentChatResponse,
     type AgentProfile,
-    type AgentStreamEvent,
     type AgentToolPolicy,
     cancelAgentRun,
     getAgentRecommendation,
     getAgents,
     streamAgentChat,
 } from "@/features/agents/agent-api";
-import { RepairDialog } from "@/features/repairs";
-import { ModelSettingsDialog } from "@/features/model-settings";
-import { MCPSettingsDialog } from "@/features/mcp";
-import { SystemDialog } from "@/features/system";
-import { KnowledgeSourcesDialog } from "@/features/knowledge-sources";
-import { ScaffoldDialog } from "@/features/scaffolds";
 import {
     createConversation,
     deleteConversation,
@@ -57,208 +29,20 @@ import {
 } from "@/features/sessions";
 import { ChatInput } from "@/features/home/components/chat-input";
 import { ChatMessageBubble } from "@/features/home/components/chat-message-bubble";
+import { ChatHeader } from "@/features/home/components/chat-header";
+import {
+    applyAgentStreamEvent,
+    buildHistory,
+    createInitialAgentResult,
+    defaultAgentSettings,
+    type AgentChatSettings,
+} from "@/features/home/components/agent-chat-state";
 import type { HomeChatMessage } from "@/features/home/types";
 import {
     VERIFICATION_FIX_REQUEST_EVENT,
     type VerificationFixRequestDetail,
-    VerificationDialog,
 } from "@/features/verification";
-import { WorkspacePicker } from "@/features/workspaces";
 import { getActiveWorkspace } from "@/features/workspaces/workspace-api";
-
-type AgentChatSettings = {
-    ragTopK: number;
-    // An empty value is sent as null, which disables distance filtering.
-    ragDistanceThreshold: number | "";
-    ragMode: "default" | "on" | "off";
-    toolsMode: "default" | "on" | "off";
-};
-
-const defaultAgentSettings: AgentChatSettings = {
-    ragTopK: 3,
-    ragDistanceThreshold: 1,
-    ragMode: "default",
-    toolsMode: "default",
-};
-
-function buildHistory(
-    messages: HomeChatMessage[],
-): AgentChatHistoryMessage[] {
-    return messages
-        .filter((message) => message.content.trim().length > 0)
-        .map((message) => ({
-            role: message.role,
-            content: message.content,
-        }))
-        .slice(-12);
-}
-
-function createInitialAgentResult(
-    agent: AgentProfile,
-    distanceThreshold: number | null,
-): AgentChatResponse {
-    return {
-        answer: "",
-        agent_id: agent.id,
-        model: agent.model,
-        steps: 0,
-        tools_used: [],
-        rag: {
-            enabled: agent.use_rag,
-            context_found: false,
-            retrieved_count: 0,
-            included_count: 0,
-            sources: [],
-            distances: [],
-            distance_threshold: distanceThreshold,
-        },
-        context: {
-            enabled: false,
-            workspace: null,
-            project_types: [],
-            selected_project_root: null,
-            files_included: [],
-            file_count: 0,
-            prompt_paths_found: [],
-            tree_entries: 0,
-            tree_truncated: false,
-            characters: 0,
-            max_characters: 0,
-            skipped_paths: [],
-        },
-    };
-}
-
-function applyAgentStreamEvent(
-    message: HomeChatMessage,
-    event: AgentStreamEvent,
-): HomeChatMessage {
-    const currentResult = message.agentResult;
-
-    switch (event.type) {
-        case "status":
-            return {
-                ...message,
-                streamingStatus: event.message,
-                agentResult: currentResult
-                    ? {
-                        ...currentResult,
-                        steps: event.step ?? currentResult.steps,
-                    }
-                    : currentResult,
-            };
-
-        case "rag":
-            return currentResult
-                ? {
-                    ...message,
-                    agentResult: {
-                        ...currentResult,
-                        rag: event.rag,
-                    },
-                }
-                : message;
-
-        case "context":
-            return currentResult
-                ? {
-                    ...message,
-                    agentResult: {
-                        ...currentResult,
-                        context: event.context,
-                    },
-                }
-                : message;
-
-        case "answer_delta":
-            return {
-                ...message,
-                content: message.content + event.content,
-                agentResult: currentResult
-                    ? {
-                        ...currentResult,
-                        answer: currentResult.answer + event.content,
-                        steps: event.step,
-                    }
-                    : currentResult,
-            };
-
-        case "answer_reset":
-            return {
-                ...message,
-                content: "",
-                agentResult: currentResult
-                    ? {
-                        ...currentResult,
-                        answer: "",
-                        steps: event.step,
-                    }
-                    : currentResult,
-            };
-
-        case "tool_start":
-            return currentResult
-                ? {
-                    ...message,
-                    streamingStatus: `Running ${event.name}`,
-                    agentResult: {
-                        ...currentResult,
-                        steps: event.step,
-                        tools_used: [
-                            ...currentResult.tools_used,
-                            {
-                                id: event.call_id,
-                                name: event.name,
-                                arguments: event.arguments,
-                                status: "running",
-                            },
-                        ],
-                    },
-                }
-                : message;
-
-        case "tool_result":
-            return currentResult
-                ? {
-                    ...message,
-                    streamingStatus:
-                        event.tool.status === "success"
-                            ? `${event.tool.name} completed`
-                            : `${event.tool.name} failed`,
-                    agentResult: {
-                        ...currentResult,
-                        steps: event.step,
-                        tools_used: currentResult.tools_used.some(
-                            (tool) => tool.id === event.call_id,
-                        )
-                            ? currentResult.tools_used.map((tool) =>
-                                tool.id === event.call_id ? event.tool : tool,
-                            )
-                            : [...currentResult.tools_used, event.tool],
-                    },
-                }
-                : message;
-
-        case "done":
-            return {
-                ...message,
-                content: event.result.answer,
-                agentResult: event.result,
-                streamingStatus: undefined,
-                streamError: undefined,
-            };
-
-        case "error":
-            return {
-                ...message,
-                streamingStatus: undefined,
-                streamError: event.message,
-            };
-
-        default:
-            return message;
-    }
-}
 
 export function ChatPanel() {
     const [messages, setMessages] = useState<HomeChatMessage[]>([]);
@@ -283,7 +67,6 @@ export function ChatPanel() {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [settings, setSettings] =
         useState<AgentChatSettings>(defaultAgentSettings);
-    const [showAdvanced, setShowAdvanced] = useState(false);
 
     const bottomRef = useRef<HTMLDivElement>(null);
     const nextToolPolicyRef = useRef<AgentToolPolicy>("auto");
@@ -299,7 +82,7 @@ export function ChatPanel() {
     );
 
     const selectedAgentUsesTools = Boolean(
-        selectedAgent?.tools.length && settings.toolsMode !== "off",
+        selectedAgent?.tools.length && settings.toolsMode !== "disabled",
     );
 
     const refreshSessions = useCallback(async () => {
@@ -564,6 +347,7 @@ export function ChatPanel() {
             streamingStatus: "Preparing the selected agent",
             agentResult: createInitialAgentResult(
                 selectedAgent,
+                settings,
                 distanceThreshold,
             ),
         };
@@ -613,9 +397,9 @@ export function ChatPanel() {
                 repair_task_id: repairTaskId,
                 session_id: requestSessionId,
                 run_id: runId,
-                rag_enabled: settings.ragMode === "default" ? null : settings.ragMode === "on",
-                tools_enabled: settings.toolsMode === "default" ? null : settings.toolsMode === "on",
-                enabled_tools: settings.toolsMode === "on" ? selectedAgent.tools : null,
+                rag_mode: settings.ragMode,
+                tools_enabled: settings.toolsMode === "default" ? null : settings.toolsMode === "enabled",
+                enabled_tools: settings.toolsMode === "enabled" ? selectedAgent.tools : null,
             }, abortController.signal)) {
                 if (event.type === "error") {
                     updateAssistantMessage((message) =>
@@ -700,294 +484,44 @@ export function ChatPanel() {
                     onDelete={(session) => void removeSession(session)}
                 />
                 <div className="flex min-w-0 flex-1 flex-col">
-                <header className="border-b border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
-                    <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <div className="flex size-9 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
-                                <SparklesIcon className="size-5" />
-                            </div>
-
-                            <div>
-                                <h1 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                                    AI Lab Agent Chat
-                                </h1>
-                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                                    RAG retrieval and workspace tools through FastAPI
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                            <div className="hidden max-w-[260px] items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 md:flex dark:border-zinc-800 dark:bg-zinc-900">
-                                <FolderCogIcon className="size-4 shrink-0 text-violet-600 dark:text-violet-400" />
-
-                                <div className="min-w-0">
-                                    <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-                                        Workspace
-                                    </p>
-                                    <p
-                                        className="truncate text-xs font-medium text-zinc-800 dark:text-zinc-200"
-                                        title={activeWorkspace ?? "No workspace selected"}
-                                    >
-                                        {workspaceLoading
-                                            ? "Loading…"
-                                            : activeWorkspace ?? "Not selected"}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <Dialog
-                                open={workspaceDialogOpen}
-                                onOpenChange={setWorkspaceDialogOpen}
-                            >
-                                <DialogTrigger asChild>
-                                    <Button type="button" variant="outline" size="sm">
-                                        <FolderCogIcon className="mr-2 size-4" />
-                                        {activeWorkspace
-                                            ? "Change workspace"
-                                            : "Select workspace"}
-                                    </Button>
-                                </DialogTrigger>
-
-                                <DialogContent className="max-w-2xl">
-                                    <DialogTitle>Select workspace</DialogTitle>
-                                    <DialogDescription>
-                                        Tool-enabled agents can only inspect files inside the
-                                        selected folder. The workspace is selected through the
-                                        workspace API and is not sent inside every chat request.
-                                    </DialogDescription>
-
-                                    <WorkspacePicker
-                                        activeWorkspace={activeWorkspace}
-                                        onWorkspaceSelected={(workspace) => {
-                                            setActiveWorkspace(workspace);
-                                            recommendedWorkspaceRef.current = null;
-                                            setSessionId(null);
-                                            setMessages([]);
-                                            setError(null);
-                                            nextToolPolicyRef.current = "auto";
-                                            freshHistoryForNextRequestRef.current = false;
-                                            setWorkspaceDialogOpen(false);
-                                        }}
-                                    />
-                                </DialogContent>
-                            </Dialog>
-
-                            {agentsLoading ? (
-                                <div className="flex items-center gap-2 px-2 text-xs text-zinc-500">
-                                    <Loader2Icon className="size-4 animate-spin" />
-                                    Loading agents…
-                                </div>
-                            ) : agents.length > 0 ? (
-                                <Select
-                                    value={selectedAgentId}
-                                    onValueChange={(agentId) => {
-                                        setSelectedAgentId(agentId);
-                                        setSessionId(null);
-                                        setRecommendationReason(null);
-                                        setMessages([]);
-                                        setError(null);
-                                        nextToolPolicyRef.current = "auto";
-                                        freshHistoryForNextRequestRef.current = false;
-                                    }}
-                                >
-                                    <SelectTrigger className="w-[180px]">
-                                        <SelectValue placeholder="Select agent" />
-                                    </SelectTrigger>
-
-                                    <SelectContent>
-                                        {agents.map((agent) => (
-                                            <SelectItem key={agent.id} value={agent.id}>
-                                                {agent.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            ) : null}
-
-                            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-                                <DialogTrigger asChild>
-                                    <Button type="button" variant="outline" size="sm">
-                                        <Settings2Icon className="mr-2 size-4" />
-                                        Retrieval
-                                    </Button>
-                                </DialogTrigger>
-
-                                <DialogContent className="max-w-lg">
-                                    <DialogTitle>Agent runtime controls</DialogTitle>
-                                    <DialogDescription>
-                                        These values map directly to the supported
-                                        <code className="mx-1">
-                                            /agent/chat/pydantic/stream
-                                        </code>
-                                        request fields. Agents with RAG disabled safely ignore
-                                        them.
-                                    </DialogDescription>
-
-                                    <div className="grid gap-4 py-2 sm:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label>RAG for this message</Label>
-                                            <Select value={settings.ragMode} onValueChange={(value: AgentChatSettings["ragMode"]) => setSettings((current) => ({ ...current, ragMode: value }))}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent><SelectItem value="default">Profile default</SelectItem><SelectItem value="on">Enabled</SelectItem><SelectItem value="off">Disabled</SelectItem></SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Workspace tools for this message</Label>
-                                            <Select value={settings.toolsMode} onValueChange={(value: AgentChatSettings["toolsMode"]) => setSettings((current) => ({ ...current, toolsMode: value }))}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent><SelectItem value="default">Profile default</SelectItem><SelectItem value="on">Enabled</SelectItem><SelectItem value="off">Disabled</SelectItem></SelectContent>
-                                            </Select>
-                                            <p className="text-xs text-zinc-500">Enabling uses only tools already permitted by this profile.</p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="rag-top-k">RAG top K</Label>
-                                            <Input
-                                                id="rag-top-k"
-                                                type="number"
-                                                min={1}
-                                                max={10}
-                                                step={1}
-                                                value={settings.ragTopK}
-                                                onChange={(event) => {
-                                                    const value = Number(event.target.value);
-
-                                                    setSettings((current) => ({
-                                                        ...current,
-                                                        ragTopK: Number.isFinite(value)
-                                                            ? Math.min(10, Math.max(1, Math.trunc(value)))
-                                                            : 3,
-                                                    }));
-                                                }}
-                                            />
-                                            <p className="text-xs text-zinc-500">
-                                                Number of candidate chunks requested from Chroma.
-                                            </p>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label htmlFor="rag-distance-threshold">
-                                                Distance threshold
-                                            </Label>
-                                            <Input
-                                                id="rag-distance-threshold"
-                                                type="number"
-                                                min={0}
-                                                step={0.05}
-                                                placeholder="Empty disables filtering"
-                                                value={settings.ragDistanceThreshold}
-                                                onChange={(event) => {
-                                                    const rawValue = event.target.value;
-
-                                                    setSettings((current) => ({
-                                                        ...current,
-                                                        ragDistanceThreshold:
-                                                            rawValue === ""
-                                                                ? ""
-                                                                : Math.max(0, Number(rawValue)),
-                                                    }));
-                                                }}
-                                            />
-                                            <p className="text-xs text-zinc-500">
-                                                Smaller distances are generally closer matches. Leave
-                                                empty to send null and disable the filter.
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-end gap-2">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => setSettings(defaultAgentSettings)}
-                                        >
-                                            Reset
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            onClick={() => setSettingsOpen(false)}
-                                        >
-                                            Done
-                                        </Button>
-                                    </div>
-                                </DialogContent>
-                            </Dialog>
-
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={handleClear}
-                                disabled={messages.length === 0 || isSending}
-                            >
-                                Clear
-                            </Button>
-                                <Button type="button" variant="ghost" size="sm" onClick={() => setShowAdvanced((value) => !value)}>
-                                Manage
-                                <ChevronDownIcon className={`ml-2 size-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-                            </Button>
-                                                        {showAdvanced ? <div className="flex flex-wrap items-center justify-end gap-2 basis-full rounded-xl border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-900/60">
-                            <VerificationDialog
-                                disabled={!activeWorkspace || isSending}
-                            />
-
-                            <RepairDialog
-                                disabled={!activeWorkspace || isSending}
-                            />
-
-                            <ScaffoldDialog
-                                disabled={!activeWorkspace || isSending}
-                            />
-
-                            <ModelSettingsDialog
-                                agents={agents}
-                                disabled={isSending || agentsLoading}
-                                onSaved={async () => {
-                                    const refreshed = await getAgents();
-                                    setAgents(refreshed);
-                                }}
-                            />
-
-                            <MCPSettingsDialog
-                                agents={agents}
-                                disabled={isSending || agentsLoading}
-                            />
-
-                            <SystemDialog disabled={isSending} />
-
-                            <KnowledgeSourcesDialog disabled={isSending} />
-                            </div> : null}
-                        </div>
-                    </div>
-
-                    {selectedAgent ? (
-                        <div className="mx-auto mt-3 flex max-w-5xl flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                            <span className="font-medium text-zinc-700 dark:text-zinc-200">
-                                {selectedAgent.name}
-                            </span>
-                            <span>•</span>
-                            <span>{selectedAgent.model}</span>
-                            <span>•</span>
-                            <span>
-                                {settings.ragMode === "default" ? (selectedAgent.use_rag ? "RAG default: on" : "RAG default: off") : `RAG override: ${settings.ragMode}`}
-                            </span>
-                            <span>•</span>
-                            <span>
-                                {selectedAgent.tools.length > 0
-                                    ? `Tools: ${selectedAgent.tools.join(", ")}`
-                                    : "No tools"}
-                            </span>
-                            {recommendationReason ? (
-                                <>
-                                    <span>•</span>
-                                    <span className="text-emerald-600 dark:text-emerald-400">
-                                        {recommendationReason}
-                                    </span>
-                                </>
-                            ) : null}
-                        </div>
-                    ) : null}
-                </header>
+                <ChatHeader
+                    agents={agents}
+                    agentsLoading={agentsLoading}
+                    selectedAgent={selectedAgent}
+                    selectedAgentId={selectedAgentId}
+                    activeWorkspace={activeWorkspace}
+                    workspaceLoading={workspaceLoading}
+                    workspaceDialogOpen={workspaceDialogOpen}
+                    settingsOpen={settingsOpen}
+                    settings={settings}
+                    recommendationReason={recommendationReason}
+                    isSending={isSending}
+                    canClear={messages.length > 0}
+                    onAgentChange={(agentId) => {
+                        setSelectedAgentId(agentId);
+                        setSessionId(null);
+                        setRecommendationReason(null);
+                        setMessages([]);
+                        setError(null);
+                        nextToolPolicyRef.current = "auto";
+                        freshHistoryForNextRequestRef.current = false;
+                    }}
+                    onWorkspaceDialogChange={setWorkspaceDialogOpen}
+                    onWorkspaceSelected={(workspace) => {
+                        setActiveWorkspace(workspace);
+                        recommendedWorkspaceRef.current = null;
+                        setSessionId(null);
+                        setMessages([]);
+                        setError(null);
+                        nextToolPolicyRef.current = "auto";
+                        freshHistoryForNextRequestRef.current = false;
+                        setWorkspaceDialogOpen(false);
+                    }}
+                    onSettingsOpenChange={setSettingsOpen}
+                    onSettingsChange={setSettings}
+                    onClear={handleClear}
+                    onAgentsRefresh={async () => setAgents(await getAgents())}
+                />
 
                 <main className="min-h-0 flex-1">
                     <ScrollArea className="h-full">
