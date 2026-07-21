@@ -1,22 +1,13 @@
 "use client";
 
-import {
-    AlertCircleIcon,
-    FolderCogIcon,
-    SparklesIcon,
-} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
     type AgentProfile,
     type AgentToolPolicy,
-    cancelAgentRun,
     getAgentRecommendation,
     getAgents,
-    streamAgentChat,
 } from "@/features/agents/agent-api";
 import {
     createConversation,
@@ -27,9 +18,9 @@ import {
     type ConversationSummary,
     updateConversation,
 } from "@/features/sessions";
-import { ChatInput } from "@/features/home/components/chat-input";
-import { ChatMessageBubble } from "@/features/home/components/chat-message-bubble";
 import { ChatHeader } from "@/features/home/components/chat-header";
+import { ChatComposer } from "@/features/home/components/chat-composer";
+import { ChatTranscript } from "@/features/home/components/chat-transcript";
 import {
     applyAgentStreamEvent,
     buildHistory,
@@ -43,6 +34,7 @@ import {
     type VerificationFixRequestDetail,
 } from "@/features/verification";
 import { getActiveWorkspace } from "@/features/workspaces/workspace-api";
+import { useAgentStream } from "@/features/home/hooks/use-agent-stream";
 
 export function ChatPanel() {
     const [messages, setMessages] = useState<HomeChatMessage[]>([]);
@@ -73,8 +65,7 @@ export function ChatPanel() {
     const freshHistoryForNextRequestRef = useRef(false);
     const nextRepairTaskIdRef = useRef<string | null>(null);
     const recommendedWorkspaceRef = useRef<string | null>(null);
-    const abortControllerRef = useRef<AbortController | null>(null);
-    const activeRunIdRef = useRef<string | null>(null);
+    const agentStream = useAgentStream();
 
     const selectedAgent = useMemo(
         () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
@@ -368,12 +359,6 @@ export function ChatPanel() {
         setError(null);
         setIsSending(true);
 
-        let receivedDoneEvent = false;
-        const runId = crypto.randomUUID();
-        const abortController = new AbortController();
-        activeRunIdRef.current = runId;
-        abortControllerRef.current = abortController;
-
         const updateAssistantMessage = (
             updater: (message: HomeChatMessage) => HomeChatMessage,
         ) => {
@@ -387,7 +372,7 @@ export function ChatPanel() {
         };
 
         try {
-            for await (const event of streamAgentChat({
+            await agentStream.run({
                 agent_id: selectedAgent.id,
                 prompt: content,
                 history: history.length > 0 ? history : null,
@@ -396,32 +381,20 @@ export function ChatPanel() {
                 tool_policy: toolPolicy,
                 repair_task_id: repairTaskId,
                 session_id: requestSessionId,
-                run_id: runId,
                 rag_mode: settings.ragMode,
+                // Keep the legacy boolean during the API migration. Current
+                // backends prioritize rag_mode; older backends understand this
+                // field instead of silently falling back to the agent profile.
+                rag_enabled: settings.ragMode === "default"
+                    ? null
+                    : settings.ragMode === "enabled",
                 tools_enabled: settings.toolsMode === "default" ? null : settings.toolsMode === "enabled",
                 enabled_tools: settings.toolsMode === "enabled" ? selectedAgent.tools : null,
-            }, abortController.signal)) {
-                if (event.type === "error") {
-                    updateAssistantMessage((message) =>
-                        applyAgentStreamEvent(message, event),
-                    );
-                    throw new Error(event.message);
-                }
-
-                if (event.type === "done") {
-                    receivedDoneEvent = true;
-                }
-
+            }, (event) => {
                 updateAssistantMessage((message) =>
                     applyAgentStreamEvent(message, event),
                 );
-            }
-
-            if (!receivedDoneEvent) {
-                throw new Error(
-                    "The agent stream ended before sending a final result.",
-                );
-            }
+            });
             await refreshSessions();
         } catch (requestError) {
             const stopped = requestError instanceof DOMException && requestError.name === "AbortError";
@@ -439,16 +412,12 @@ export function ChatPanel() {
             }));
             setError(stopped ? null : message);
         } finally {
-            abortControllerRef.current = null;
-            activeRunIdRef.current = null;
             setIsSending(false);
         }
     }
 
     function handleStop() {
-        const runId = activeRunIdRef.current;
-        abortControllerRef.current?.abort();
-        if (runId) void cancelAgentRun(runId).catch(() => undefined);
+        agentStream.stop();
     }
 
     function handleClear() {
@@ -523,91 +492,31 @@ export function ChatPanel() {
                     onAgentsRefresh={async () => setAgents(await getAgents())}
                 />
 
-                <main className="min-h-0 flex-1">
-                    <ScrollArea className="h-full">
-                        <div className="mx-auto max-w-5xl">
-                            {messages.length === 0 ? (
-                                <div className="flex min-h-[55vh] items-center justify-center px-6 py-16 text-center">
-                                    <div className="max-w-xl space-y-3">
-                                        <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                                            <SparklesIcon className="size-6" />
-                                        </div>
-
-                                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                                            {selectedAgent
-                                                ? `Chat with ${selectedAgent.name}`
-                                                : "Select an agent"}
-                                        </h2>
-
-                                        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-                                            {selectedAgent?.description ??
-                                                "Choose an agent to begin."}
-                                        </p>
-
-                                        {selectedAgentUsesTools && !activeWorkspace ? (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() => setWorkspaceDialogOpen(true)}
-                                            >
-                                                <FolderCogIcon className="mr-2 size-4" />
-                                                Select a workspace for tools
-                                            </Button>
-                                        ) : null}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
-                                    {messages.map((message, index) => (
-                                        <ChatMessageBubble
-                                            key={message.id}
-                                            message={message}
-                                            isStreaming={
-                                                isSending &&
-                                                index === messages.length - 1 &&
-                                                message.role === "assistant"
-                                            }
-                                        />
-                                    ))}
-                                </div>
-                            )}
-
-                            <div ref={bottomRef} />
-                        </div>
-                    </ScrollArea>
-                </main>
-
-                <footer className="border-t border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-                    <div className="mx-auto max-w-5xl">
-                        {error ? (
-                            <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-                                <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
-                                <span>{error}</span>
-                            </div>
-                        ) : null}
-
-                        <ChatInput
-                            value={input}
-                            onChange={setInput}
-                            onSubmit={handleSend}
-                            disabled={inputDisabled}
-                            streaming={isSending}
-                            onStop={handleStop}
-                            placeholder={
-                                selectedAgentUsesTools && !activeWorkspace
-                                    ? "Select a workspace before using this agent…"
-                                    : selectedAgent
-                                        ? `Message ${selectedAgent.name}…`
-                                        : "Loading agents…"
-                            }
-                        />
-
-                        <p className="mt-2 text-center text-[11px] text-zinc-400">
-                            RAG progress, tool execution, and answer tokens are streamed from
-                            the backend as newline-delimited JSON events.
-                        </p>
-                    </div>
-                </footer>
+                <ChatTranscript
+                    messages={messages}
+                    isSending={isSending}
+                    selectedAgent={selectedAgent}
+                    selectedAgentUsesTools={selectedAgentUsesTools}
+                    activeWorkspace={activeWorkspace}
+                    onSelectWorkspace={() => setWorkspaceDialogOpen(true)}
+                    bottomRef={bottomRef}
+                />
+                <ChatComposer
+                    error={error}
+                    value={input}
+                    onChange={setInput}
+                    onSubmit={handleSend}
+                    disabled={inputDisabled}
+                    streaming={isSending}
+                    onStop={handleStop}
+                    placeholder={
+                        selectedAgentUsesTools && !activeWorkspace
+                            ? "Select a workspace before using this agent…"
+                            : selectedAgent
+                                ? `Message ${selectedAgent.name}…`
+                                : "Loading agents…"
+                    }
+                />
                 </div>
             </div>
         </TooltipProvider>

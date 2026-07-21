@@ -6,10 +6,15 @@ AgentConfig = Dict[str, Any]
 READ_TOOLS = [
     "list_files", "search_files", "read_file", "read_file_range", "search_text"
 ]
-CHANGE_TOOLS = ["propose_file_change", "propose_path_operation"]
+CHANGE_TOOLS = [
+    "propose_file_change",
+    "propose_file_change_set",
+    "propose_path_operation",
+]
 CHANGE_SAFETY_PROMPT = (
     "Every workspace mutation must use a proposal tool and requires human "
-    "approval. Use propose_file_change for create/update and "
+    "approval. Prefer propose_file_change_set for a coherent multi-file "
+    "create/update task, use propose_file_change for one file, and "
     "propose_path_operation for delete, move/rename, or mkdir. Read every "
     "existing file before changing, deleting, or moving it. A new file or "
     "directory does not require a fake read. Never delete a directory. Never "

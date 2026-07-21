@@ -261,6 +261,98 @@ def propose_file_change(
     return {"proposal": proposal}
 
 
+def propose_file_change_set(
+    operations: List[Dict[str, str]],
+    summary: str = "",
+    change_set_id: str | None = None,
+    repair_task_id: str | None = None,
+) -> Dict[str, Any]:
+    """Create one reviewable set of file creates/updates.
+
+    Every operation is validated before any proposal is stored. Existing files
+    may use a unique ``old_text`` replacement or provide complete content by
+    leaving ``old_text`` empty. New files must leave ``old_text`` empty.
+    """
+    if not isinstance(operations, list) or not operations:
+        raise ValueError("operations must contain at least one file change")
+    if len(operations) > 20:
+        raise ValueError("A change set may contain at most 20 file changes")
+
+    resolved_id = change_set_id or __import__("uuid").uuid4().hex
+    prepared: List[Dict[str, str]] = []
+    seen_paths: set[str] = set()
+
+    for index, operation in enumerate(operations):
+        if not isinstance(operation, dict):
+            raise ValueError(f"operations[{index}] must be an object")
+        file_path = _require_non_empty_string(
+            operation.get("file_path"), f"operations[{index}].file_path"
+        )
+        normalized = file_path.replace("\\", "/").lower()
+        if normalized in seen_paths:
+            raise ValueError(f"Duplicate file path in change set: {file_path}")
+        seen_paths.add(normalized)
+
+        old_text = operation.get("old_text", "")
+        new_text = operation.get("new_text")
+        item_summary = operation.get("summary", summary)
+        if not isinstance(old_text, str):
+            raise ValueError(f"operations[{index}].old_text must be a string")
+        if not isinstance(new_text, str):
+            raise ValueError(f"operations[{index}].new_text must be a string")
+        if not isinstance(item_summary, str):
+            raise ValueError(f"operations[{index}].summary must be a string")
+
+        path = workspace_service.resolve_workspace_path(file_path)
+        if path.exists() and path.is_dir():
+            raise IsADirectoryError(f"Not a file: {file_path}")
+        if not path.exists():
+            if old_text:
+                raise ValueError(
+                    f"old_text must be empty for new file: {file_path}"
+                )
+            content = new_text
+        else:
+            try:
+                current = path.read_bytes().decode("utf-8")
+            except UnicodeDecodeError as error:
+                raise ValueError(
+                    f"File is not readable UTF-8 text: {file_path}"
+                ) from error
+            content = (
+                _replace_unique_text(
+                    current_content=current,
+                    old_text=old_text,
+                    new_text=new_text,
+                )
+                if old_text
+                else new_text
+            )
+        prepared.append(
+            {
+                "file_path": file_path,
+                "content": content,
+                "summary": item_summary,
+            }
+        )
+
+    proposals = [
+        change_service.propose(
+            file_path=item["file_path"],
+            content=item["content"],
+            summary=item["summary"],
+            change_set_id=resolved_id,
+            repair_task_id=repair_task_id,
+        )
+        for item in prepared
+    ]
+    return {
+        "change_set_id": resolved_id,
+        "proposal_count": len(proposals),
+        "proposals": proposals,
+    }
+
+
 def propose_path_operation(
     operation: str,
     file_path: str,

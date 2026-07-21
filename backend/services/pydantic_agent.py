@@ -9,6 +9,7 @@ from services.pydantic_model import build_pydantic_model
 from tools.file_tools import (
     list_files as _list_files,
     propose_file_change as _propose_file_change,
+    propose_file_change_set as _propose_file_change_set,
     propose_path_operation as _propose_path_operation,
     read_file as _read_file,
     read_file_range as _read_file_range,
@@ -195,6 +196,48 @@ def propose_file_change(
         return _tool_error(error)
 
 
+def propose_file_change_set(
+    ctx: RunContext[AgentRunDeps],
+    operations: list[dict[str, str]],
+    summary: str = "",
+) -> Any:
+    """Propose up to 20 related file creates/updates as one change set."""
+    deps = _run_deps(ctx)
+    try:
+        for operation in operations:
+            file_path = operation.get("file_path", "")
+            normalized = _normalized_path(file_path)
+            try:
+                _read_file(file_path)
+            except FileNotFoundError:
+                continue
+            except EXPECTED_TOOL_ERRORS:
+                # If existence cannot be established, keep the safe default:
+                # require an explicit successful read before an update.
+                pass
+            if deps is not None and normalized not in deps.inspected_paths:
+                raise ModelRetry(
+                    "Read every existing target before proposing a multi-file "
+                    f"change set. Missing read: {file_path}"
+                )
+
+        result = _propose_file_change_set(
+            operations=operations,
+            summary=summary,
+            change_set_id=deps.change_set_id if deps is not None else None,
+            repair_task_id=deps.repair_task_id if deps is not None else None,
+        )
+        if deps is not None:
+            deps.proposed_paths.update(
+                _normalized_path(item.get("file_path", ""))
+                for item in operations
+                if item.get("file_path")
+            )
+        return result
+    except EXPECTED_TOOL_ERRORS as error:
+        return _tool_error(error)
+
+
 def propose_path_operation(
     ctx: RunContext[AgentRunDeps],
     operation: Literal["delete", "move", "mkdir"],
@@ -271,6 +314,7 @@ TOOL_FUNCTIONS: Dict[str, ToolFunction] = {
     "read_file_range": read_file_range,
     "search_text": search_text,
     "propose_file_change": propose_file_change,
+    "propose_file_change_set": propose_file_change_set,
     "propose_path_operation": propose_path_operation,
 }
 

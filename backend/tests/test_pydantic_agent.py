@@ -8,6 +8,7 @@ from services.pydantic_agent import (
     enforce_tool_policy,
     get_pydantic_agent,
     propose_file_change,
+    propose_file_change_set,
 )
 
 
@@ -69,6 +70,19 @@ class PydanticAgentTests(unittest.TestCase):
                 file_path="backend/app.py",
                 old_text="return 1",
                 new_text="return 2",
+            )
+
+    def test_change_set_requires_every_existing_target_to_be_read(self):
+        context = SimpleNamespace(deps=AgentRunDeps(tool_policy="propose"))
+        with self.assertRaisesRegex(ModelRetry, "Missing read"):
+            propose_file_change_set(
+                context,
+                operations=[
+                    {
+                        "file_path": "backend/app.py",
+                        "new_text": "updated",
+                    }
+                ],
             )
 
 

@@ -169,6 +169,41 @@ TOOL_SCHEMAS: Dict[str, ToolSchema] = {
             },
         },
     },
+    "propose_file_change_set": {
+        "type": "function",
+        "function": {
+            "name": "propose_file_change_set",
+            "description": (
+                "Create one human-reviewable change set containing multiple "
+                "file creates or updates. It validates every operation before "
+                "creating proposals and never writes files directly."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "summary": {"type": "string", "default": ""},
+                    "operations": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 20,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "file_path": {"type": "string"},
+                                "old_text": {"type": "string", "default": ""},
+                                "new_text": {"type": "string"},
+                                "summary": {"type": "string", "default": ""},
+                            },
+                            "required": ["file_path", "new_text"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                "required": ["operations"],
+                "additionalProperties": False,
+            },
+        },
+    },
     "propose_path_operation": {
         "type": "function",
         "function": {

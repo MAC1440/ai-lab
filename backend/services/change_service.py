@@ -332,70 +332,8 @@ class ChangeService:
     def approve(self, proposal_id: str) -> Dict[str, Any]:
         with self._lock:
             proposal = self._get_stored(proposal_id)
-            self._require_pending(proposal)
-
-            active_workspace = self.workspace_service.get_workspace()
-            active_workspace_text = os.path.normcase(
-                str(active_workspace.resolve())
-            )
-            proposal_workspace_text = os.path.normcase(proposal.workspace)
-
-            if active_workspace_text != proposal_workspace_text:
-                raise ChangeProposalConflictError(
-                    "The active workspace changed after this proposal was "
-                    "created"
-                )
-
-            target = self.workspace_service.resolve_workspace_path(
-                proposal.file_path
-            )
-            current_exists = target.exists()
-
-            if current_exists and target.is_dir():
-                raise ChangeProposalConflictError(
-                    "The proposed file path now points to a folder"
-                )
-
-            current_content = self._read_current_content(
-                target,
-                proposal.file_path,
-            )
-            current_hash = self._hash_text(current_content)
-
-            if (
-                current_exists != proposal.base_exists
-                or current_hash != proposal.base_sha256
-            ):
-                raise ChangeProposalConflictError(
-                    "The file changed after this proposal was created. "
-                    "Ask the agent to inspect it again and create a new "
-                    "proposal."
-                )
-
-            if proposal.operation in {"create", "update"}:
-                self._atomic_write(target, proposal.proposed_content)
-            elif proposal.operation == "delete":
-                target.unlink()
-            elif proposal.operation == "move":
-                if not proposal.destination_path:
-                    raise ChangeProposalConflictError(
-                        "Move proposal has no destination path"
-                    )
-                destination = self.workspace_service.resolve_workspace_path(
-                    proposal.destination_path
-                )
-                if destination.exists():
-                    raise ChangeProposalConflictError(
-                        "The move destination now exists"
-                    )
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(target, destination)
-            elif proposal.operation == "mkdir":
-                if current_exists:
-                    raise ChangeProposalConflictError(
-                        "The proposed directory path now exists"
-                    )
-                target.mkdir(parents=True, exist_ok=False)
+            target = self._validate_for_approval(proposal)
+            self._apply_proposal(proposal, target)
             proposal.status = "approved"
             proposal.resolved_at = self._utc_now()
             self._save(proposal)
@@ -411,23 +349,162 @@ class ChangeService:
             return self._public(proposal)
 
     def approve_change_set(self, change_set_id: str) -> List[Dict[str, Any]]:
-        """Approve every pending proposal in a model turn.
+        """Preflight and atomically apply every proposal in one model turn.
 
-        Each proposal still performs the normal workspace and stale-file
-        checks. The method stops on the first conflict so an unsafe proposal is
-        never silently skipped.
+        All workspace and stale-content checks complete before the first write.
+        If an I/O operation fails, touched files are restored to their exact
+        pre-approval contents and every proposal remains pending.
         """
 
         clean_id = self._required_id(change_set_id, "change_set_id")
-        proposals = self.list_proposals(
-            status="pending",
-            change_set_id=clean_id,
-        )
-        if not proposals:
-            raise ChangeProposalNotFoundError(
-                f"No pending proposals found for change set: {clean_id}"
+        with self._lock:
+            proposals = [
+                proposal
+                for proposal in self._proposals.values()
+                if proposal.status == "pending"
+                and proposal.change_set_id == clean_id
+            ]
+            proposals.sort(key=lambda item: item.created_at)
+            if not proposals:
+                raise ChangeProposalNotFoundError(
+                    f"No pending proposals found for change set: {clean_id}"
+                )
+
+            operation_paths = [
+                path
+                for proposal in proposals
+                for path in (proposal.file_path, proposal.destination_path)
+                if path
+            ]
+            normalized_paths = [
+                os.path.normcase(str(Path(path))) for path in operation_paths
+            ]
+            if len(normalized_paths) != len(set(normalized_paths)):
+                raise ChangeProposalConflictError(
+                    "A change set cannot target the same path more than once"
+                )
+
+            targets = [self._validate_for_approval(item) for item in proposals]
+            touched: set[Path] = set(targets)
+            for item in proposals:
+                if item.destination_path:
+                    touched.add(
+                        self.workspace_service.resolve_workspace_path(
+                            item.destination_path
+                        )
+                    )
+            snapshots = {
+                path: self._snapshot_path(path)
+                for path in touched
+            }
+
+            try:
+                for proposal, target in zip(proposals, targets):
+                    self._apply_proposal(proposal, target)
+            except Exception:
+                for path, snapshot in reversed(list(snapshots.items())):
+                    self._restore_snapshot(path, snapshot)
+                raise
+
+            resolved_at = self._utc_now()
+            for proposal in proposals:
+                proposal.status = "approved"
+                proposal.resolved_at = resolved_at
+                self._save(proposal)
+            return [self._public(item) for item in proposals]
+
+    def _validate_for_approval(self, proposal: _StoredProposal) -> Path:
+        self._require_pending(proposal)
+        active_workspace = self.workspace_service.get_workspace()
+        if os.path.normcase(str(active_workspace.resolve())) != os.path.normcase(
+            proposal.workspace
+        ):
+            raise ChangeProposalConflictError(
+                "The active workspace changed after this proposal was created"
             )
-        return [self.approve(item["proposal_id"]) for item in proposals]
+
+        target = self.workspace_service.resolve_workspace_path(
+            proposal.file_path
+        )
+        current_exists = target.exists()
+        if proposal.operation == "mkdir":
+            if current_exists:
+                raise ChangeProposalConflictError(
+                    "The proposed directory path now exists"
+                )
+            return target
+        if current_exists and target.is_dir():
+            raise ChangeProposalConflictError(
+                "The proposed file path now points to a folder"
+            )
+        current_content = self._read_current_content(
+            target, proposal.file_path
+        )
+        if (
+            current_exists != proposal.base_exists
+            or self._hash_text(current_content) != proposal.base_sha256
+        ):
+            raise ChangeProposalConflictError(
+                "The file changed after this proposal was created. Ask the "
+                "agent to inspect it again and create a new proposal."
+            )
+        if proposal.operation == "move":
+            if not proposal.destination_path:
+                raise ChangeProposalConflictError(
+                    "Move proposal has no destination path"
+                )
+            destination = self.workspace_service.resolve_workspace_path(
+                proposal.destination_path
+            )
+            if destination.exists():
+                raise ChangeProposalConflictError(
+                    "The move destination now exists"
+                )
+        return target
+
+    def _apply_proposal(self, proposal: _StoredProposal, target: Path) -> None:
+        if proposal.operation in {"create", "update"}:
+            self._atomic_write(target, proposal.proposed_content)
+        elif proposal.operation == "delete":
+            target.unlink()
+        elif proposal.operation == "move":
+            destination = self.workspace_service.resolve_workspace_path(
+                proposal.destination_path or ""
+            )
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(target, destination)
+        elif proposal.operation == "mkdir":
+            target.mkdir(parents=True, exist_ok=False)
+
+    @staticmethod
+    def _snapshot_path(path: Path) -> tuple[str, bytes | None, int | None]:
+        if not path.exists():
+            return ("missing", None, None)
+        if path.is_dir():
+            return ("directory", None, path.stat().st_mode)
+        return ("file", path.read_bytes(), path.stat().st_mode)
+
+    def _restore_snapshot(
+        self,
+        path: Path,
+        snapshot: tuple[str, bytes | None, int | None],
+    ) -> None:
+        kind, content, mode = snapshot
+        if path.exists():
+            if path.is_dir():
+                try:
+                    path.rmdir()
+                except OSError:
+                    pass
+            else:
+                path.unlink()
+        if kind == "directory":
+            path.mkdir(parents=True, exist_ok=True)
+        elif kind == "file":
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content or b"")
+        if kind != "missing" and mode is not None and path.exists():
+            os.chmod(path, mode)
 
     def reject_change_set(self, change_set_id: str) -> List[Dict[str, Any]]:
         clean_id = self._required_id(change_set_id, "change_set_id")

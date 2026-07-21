@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from services.change_service import (
     ChangeProposalConflictError,
@@ -162,6 +163,82 @@ class ChangeServiceTests(unittest.TestCase):
         self.assertEqual({item["status"] for item in resolved}, {"approved"})
         self.assertEqual((self.root / "one.txt").read_text(), "one.txt\n")
         self.assertEqual((self.root / "two.txt").read_text(), "two.txt\n")
+
+    def test_change_set_preflights_all_files_before_first_write(self):
+        first = self.root / "one.txt"
+        second = self.root / "two.txt"
+        first.write_text("old one\n", encoding="utf-8")
+        second.write_text("old two\n", encoding="utf-8")
+        self.service.propose(
+            file_path="one.txt", content="new one\n", change_set_id="set-a"
+        )
+        self.service.propose(
+            file_path="two.txt", content="new two\n", change_set_id="set-a"
+        )
+        second.write_text("changed elsewhere\n", encoding="utf-8")
+
+        with self.assertRaises(ChangeProposalConflictError):
+            self.service.approve_change_set("set-a")
+
+        self.assertEqual(first.read_text(encoding="utf-8"), "old one\n")
+        self.assertEqual(
+            {item["status"] for item in self.service.list_proposals(
+                change_set_id="set-a"
+            )},
+            {"pending"},
+        )
+
+    def test_change_set_rejects_duplicate_targets(self):
+        (self.root / "one.txt").write_text("old\n", encoding="utf-8")
+        self.service.propose(
+            file_path="one.txt", content="first\n", change_set_id="set-a"
+        )
+        self.service.propose(
+            file_path="one.txt", content="second\n", change_set_id="set-a"
+        )
+        with self.assertRaisesRegex(
+            ChangeProposalConflictError, "same path more than once"
+        ):
+            self.service.approve_change_set("set-a")
+        self.assertEqual(
+            (self.root / "one.txt").read_text(encoding="utf-8"), "old\n"
+        )
+
+    def test_change_set_rolls_back_when_second_write_fails(self):
+        first = self.root / "one.txt"
+        second = self.root / "two.txt"
+        first.write_text("old one\n", encoding="utf-8")
+        second.write_text("old two\n", encoding="utf-8")
+        self.service.propose(
+            file_path="one.txt", content="new one\n", change_set_id="set-a"
+        )
+        self.service.propose(
+            file_path="two.txt", content="new two\n", change_set_id="set-a"
+        )
+        original_apply = self.service._apply_proposal
+        call_count = 0
+
+        def fail_second(proposal, target):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise OSError("simulated disk failure")
+            original_apply(proposal, target)
+
+        with patch.object(
+            self.service, "_apply_proposal", side_effect=fail_second
+        ):
+            with self.assertRaisesRegex(OSError, "simulated disk failure"):
+                self.service.approve_change_set("set-a")
+
+        self.assertEqual(first.read_text(encoding="utf-8"), "old one\n")
+        self.assertEqual(second.read_text(encoding="utf-8"), "old two\n")
+        self.assertEqual(
+            {item["status"] for item in self.service.list_proposals(
+                change_set_id="set-a"
+            )},
+            {"pending"},
+        )
 
     def test_reject_change_set_keeps_files_unchanged(self):
         self.service.propose(

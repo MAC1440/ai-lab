@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from dependencies import (
     conversation_service,
@@ -44,6 +44,8 @@ class HistoryMessage(BaseModel):
 
 
 class AgentChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     agent_id: str = "coding"
     prompt: str = Field(min_length=1)
     history: Optional[List[HistoryMessage]] = None
@@ -72,6 +74,15 @@ class AgentChatRequest(BaseModel):
     rag_mode: Literal["default", "enabled", "disabled"] = "default"
     tools_enabled: Optional[bool] = None
     enabled_tools: Optional[List[str]] = None
+
+    @model_validator(mode="after")
+    def validate_rag_overrides(self):
+        """Reject contradictory old/new clients instead of failing silently."""
+        if self.rag_mode == "enabled" and self.rag_enabled is False:
+            raise ValueError("rag_mode=enabled conflicts with rag_enabled=false")
+        if self.rag_mode == "disabled" and self.rag_enabled is True:
+            raise ValueError("rag_mode=disabled conflicts with rag_enabled=true")
+        return self
 
 
 @router.get("/list")

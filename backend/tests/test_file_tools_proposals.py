@@ -132,6 +132,54 @@ class FileProposalToolTests(unittest.TestCase):
                 file_path="anything.txt",
             )
 
+    def test_multi_file_change_set_is_reviewable_and_shared(self):
+        (self.root / "Existing.cs").write_text(
+            "public class Existing {}\n", encoding="utf-8"
+        )
+        result = file_tools.propose_file_change_set(
+            operations=[
+                {
+                    "file_path": "Existing.cs",
+                    "new_text": "public class Existing { public int Hp; }\n",
+                },
+                {
+                    "file_path": "Health.cs",
+                    "new_text": "public class Health {}\n",
+                },
+            ],
+            summary="Add health feature",
+            change_set_id="health-set",
+        )
+
+        self.assertEqual(result["proposal_count"], 2)
+        self.assertEqual(
+            {item["change_set_id"] for item in result["proposals"]},
+            {"health-set"},
+        )
+        self.assertFalse((self.root / "Health.cs").exists())
+        self.assertEqual(
+            (self.root / "Existing.cs").read_text(encoding="utf-8"),
+            "public class Existing {}\n",
+        )
+
+    def test_multi_file_preflight_creates_no_partial_proposals(self):
+        with self.assertRaisesRegex(ValueError, "old_text must be empty"):
+            file_tools.propose_file_change_set(
+                operations=[
+                    {"file_path": "valid.cs", "new_text": "valid\n"},
+                    {
+                        "file_path": "missing.cs",
+                        "old_text": "not there",
+                        "new_text": "invalid\n",
+                    },
+                ],
+                change_set_id="invalid-set",
+            )
+        self.assertEqual(
+            self.change_service.list_proposals(change_set_id="invalid-set"),
+            [],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

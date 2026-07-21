@@ -4,6 +4,7 @@ from services.agent_service import AgentService
 from tools.file_tools import (
     list_files,
     propose_file_change,
+    propose_file_change_set,
     propose_path_operation,
     read_file,
     read_file_range,
@@ -27,6 +28,7 @@ class ToolExecutor:
             "read_file_range": read_file_range,
             "search_text": search_text,
             "propose_file_change": propose_file_change,
+            "propose_file_change_set": propose_file_change_set,
             "propose_path_operation": propose_path_operation,
         }
 
@@ -146,6 +148,22 @@ class ToolExecutor:
                 "file_path": self._file_path(arguments),
                 "old_text": old_text,
                 "new_text": new_text,
+                "summary": self._string(
+                    arguments,
+                    "summary",
+                    default="",
+                    allow_empty=True,
+                ),
+            }
+
+        if tool_name == "propose_file_change_set":
+            operations = arguments.get("operations")
+            if not isinstance(operations, list):
+                raise ValueError(
+                    "propose_file_change_set requires an operations array"
+                )
+            return {
+                "operations": operations,
                 "summary": self._string(
                     arguments,
                     "summary",
