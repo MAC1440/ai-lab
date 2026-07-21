@@ -7,6 +7,8 @@ from services.conversation_service import ConversationService
 from services.conversation_store import ConversationStore
 from services.project_detection_service import ProjectDetectionService
 from services.project_context_service import ProjectContextService
+from services.project_task_service import ProjectTaskService
+from services.project_task_store import ProjectTaskStore
 from services.provider_settings_service import ProviderSettingsService
 from services.mcp_service import MCPService
 from services.repair_service import RepairService
@@ -88,6 +90,18 @@ repair_service = RepairService(
     change_service=change_service,
     store=repair_store,
 )
+
+_project_tasks_database_path = Path(
+    os.getenv("PROJECT_TASK_DB_PATH", "data/project-tasks.sqlite3")
+).expanduser()
+if not _project_tasks_database_path.is_absolute():
+    _project_tasks_database_path = _backend_root / _project_tasks_database_path
+project_task_store = ProjectTaskStore(_project_tasks_database_path)
+project_task_service = ProjectTaskService(
+    workspace_service=workspace_service,
+    change_service=change_service,
+    store=project_task_store,
+)
 verification_service = VerificationService(
     workspace_service=workspace_service,
     project_detection_service=project_detection_service,
@@ -107,6 +121,7 @@ system_service = SystemService(
         "changes": _changes_database_path,
         "conversations": _conversations_database_path,
         "repairs": _repairs_database_path,
+        "project-tasks": _project_tasks_database_path,
     },
     config_paths={
         "provider-settings": _provider_settings_path,

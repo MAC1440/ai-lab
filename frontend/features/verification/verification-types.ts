@@ -25,6 +25,7 @@ export type VerificationProfile = {
   timeout_seconds: number;
   available: boolean;
   unavailable_reason: string | null;
+  result_format?: string | null;
 };
 
 export type VerificationOverview = {
@@ -107,4 +108,5 @@ export type StartVerificationRequest = {
   profile_id: string;
   proposal_id?: string | null;
   repair_task_id?: string | null;
+  project_task_id?: string | null;
 };

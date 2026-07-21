@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
     type AgentProfile,
-    type AgentToolPolicy,
     getAgentRecommendation,
     getAgents,
 } from "@/features/agents/agent-api";
@@ -29,12 +28,12 @@ import {
     type AgentChatSettings,
 } from "@/features/home/components/agent-chat-state";
 import type { HomeChatMessage } from "@/features/home/types";
-import {
-    VERIFICATION_FIX_REQUEST_EVENT,
-    type VerificationFixRequestDetail,
-} from "@/features/verification";
 import { getActiveWorkspace } from "@/features/workspaces/workspace-api";
 import { useAgentStream } from "@/features/home/hooks/use-agent-stream";
+import {
+    type ExternalAgentRequest,
+    useExternalAgentRequest,
+} from "@/features/home/hooks/use-external-agent-request";
 
 export function ChatPanel() {
     const [messages, setMessages] = useState<HomeChatMessage[]>([]);
@@ -61,11 +60,22 @@ export function ChatPanel() {
         useState<AgentChatSettings>(defaultAgentSettings);
 
     const bottomRef = useRef<HTMLDivElement>(null);
-    const nextToolPolicyRef = useRef<AgentToolPolicy>("auto");
-    const freshHistoryForNextRequestRef = useRef(false);
-    const nextRepairTaskIdRef = useRef<string | null>(null);
     const recommendedWorkspaceRef = useRef<string | null>(null);
     const agentStream = useAgentStream();
+
+    const loadExternalRequest = useCallback((request: ExternalAgentRequest) => {
+        setInput(request.prompt);
+        setError(null);
+        if (request.freshContext) {
+            setSessionId(null);
+            setMessages([]);
+        }
+        if (agents.some((agent) => agent.id === request.recommendedAgentId)) {
+            setSelectedAgentId(request.recommendedAgentId);
+            setRecommendationReason(request.recommendationReason);
+        }
+    }, [agents]);
+    const externalRequest = useExternalAgentRequest(loadExternalRequest);
 
     const selectedAgent = useMemo(
         () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
@@ -243,52 +253,6 @@ export function ChatPanel() {
             });
     }, [activeWorkspace, agents]);
 
-    useEffect(() => {
-        function handleVerificationFixRequest(event: Event) {
-            const customEvent = event as CustomEvent<VerificationFixRequestDetail>;
-            const prompt = customEvent.detail?.prompt;
-
-            if (!prompt) {
-                return;
-            }
-
-            setInput(prompt);
-            setError(null);
-            nextToolPolicyRef.current = customEvent.detail.toolPolicy;
-            freshHistoryForNextRequestRef.current =
-                customEvent.detail.freshContext;
-            if (customEvent.detail.freshContext) {
-                setSessionId(null);
-                setMessages([]);
-            }
-            nextRepairTaskIdRef.current = customEvent.detail.repairTaskId;
-
-            if (
-                agents.some(
-                    (agent) =>
-                        agent.id === customEvent.detail.recommendedAgentId,
-                )
-            ) {
-                setSelectedAgentId(customEvent.detail.recommendedAgentId);
-                setRecommendationReason(
-                    "Selected for the failed verification's project type.",
-                );
-            }
-        }
-
-        window.addEventListener(
-            VERIFICATION_FIX_REQUEST_EVENT,
-            handleVerificationFixRequest,
-        );
-
-        return () => {
-            window.removeEventListener(
-                VERIFICATION_FIX_REQUEST_EVENT,
-                handleVerificationFixRequest,
-            );
-        };
-    }, [agents]);
-
     async function handleSend() {
         const content = input.trim();
 
@@ -343,16 +307,14 @@ export function ChatPanel() {
             ),
         };
 
-        const history = requestSessionId || freshHistoryForNextRequestRef.current
+        const pendingRequest = externalRequest.consume();
+        const history = requestSessionId || pendingRequest.freshContext
             ? []
             : buildHistory(messages);
-        const toolPolicy = nextToolPolicyRef.current;
-        const repairTaskId = nextRepairTaskIdRef.current;
+        const toolPolicy = pendingRequest.toolPolicy;
+        const repairTaskId = pendingRequest.repairTaskId;
+        const projectTaskId = pendingRequest.projectTaskId;
         const pendingMessages = [...messages, userMessage];
-
-        nextToolPolicyRef.current = "auto";
-        freshHistoryForNextRequestRef.current = false;
-        nextRepairTaskIdRef.current = null;
 
         setMessages([...pendingMessages, assistantPlaceholder]);
         setInput("");
@@ -380,6 +342,7 @@ export function ChatPanel() {
                 rag_distance_threshold: distanceThreshold,
                 tool_policy: toolPolicy,
                 repair_task_id: repairTaskId,
+                project_task_id: projectTaskId,
                 session_id: requestSessionId,
                 rag_mode: settings.ragMode,
                 // Keep the legacy boolean during the API migration. Current
@@ -424,9 +387,7 @@ export function ChatPanel() {
         setSessionId(null);
         setMessages([]);
         setError(null);
-        nextToolPolicyRef.current = "auto";
-        freshHistoryForNextRequestRef.current = false;
-        nextRepairTaskIdRef.current = null;
+        externalRequest.reset();
     }
 
     const inputDisabled =
@@ -472,8 +433,7 @@ export function ChatPanel() {
                         setRecommendationReason(null);
                         setMessages([]);
                         setError(null);
-                        nextToolPolicyRef.current = "auto";
-                        freshHistoryForNextRequestRef.current = false;
+                        externalRequest.reset();
                     }}
                     onWorkspaceDialogChange={setWorkspaceDialogOpen}
                     onWorkspaceSelected={(workspace) => {
@@ -482,8 +442,7 @@ export function ChatPanel() {
                         setSessionId(null);
                         setMessages([]);
                         setError(null);
-                        nextToolPolicyRef.current = "auto";
-                        freshHistoryForNextRequestRef.current = false;
+                        externalRequest.reset();
                         setWorkspaceDialogOpen(false);
                     }}
                     onSettingsOpenChange={setSettingsOpen}

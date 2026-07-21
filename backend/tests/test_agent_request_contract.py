@@ -27,6 +27,13 @@ class AgentRequestContractTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             AgentChatRequest(prompt="hello", rag_mod="enabled")
 
+    def test_project_task_id_survives_request_validation(self):
+        request = AgentChatRequest(
+            prompt="Implement the task",
+            project_task_id="task-12345",
+        )
+        self.assertEqual(request.project_task_id, "task-12345")
+
 
 if __name__ == "__main__":
     unittest.main()

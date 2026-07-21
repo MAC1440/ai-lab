@@ -5,10 +5,13 @@ import os
 import signal
 import subprocess
 import time
+import re
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import RLock
 from typing import Any, AsyncIterator, Dict, List, Optional
+from pathlib import Path
 from uuid import uuid4
 
 from services.project_detection_service import ProjectDetectionService
@@ -111,6 +114,7 @@ class VerificationService:
         stored = False
 
         try:
+            self._prepare_result_file(profile.result_file)
             self.store.create_run(
                 run_id=run_id,
                 workspace=str(workspace),
@@ -212,6 +216,27 @@ class VerificationService:
             if terminal_status is None:
                 terminal_status = "passed" if exit_code == 0 else "failed"
 
+            validation_output, validation_error = self._validate_profile_result(
+                profile=profile,
+                output="".join(output_parts),
+            )
+            if validation_output:
+                remaining = self.max_output_chars - output_length
+                if remaining > 0:
+                    output_parts.append(validation_output[:remaining])
+                    output_length += min(len(validation_output), remaining)
+                if len(validation_output) > remaining:
+                    output_truncated = True
+                yield {
+                    "type": "output",
+                    "run_id": run_id,
+                    "stream": "stdout",
+                    "content": validation_output,
+                }
+            if terminal_status == "passed" and validation_error:
+                terminal_status = "failed"
+                terminal_error = validation_error
+
             duration_ms = self._duration_ms(started_clock)
             result = self.store.finish_run(
                 run_id,
@@ -292,6 +317,7 @@ class VerificationService:
                     # the original disconnect or generator-close exception.
                     pass
             self._release(active_run)
+            self._cleanup_result_file(profile.result_file)
 
     def cancel(self, run_id: str) -> Dict[str, Any]:
         if not isinstance(run_id, str) or not run_id.strip():
@@ -309,6 +335,93 @@ class VerificationService:
             "run_id": active_run.run_id,
             "cancellation_requested": True,
         }
+
+    @staticmethod
+    def _prepare_result_file(result_file: Optional[str]) -> None:
+        if not result_file:
+            return
+        path = Path(result_file)
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as error:
+            raise RuntimeError(
+                f"Could not prepare verification result file: {error}"
+            ) from error
+
+    @staticmethod
+    def _cleanup_result_file(result_file: Optional[str]) -> None:
+        if not result_file:
+            return
+        try:
+            Path(result_file).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    @staticmethod
+    def _validate_profile_result(
+        *,
+        profile,
+        output: str,
+    ) -> tuple[str, Optional[str]]:
+        if profile.project_type != "unity":
+            return "", None
+
+        compiler_patterns = (
+            r"\berror CS\d{4}\b",
+            r"Scripts have compiler errors",
+            r"Compilation failed",
+            r"Aborting batchmode due to failure",
+        )
+        if any(
+            re.search(pattern, output, flags=re.IGNORECASE)
+            for pattern in compiler_patterns
+        ):
+            return "", "Unity reported compiler or batch-mode errors in its log."
+
+        if profile.result_format != "nunit-xml" or not profile.result_file:
+            return "", None
+
+        result_path = Path(profile.result_file)
+        if not result_path.is_file():
+            return (
+                "\n[AI Lab] Unity did not create the requested test-results XML.\n",
+                "Unity EditMode tests did not produce a result file.",
+            )
+        try:
+            root = ET.parse(result_path).getroot()
+        except (OSError, ET.ParseError) as error:
+            return (
+                f"\n[AI Lab] Unity test results could not be parsed: {error}\n",
+                "Unity produced an unreadable test-results file.",
+            )
+
+        def count(*names: str) -> int:
+            for name in names:
+                value = root.attrib.get(name)
+                if value is not None:
+                    try:
+                        return int(value)
+                    except ValueError:
+                        return 0
+            return 0
+
+        total = count("total", "total-tests")
+        failures = count("failed", "failures")
+        errors = count("errors")
+        skipped = count("skipped", "not-run", "inconclusive")
+        result = root.attrib.get("result", "").lower()
+        summary = (
+            "\n[AI Lab] Unity EditMode results: "
+            f"total={total}, failed={failures}, errors={errors}, "
+            f"skipped={skipped}.\n"
+        )
+        failed = failures > 0 or errors > 0 or result in {"failed", "failure"}
+        return (
+            summary,
+            "Unity EditMode tests reported failures."
+            if failed
+            else None,
+        )
 
     def _reserve(self, active_run: _ActiveRun) -> None:
         with self._active_lock:

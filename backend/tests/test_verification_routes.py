@@ -76,6 +76,18 @@ class FakeVerificationService:
         }
 
 
+class FakeProjectTaskService:
+    def __init__(self):
+        self.started = []
+        self.finished = []
+
+    def record_verification_started(self, task_id, *, run_id, profile_id):
+        self.started.append((task_id, run_id, profile_id))
+
+    def record_verification_result(self, task_id, *, run, repair_task_id=None):
+        self.finished.append((task_id, run["run_id"], repair_task_id))
+
+
 class UnavailableVerificationService(FakeVerificationService):
     async def run_events(self, *, profile_id, proposal_id=None):
         del profile_id, proposal_id
@@ -94,7 +106,7 @@ class VerificationRouteTests(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    def patched_dependencies(self, service=None):
+    def patched_dependencies(self, service=None, project_tasks=None):
         stack = ExitStack()
         stack.enter_context(
             patch(
@@ -118,6 +130,12 @@ class VerificationRouteTests(unittest.TestCase):
             patch(
                 "routes.verifications.verification_service",
                 service or FakeVerificationService(),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "routes.verifications.project_task_service",
+                project_tasks or FakeProjectTaskService(),
             )
         )
         return stack
@@ -161,6 +179,21 @@ class VerificationRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(event["type"], "error")
         self.assertEqual(event["status_code"], 409)
+
+    def test_stream_updates_linked_project_task(self):
+        tasks = FakeProjectTaskService()
+        with self.patched_dependencies(project_tasks=tasks):
+            response = self.client.post(
+                "/verifications/run/stream",
+                json={
+                    "profile_id": "profile-1",
+                    "project_task_id": "task-1",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(tasks.started, [("task-1", "run-1", "profile-1")])
+        self.assertEqual(tasks.finished, [("task-1", "run-1", None)])
 
 
 if __name__ == "__main__":

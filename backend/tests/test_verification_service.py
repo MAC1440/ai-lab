@@ -124,6 +124,56 @@ class VerificationServiceTests(unittest.IsolatedAsyncioTestCase):
         stored = self.store.get_run(started_event["run_id"])
         self.assertEqual(stored["status"], "cancelled")
 
+    def test_unity_compiler_error_fails_even_with_success_exit_code(self):
+        profile = VerificationProfile(
+            profile_id="unity-compile",
+            name="Unity compile",
+            description="Compile",
+            project_type="unity",
+            working_directory=".",
+            command=("Unity",),
+            display_command="Unity",
+            timeout_seconds=10,
+            available=True,
+        )
+
+        summary, error = VerificationService._validate_profile_result(
+            profile=profile,
+            output="Assets/Player.cs(4,2): error CS1002: ; expected",
+        )
+
+        self.assertEqual(summary, "")
+        self.assertIn("compiler", error)
+
+    def test_unity_nunit_results_are_authoritative(self):
+        result_file = self.root / "results.xml"
+        result_file.write_text(
+            '<test-run result="Failed" total="3" passed="2" failed="1" />',
+            encoding="utf-8",
+        )
+        profile = VerificationProfile(
+            profile_id="unity-tests",
+            name="Unity tests",
+            description="Tests",
+            project_type="unity",
+            working_directory=".",
+            command=("Unity",),
+            display_command="Unity",
+            timeout_seconds=10,
+            available=True,
+            result_file=str(result_file),
+            result_format="nunit-xml",
+        )
+
+        summary, error = VerificationService._validate_profile_result(
+            profile=profile,
+            output="",
+        )
+
+        self.assertIn("total=3", summary)
+        self.assertIn("failed=1", summary)
+        self.assertIn("failures", error)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,6 +8,7 @@ This backend provides a small FastAPI service for:
 - ChromaDB-backed RAG for enabled agents
 - reviewable workspace file changes
 - safe streamed workspace verification with persistent run history
+- durable multi-file project tasks with approval, verification, and repair
 
 ## Quick start
 
@@ -40,6 +41,7 @@ PORT=8000
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 VERIFICATION_DB_PATH=data/verification.sqlite3
 VERIFICATION_MAX_OUTPUT_CHARS=200000
+PROJECT_TASK_DB_PATH=data/project-tasks.sqlite3
 ```
 
 The current agent profile model names live in
@@ -47,7 +49,18 @@ The current agent profile model names live in
 fallback for direct `OllamaClient` use; it does not override those profiles.
 
 Set `UNITY_EDITOR_PATH` to the full Unity executable path to enable optional
-Unity batch-mode checks.
+Unity batch-mode compile checks. Projects that declare
+`com.unity.test-framework` also receive an EditMode test profile whose NUnit
+XML is parsed independently of Unity's process exit code.
+
+### Durable project tasks
+
+The **Tasks** dialog creates a bounded goal, loads its controlled execution
+prompt into chat, and persists progress through proposal review, verification,
+and repair. The browser sends `project_task_id` with the agent request. The
+model still has no direct write or shell access: all file changes remain
+validated proposals, and verification remains restricted to detected profile
+IDs.
 
 ## Example endpoints
 

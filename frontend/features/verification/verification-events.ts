@@ -8,6 +8,7 @@ export type VerificationFixRequestDetail = {
   toolPolicy: "propose";
   freshContext: true;
   repairTaskId: string;
+  projectTaskId: string | null;
   recommendedAgentId: "web" | "unity" | "coding";
 };
 
@@ -40,7 +41,7 @@ export function buildVerificationFixPrompt(run: VerificationRun): string {
     `Exit code: ${run.exit_code ?? "unknown"}`,
     errorLine,
     "Read the exact files named in the traceback before searching broadly.",
-    "Identify only the reported cause and call propose_file_change for each required fix.",
+    "Identify only the reported cause and use propose_file_change_set for related fixes when possible.",
     "A chat-only explanation is not a completed repair. Do not discuss unrelated architecture.",
     "Do not claim the issue is fixed; the proposal still requires approval and another verification run.",
     "",
@@ -56,12 +57,14 @@ export function buildVerificationFixPrompt(run: VerificationRun): string {
 export function requestAgentFix(
   run: VerificationRun,
   repairTaskId: string,
+  projectTaskId: string | null = null,
 ): void {
   const detail: VerificationFixRequestDetail = {
     prompt: buildVerificationFixPrompt(run),
     toolPolicy: "propose",
     freshContext: true,
     repairTaskId,
+    projectTaskId,
     recommendedAgentId:
       run.project_type === "unity"
         ? "unity"

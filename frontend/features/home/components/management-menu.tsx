@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { KnowledgeSourcesDialog } from "@/features/knowledge-sources";
 import { MCPSettingsDialog } from "@/features/mcp";
 import { ModelSettingsDialog } from "@/features/model-settings";
+import { ProjectTaskDialog } from "@/features/project-tasks";
 import { RepairDialog } from "@/features/repairs";
 import { ScaffoldDialog } from "@/features/scaffolds";
 import { SystemDialog } from "@/features/system";
@@ -23,6 +24,7 @@ export function ManagementMenu({ agents, disabled, workspaceReady, onAgentsChang
         <PopoverContent align="end" className="w-[320px] p-3">
             <p className="mb-3 text-xs font-medium uppercase tracking-wide text-zinc-500">Workspace and application tools</p>
             <div className="grid grid-cols-2 gap-2">
+                <ProjectTaskDialog disabled={!workspaceReady || disabled} />
                 <VerificationDialog disabled={!workspaceReady || disabled} />
                 <RepairDialog disabled={!workspaceReady || disabled} />
                 <ScaffoldDialog disabled={!workspaceReady || disabled} />

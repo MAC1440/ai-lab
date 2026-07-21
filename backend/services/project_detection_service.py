@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -43,6 +44,8 @@ class VerificationProfile:
     timeout_seconds: int
     available: bool
     unavailable_reason: Optional[str] = None
+    result_file: Optional[str] = None
+    result_format: Optional[str] = None
 
     def public(self) -> Dict[str, Any]:
         return {
@@ -55,6 +58,7 @@ class VerificationProfile:
             "timeout_seconds": self.timeout_seconds,
             "available": self.available,
             "unavailable_reason": self.unavailable_reason,
+            "result_format": self.result_format,
         }
 
 
@@ -390,7 +394,7 @@ class ProjectDetectionService:
         editor_available = bool(editor_path and editor_path.is_file())
         command_editor = str(editor_path) if editor_path else "Unity"
 
-        profile = self._profile(
+        compile_profile = self._profile(
             action="unity-compile",
             name=f"Unity compile check ({relative})",
             description=(
@@ -402,13 +406,16 @@ class ProjectDetectionService:
             command=(
                 command_editor,
                 "-batchmode",
+                "-nographics",
                 "-quit",
                 "-projectPath",
                 ".",
                 "-logFile",
                 "-",
             ),
-            display_command=("Unity -batchmode -quit -projectPath . -logFile -"),
+            display_command=(
+                "Unity -batchmode -nographics -quit -projectPath . -logFile -"
+            ),
             timeout_seconds=900,
             available=editor_available,
             unavailable_reason=(
@@ -427,7 +434,58 @@ class ProjectDetectionService:
         if version:
             project["version"] = version
 
-        return project, [profile]
+        profiles = [compile_profile]
+        if self._unity_test_framework_declared(directory):
+            result_identity = hashlib.sha256(
+                str(directory.resolve()).encode("utf-8")
+            ).hexdigest()[:16]
+            result_file = str(
+                Path(tempfile.gettempdir())
+                / f"ai-lab-unity-editmode-{result_identity}.xml"
+            )
+            profiles.append(
+                self._profile(
+                    action="unity-editmode-tests",
+                    name=f"Unity EditMode tests ({relative})",
+                    description=(
+                        "Run Unity Test Framework EditMode tests in batch mode "
+                        "and validate the generated NUnit XML. Close the Unity "
+                        "Editor before running this check."
+                    ),
+                    project_type="unity",
+                    working_directory=relative,
+                    command=(
+                        command_editor,
+                        "-batchmode",
+                        "-nographics",
+                        "-runTests",
+                        "-testPlatform",
+                        "EditMode",
+                        "-projectPath",
+                        ".",
+                        "-testResults",
+                        result_file,
+                        "-logFile",
+                        "-",
+                    ),
+                    display_command=(
+                        "Unity -batchmode -nographics -runTests "
+                        "-testPlatform EditMode -projectPath . "
+                        "-testResults <temporary-results.xml> -logFile -"
+                    ),
+                    timeout_seconds=1200,
+                    available=editor_available,
+                    unavailable_reason=(
+                        None
+                        if editor_available
+                        else "Set UNITY_EDITOR_PATH to the full Unity executable path"
+                    ),
+                    result_file=result_file,
+                    result_format="nunit-xml",
+                )
+            )
+
+        return project, profiles
 
     def _profile(
         self,
@@ -442,6 +500,8 @@ class ProjectDetectionService:
         timeout_seconds: int,
         available: bool,
         unavailable_reason: Optional[str],
+        result_file: Optional[str] = None,
+        result_format: Optional[str] = None,
     ) -> VerificationProfile:
         identity = f"{project_type}:{action}:{working_directory}"
         suffix = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:12]
@@ -457,6 +517,22 @@ class ProjectDetectionService:
             timeout_seconds=timeout_seconds,
             available=available,
             unavailable_reason=unavailable_reason,
+            result_file=result_file,
+            result_format=result_format,
+        )
+
+    @staticmethod
+    def _unity_test_framework_declared(directory: Path) -> bool:
+        manifest = directory / "Packages" / "manifest.json"
+        if not manifest.is_file():
+            return False
+        try:
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return False
+        dependencies = payload.get("dependencies")
+        return isinstance(dependencies, dict) and isinstance(
+            dependencies.get("com.unity.test-framework"), str
         )
 
     @staticmethod

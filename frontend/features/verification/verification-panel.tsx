@@ -41,6 +41,7 @@ const MAX_LIVE_OUTPUT_CHARS = 100_000;
 type VerificationPanelProps = {
   relatedProposalId?: string | null;
   relatedRepairTaskId?: string | null;
+  relatedProjectTaskId?: string | null;
   onRequestAgentFix?: () => void;
 };
 
@@ -89,6 +90,7 @@ function verificationOutput(run: VerificationRun): string {
 export function VerificationPanel({
   relatedProposalId = null,
   relatedRepairTaskId = null,
+  relatedProjectTaskId = null,
   onRequestAgentFix,
 }: VerificationPanelProps) {
   const [overview, setOverview] = useState<VerificationOverview | null>(null);
@@ -169,6 +171,7 @@ export function VerificationPanel({
           profile_id: profile.profile_id,
           proposal_id: relatedProposalId,
           repair_task_id: relatedRepairTaskId,
+          project_task_id: relatedProjectTaskId,
         },
         controller.signal,
       )) {
@@ -266,7 +269,11 @@ export function VerificationPanel({
         : run;
 
       const repairTask = await createRepairTask(completeRun.run_id);
-      requestAgentFix(completeRun, repairTask.task_id);
+      requestAgentFix(
+        completeRun,
+        repairTask.task_id,
+        relatedProjectTaskId,
+      );
       onRequestAgentFix?.();
     } catch (requestError) {
       setError(

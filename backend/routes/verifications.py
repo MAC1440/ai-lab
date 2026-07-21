@@ -3,10 +3,11 @@ from typing import Any, AsyncIterator, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from dependencies import (
     project_detection_service,
+    project_task_service,
     repair_service,
     verification_service,
     verification_store,
@@ -27,6 +28,8 @@ router = APIRouter(
 
 
 class VerificationRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     profile_id: str = Field(min_length=1, max_length=200)
     proposal_id: Optional[str] = Field(
         default=None,
@@ -34,6 +37,11 @@ class VerificationRunRequest(BaseModel):
         max_length=200,
     )
     repair_task_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+    )
+    project_task_id: Optional[str] = Field(
         default=None,
         min_length=1,
         max_length=100,
@@ -99,12 +107,41 @@ async def stream_verification_run(request: VerificationRunRequest):
                 proposal_id=request.proposal_id,
             ):
                 if (
+                    request.project_task_id
+                    and event.get("type") == "verification_started"
+                ):
+                    project_task_service.record_verification_started(
+                        request.project_task_id,
+                        run_id=event["run_id"],
+                        profile_id=request.profile_id,
+                    )
+                if (
                     request.repair_task_id
                     and event.get("type") == "verification_done"
                 ):
                     repair_service.record_verification(
                         request.repair_task_id,
                         event["result"],
+                    )
+                if (
+                    request.project_task_id
+                    and event.get("type") == "verification_done"
+                ):
+                    result = event["result"]
+                    repair_task_id = request.repair_task_id
+                    if (
+                        not repair_task_id
+                        and result.get("status")
+                        in {"failed", "error", "timed_out"}
+                    ):
+                        repair_task = repair_service.create_from_verification(
+                            result["run_id"]
+                        )
+                        repair_task_id = repair_task["task_id"]
+                    project_task_service.record_verification_result(
+                        request.project_task_id,
+                        run=result,
+                        repair_task_id=repair_task_id,
                     )
                 yield _encode_ndjson(event)
         except PermissionError as error:

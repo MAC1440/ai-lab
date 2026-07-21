@@ -13,6 +13,7 @@ from dependencies import (
     mcp_service,
     project_context_service,
     project_detection_service,
+    project_task_service,
     run_cancellation_service,
 )
 from services.agent_runner import AgentRunner
@@ -56,6 +57,11 @@ class AgentChatRequest(BaseModel):
     )
     tool_policy: Literal["auto", "inspect", "propose"] = "auto"
     repair_task_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+    )
+    project_task_id: Optional[str] = Field(
         default=None,
         min_length=1,
         max_length=100,
@@ -119,8 +125,16 @@ async def pydantic_agent_chat_stream(
     history = _serialize_history(request.history)
 
     async def generate_events():
+        task_run_started = False
+        task_run_finished = False
         try:
             await run_cancellation_service.register(request.run_id)
+            if request.project_task_id:
+                project_task_service.start_agent_run(
+                    request.project_task_id,
+                    request.run_id,
+                )
+                task_run_started = True
             run_history = history
             if request.session_id:
                 run_history = conversation_service.prepare_run(
@@ -143,17 +157,35 @@ async def pydantic_agent_chat_stream(
                 tools_enabled=request.tools_enabled,
                 enabled_tools=request.enabled_tools,
             ):
-                if event.get("type") == "done" and request.session_id:
-                    event["result"]["session_id"] = request.session_id
-                    conversation_service.complete_run(
-                        session_id=request.session_id,
-                        result=event["result"],
-                    )
+                if event.get("type") == "done":
+                    if request.project_task_id:
+                        event["result"]["project_task_id"] = (
+                            request.project_task_id
+                        )
+                        project_task_service.record_agent_result(
+                            request.project_task_id,
+                            run_id=request.run_id,
+                            result=event["result"],
+                        )
+                        task_run_finished = True
+                    if request.session_id:
+                        event["result"]["session_id"] = request.session_id
+                        conversation_service.complete_run(
+                            session_id=request.session_id,
+                            result=event["result"],
+                        )
                 yield _encode_ndjson(event)
 
         except asyncio.CancelledError:
             # Re-raising is what closes Pydantic AI's model context and the
             # underlying HTTP stream to Ollama immediately.
+            if request.project_task_id and task_run_started:
+                project_task_service.record_agent_interrupted(
+                    request.project_task_id,
+                    run_id=request.run_id,
+                    reason="Agent execution was cancelled by the user.",
+                )
+                task_run_finished = True
             raise
 
         except PermissionError as error:
@@ -205,6 +237,22 @@ async def pydantic_agent_chat_stream(
                 }
             )
         finally:
+            if (
+                request.project_task_id
+                and task_run_started
+                and not task_run_finished
+            ):
+                try:
+                    project_task_service.record_agent_interrupted(
+                        request.project_task_id,
+                        run_id=request.run_id,
+                        reason=(
+                            "The agent stream ended before a validated change "
+                            "set was recorded."
+                        ),
+                    )
+                except Exception:
+                    pass
             await run_cancellation_service.unregister(request.run_id)
 
     return StreamingResponse(

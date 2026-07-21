@@ -102,6 +102,43 @@ class ProjectDetectionServiceTests(unittest.TestCase):
         self.assertFalse(unity_profile["available"])
         self.assertIn("UNITY_EDITOR_PATH", unity_profile["unavailable_reason"])
 
+    def test_unity_test_framework_adds_editmode_profile(self):
+        (self.root / "Assets").mkdir()
+        project_settings = self.root / "ProjectSettings"
+        project_settings.mkdir()
+        (project_settings / "ProjectVersion.txt").write_text(
+            "m_EditorVersion: 6000.1.4f1\n",
+            encoding="utf-8",
+        )
+        packages = self.root / "Packages"
+        packages.mkdir()
+        (packages / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "dependencies": {
+                        "com.unity.test-framework": "1.3.9",
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = self.service.inspect_workspace()
+        unity_profiles = [
+            profile
+            for profile in result["profiles"]
+            if profile["project_type"] == "unity"
+        ]
+
+        self.assertEqual(len(unity_profiles), 2)
+        test_profile = next(
+            profile
+            for profile in unity_profiles
+            if "EditMode" in profile["name"]
+        )
+        self.assertEqual(test_profile["result_format"], "nunit-xml")
+        self.assertIn("-runTests", test_profile["command"])
+
     def test_profile_ids_are_stable(self):
         (self.root / "requirements.txt").write_text(
             "pytest\n",

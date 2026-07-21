@@ -82,6 +82,7 @@ export type AgentChatRequest = {
     rag_distance_threshold?: number | null;
     tool_policy?: AgentToolPolicy;
     repair_task_id?: string | null;
+    project_task_id?: string | null;
     session_id?: string | null;
     run_id: string;
     rag_enabled?: boolean | null;
@@ -110,6 +111,7 @@ export type AgentChatResponse = {
     context?: AgentProjectContextTrace;
     change_set_id?: string | null;
     repair_task_id?: string | null;
+    project_task_id?: string | null;
     session_id?: string | null;
 };
 
