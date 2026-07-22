@@ -73,6 +73,72 @@ class ImplementationPlan(BaseModel):
         return self
 
 
+class GeneratedFileChange(BaseModel):
+    """One complete file operation produced by the generation-only stage."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1, max_length=500)
+    operation: PlanOperation
+    summary: str = Field(min_length=1, max_length=1000)
+    content: Optional[str] = Field(default=None, max_length=1_000_000)
+    destination_path: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("path", "destination_path")
+    @classmethod
+    def normalize_path(cls, value: Optional[str]) -> Optional[str]:
+        return PlannedFile.normalize_path(value)
+
+    @model_validator(mode="after")
+    def validate_operation_payload(self):
+        if self.operation in {"create", "update"}:
+            if self.content is None:
+                raise ValueError(
+                    "Create and update operations require complete file content"
+                )
+            if self.destination_path is not None:
+                raise ValueError(
+                    "destination_path is only valid for move operations"
+                )
+        elif self.operation == "move":
+            if not self.destination_path:
+                raise ValueError("Move operations require destination_path")
+            if self.content is not None:
+                raise ValueError("Move operations must not include content")
+        else:
+            if self.content is not None:
+                raise ValueError("Delete operations must not include content")
+            if self.destination_path is not None:
+                raise ValueError(
+                    "destination_path is only valid for move operations"
+                )
+        return self
+
+
+class GeneratedChangeSet(BaseModel):
+    """Typed output contract for the generation-only model invocation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = Field(min_length=1, max_length=2000)
+    operations: List[GeneratedFileChange] = Field(min_length=1, max_length=20)
+
+    @model_validator(mode="after")
+    def reject_conflicts(self):
+        paths: set[str] = set()
+        for item in self.operations:
+            for path in (item.path, item.destination_path):
+                if path is None:
+                    continue
+                key = path.casefold()
+                if key in paths:
+                    raise ValueError(
+                        f"Duplicate or conflicting generated path: {path}"
+                    )
+                paths.add(key)
+        return self
+
+
 class TaskContextService:
     """Compile exact, reproducible project files for one generation stage."""
 
@@ -145,11 +211,38 @@ class TaskContextService:
             "missing_required": missing_required,
         }
 
+    def assert_fresh(self, context: Dict[str, Any]) -> None:
+        """Reject generation when a frozen context file changed on disk."""
+
+        root = self.workspace_service.get_workspace().resolve()
+        recorded_workspace = Path(str(context.get("workspace", ""))).resolve()
+        if recorded_workspace != root:
+            raise ValueError("The context pack belongs to another workspace")
+        if not context.get("complete", False):
+            raise ValueError("The context pack is incomplete")
+
+        for item in context.get("files", []):
+            relative = str(item.get("path", ""))
+            target = self._resolve(root, relative)
+            if not target.is_file():
+                raise ValueError(
+                    f"Context file disappeared after planning: {relative}"
+                )
+            raw = target.read_bytes()
+            digest = hashlib.sha256(raw).hexdigest()
+            if digest != item.get("sha256"):
+                raise ValueError(
+                    f"Context file changed after planning: {relative}"
+                )
+
     @staticmethod
     def _paths_to_read(files: Iterable[PlannedFile]) -> List[str]:
         result: List[str] = []
         for item in files:
-            if item.operation in {"update", "delete", "move"} and item.path not in result:
+            if (
+                item.operation in {"update", "delete", "move"}
+                and item.path not in result
+            ):
                 result.append(item.path)
         return result
 

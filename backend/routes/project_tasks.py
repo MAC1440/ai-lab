@@ -1,10 +1,15 @@
+import asyncio
+import json
 from typing import Any, Dict, Literal, Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from dependencies import (
     project_task_service,
+    project_task_orchestrator,
     run_cancellation_service,
     verification_service,
 )
@@ -34,6 +39,16 @@ class SaveProjectTaskPlanRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     plan: Dict[str, Any]
+
+
+class RunProjectTaskRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str = Field(
+        default_factory=lambda: uuid4().hex,
+        min_length=8,
+        max_length=100,
+    )
 
 
 @router.get("")
@@ -108,6 +123,47 @@ def compile_project_task_context(task_id: str):
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+@router.post("/{task_id}/run/stream")
+async def run_project_task_stream(
+    task_id: str,
+    request: RunProjectTaskRequest,
+):
+    async def generate_events():
+        try:
+            await run_cancellation_service.register(request.run_id)
+            async for event in project_task_orchestrator.run_events(
+                task_id=task_id,
+                run_id=request.run_id,
+            ):
+                yield _encode_ndjson(event)
+        except asyncio.CancelledError:
+            raise
+        except ProjectTaskNotFoundError as error:
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 404, "message": str(error)}
+            )
+        except ProjectTaskStateError as error:
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 409, "message": str(error)}
+            )
+        except (OSError, UnicodeError, ValueError, RuntimeError) as error:
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 400, "message": str(error)}
+            )
+        except Exception as error:  # pragma: no cover - provider boundary
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 500, "message": str(error)}
+            )
+        finally:
+            await run_cancellation_service.unregister(request.run_id)
+
+    return StreamingResponse(
+        generate_events(),
+        media_type="application/x-ndjson",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
 @router.post("/{task_id}/cancel")
 async def cancel_project_task(task_id: str):
     try:
@@ -132,3 +188,7 @@ async def cancel_project_task(task_id: str):
         raise HTTPException(status_code=409, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+def _encode_ndjson(event: Dict[str, Any]) -> str:
+    return json.dumps(event, ensure_ascii=False) + "\n"

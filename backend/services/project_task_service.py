@@ -40,13 +40,23 @@ class ProjectTaskService:
         )
 
     def save_plan(
-        self, task_id: str, plan_data: Dict[str, Any]
+        self,
+        task_id: str,
+        plan_data: Dict[str, Any],
+        *,
+        run_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         task = self.get_task(task_id)
         if task["status"] in TERMINAL_STATUSES:
             raise ProjectTaskStateError("A terminal task cannot accept a plan")
-        if task["status"] in {"running", "verifying", "awaiting_approval"}:
+        if task["status"] in {"verifying", "awaiting_approval"}:
             raise ProjectTaskStateError("The task is not ready for planning")
+        if task["status"] == "running":
+            self._require_current_agent_run(task, run_id or "")
+            if task["phase"] != "planning_model":
+                raise ProjectTaskStateError(
+                    "The active task is not in its planning stage"
+                )
         plan = ImplementationPlan.model_validate(plan_data)
         self._validate_plan_against_workspace(plan)
         artifact = self.store.put_artifact(
@@ -57,7 +67,7 @@ class ProjectTaskService:
         )
         self.store.update(
             task_id,
-            status="queued",
+            status="running" if run_id else "queued",
             phase="context_collection",
             last_error=None,
             updated_at=self._utc_now(),
@@ -70,10 +80,21 @@ class ProjectTaskService:
         )
         return self.get_task(task_id)
 
-    def compile_context(self, task_id: str) -> Dict[str, Any]:
+    def compile_context(
+        self,
+        task_id: str,
+        *,
+        run_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         task = self.get_task(task_id)
         if task["status"] in TERMINAL_STATUSES:
             raise ProjectTaskStateError("A terminal task cannot compile context")
+        if task["status"] == "running":
+            self._require_current_agent_run(task, run_id or "")
+            if task["phase"] != "context_collection":
+                raise ProjectTaskStateError(
+                    "The active task is not collecting context"
+                )
         plan_artifact = self.store.latest_artifact(task_id, "implementation_plan")
         if plan_artifact is None:
             raise ProjectTaskStateError("Save an implementation plan first")
@@ -85,8 +106,20 @@ class ProjectTaskService:
             payload=context,
             created_at=self._utc_now(),
         )
-        status = "ready" if context["complete"] else "needs_attention"
-        phase = "generation" if context["complete"] else "context_incomplete"
+        status = (
+            "running"
+            if context["complete"] and run_id
+            else "ready"
+            if context["complete"]
+            else "needs_attention"
+        )
+        phase = (
+            "generation_model"
+            if context["complete"] and run_id
+            else "generation"
+            if context["complete"]
+            else "context_incomplete"
+        )
         error = None if context["complete"] else (
             "Required context files are missing: "
             + ", ".join(context["missing_required"])
@@ -105,6 +138,116 @@ class ProjectTaskService:
             {"artifact_id": artifact["artifact_id"], "bytes": context["bytes"]},
         )
         return self.get_task(task_id)
+
+    def begin_orchestration(
+        self,
+        task_id: str,
+        *,
+        run_id: str,
+        stage: str,
+    ) -> Dict[str, Any]:
+        if stage not in {"planning", "generation"}:
+            raise ValueError("stage must be planning or generation")
+        task = self.get_task(task_id)
+        if task["status"] in TERMINAL_STATUSES:
+            raise ProjectTaskStateError(
+                "A completed or cancelled project task cannot run"
+            )
+        if task["status"] in {"running", "verifying", "awaiting_approval"}:
+            raise ProjectTaskStateError("The project task is already active")
+        if task["status"] == "ready_to_verify":
+            raise ProjectTaskStateError(
+                "Verify the approved change set instead of generating again"
+            )
+        if task["attempt_count"] >= task["max_attempts"]:
+            raise ProjectTaskStateError(
+                "This task reached its configured generation-attempt limit"
+            )
+        if stage == "generation":
+            artifact_types = {
+                item["artifact_type"] for item in task.get("artifacts", [])
+            }
+            if not {"implementation_plan", "context_pack"}.issubset(
+                artifact_types
+            ):
+                raise ProjectTaskStateError(
+                    "Generation requires a saved plan and context pack"
+                )
+
+        clean_run_id = self._required_id(run_id)
+        updated = self.store.update(
+            task_id,
+            status="running",
+            phase=f"{stage}_model",
+            current_agent_run_id=clean_run_id,
+            current_change_set_id=None,
+            last_error=None,
+            attempt_count=task["attempt_count"] + 1,
+            updated_at=self._utc_now(),
+            completed_at=None,
+            cancelled_at=None,
+        )
+        self._event(
+            task_id,
+            "orchestration_started",
+            f"Structured {stage} workflow started.",
+            {"run_id": clean_run_id, "stage": stage},
+        )
+        return self._enrich(updated)
+
+    def record_artifact(
+        self,
+        task_id: str,
+        *,
+        artifact_type: str,
+        payload: Dict[str, Any],
+        run_id: str,
+    ) -> Dict[str, Any]:
+        task = self.get_task(task_id)
+        self._require_current_agent_run(task, run_id)
+        return self.store.put_artifact(
+            task_id,
+            artifact_type=artifact_type,
+            payload=payload,
+            created_at=self._utc_now(),
+        )
+
+    def record_orchestration_failure(
+        self,
+        task_id: str,
+        *,
+        run_id: str,
+        stage: str,
+        reason: str,
+    ) -> Dict[str, Any]:
+        task = self.get_task(task_id)
+        if task.get("current_agent_run_id") != run_id:
+            return task
+        clean_stage = (
+            "generation"
+            if task.get("phase") in {"generation_model", "validation"}
+            else "planning"
+            if task.get("phase") in {"planning_model", "context_collection"}
+            else stage
+        )
+        updated = self.store.update(
+            task_id,
+            status="needs_attention",
+            phase=f"{clean_stage}_failed",
+            current_agent_run_id=None,
+            last_error=self._required_text(reason, "reason", 12_000),
+            updated_at=self._utc_now(),
+        )
+        self._event(
+            task_id,
+            "orchestration_failed",
+            str(reason),
+            {"run_id": run_id, "stage": clean_stage},
+        )
+        return self._enrich(updated)
+
+    def validate_plan_workspace(self, plan: ImplementationPlan) -> None:
+        self._validate_plan_against_workspace(plan)
 
     def create(
         self,

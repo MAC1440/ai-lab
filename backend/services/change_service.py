@@ -257,6 +257,152 @@ class ChangeService:
             repair_task_id=repair_task_id,
         )
 
+    def propose_change_set(
+        self,
+        *,
+        operations: List[Dict[str, Any]],
+        change_set_id: str,
+        repair_task_id: Optional[str] = None,
+        max_total_bytes: int = 2_000_000,
+    ) -> List[Dict[str, Any]]:
+        """Create an all-or-nothing set of review proposals.
+
+        The complete operation list is preflighted before proposal creation.
+        If a later proposal unexpectedly fails, every proposal created by this
+        call is removed from memory and SQLite so no partial change set leaks
+        into the review UI.
+        """
+
+        clean_set_id = self._required_id(change_set_id, "change_set_id")
+        if not isinstance(operations, list) or not 1 <= len(operations) <= 20:
+            raise ValueError("operations must contain between 1 and 20 items")
+        if max_total_bytes < 1:
+            raise ValueError("max_total_bytes must be positive")
+
+        normalized: List[Dict[str, Any]] = []
+        occupied_paths: set[str] = set()
+        total_bytes = 0
+        for index, raw in enumerate(operations):
+            if not isinstance(raw, dict):
+                raise ValueError(f"Operation {index + 1} must be an object")
+            operation = raw.get("operation")
+            if operation not in {"create", "update", "delete", "move"}:
+                raise ValueError(
+                    f"Operation {index + 1} has an unsupported operation type"
+                )
+            path = self._validate_path(raw.get("path", ""))
+            destination = raw.get("destination_path")
+            if destination is not None:
+                destination = self._validate_path(destination)
+            summary = raw.get("summary", "")
+            if not isinstance(summary, str):
+                raise ValueError(f"Operation {index + 1} summary must be text")
+            content = raw.get("content")
+            if operation in {"create", "update"}:
+                if not isinstance(content, str):
+                    raise ValueError(
+                        f"{operation} operation requires complete content: {path}"
+                    )
+                encoded_size = len(content.encode("utf-8"))
+                if encoded_size > self.max_file_bytes:
+                    raise ValueError(
+                        f"Proposed content exceeds {self.max_file_bytes} bytes: {path}"
+                    )
+                total_bytes += encoded_size
+            elif content is not None:
+                raise ValueError(
+                    f"{operation} operation must not include content: {path}"
+                )
+            if operation == "move" and not destination:
+                raise ValueError(f"Move operation requires destination_path: {path}")
+            if operation != "move" and destination is not None:
+                raise ValueError(
+                    f"destination_path is only valid for move operations: {path}"
+                )
+
+            for candidate in (path, destination):
+                if candidate is None:
+                    continue
+                key = os.path.normcase(candidate.replace("\\", "/"))
+                if key in occupied_paths:
+                    raise ValueError(
+                        f"A change set cannot target the same path twice: {candidate}"
+                    )
+                occupied_paths.add(key)
+            normalized.append(
+                {
+                    "path": path,
+                    "operation": operation,
+                    "content": content,
+                    "summary": summary,
+                    "destination_path": destination,
+                }
+            )
+
+        if total_bytes > max_total_bytes:
+            raise ValueError(
+                f"Change set content exceeds {max_total_bytes} bytes"
+            )
+
+        # Enforce the model's declared create/update intent instead of letting
+        # propose() silently infer a different operation from current disk state.
+        for item in normalized:
+            target = self.workspace_service.resolve_workspace_path(item["path"])
+            if item["operation"] == "create" and target.exists():
+                raise FileExistsError(f"Create target already exists: {item['path']}")
+            if item["operation"] in {"update", "delete", "move"}:
+                if not target.is_file():
+                    raise FileNotFoundError(
+                        f"Existing target was not found: {item['path']}"
+                    )
+            if item["operation"] == "move":
+                destination = self.workspace_service.resolve_workspace_path(
+                    item["destination_path"]
+                )
+                if destination.exists():
+                    raise FileExistsError(
+                        f"Move destination already exists: {item['destination_path']}"
+                    )
+
+        results: List[Dict[str, Any]] = []
+        with self._lock:
+            proposal_ids_before = set(self._proposals)
+            try:
+                for item in normalized:
+                    common = {
+                        "summary": item["summary"],
+                        "change_set_id": clean_set_id,
+                        "repair_task_id": repair_task_id,
+                    }
+                    if item["operation"] in {"create", "update"}:
+                        proposal = self.propose(
+                            file_path=item["path"],
+                            content=item["content"],
+                            **common,
+                        )
+                    elif item["operation"] == "delete":
+                        proposal = self.propose_delete(
+                            file_path=item["path"],
+                            **common,
+                        )
+                    else:
+                        proposal = self.propose_move(
+                            file_path=item["path"],
+                            destination_path=item["destination_path"],
+                            **common,
+                        )
+                    results.append(proposal)
+            except Exception:
+                created_ids = [
+                    proposal_id
+                    for proposal_id in self._proposals
+                    if proposal_id not in proposal_ids_before
+                    and self._proposals[proposal_id].change_set_id == clean_set_id
+                ]
+                self._discard_proposals(created_ids)
+                raise
+        return results
+
     def _store_operation(
         self,
         *,
@@ -528,6 +674,22 @@ class ChangeService:
                 f"Change proposal not found: {proposal_id}"
             )
         return proposal
+
+    def _discard_proposals(self, proposal_ids: List[str]) -> None:
+        if not proposal_ids:
+            return
+        for proposal_id in proposal_ids:
+            self._proposals.pop(proposal_id, None)
+        if self.database_path is None:
+            return
+        placeholders = ", ".join("?" for _ in proposal_ids)
+        with self._connect() as connection:
+            query = (
+                "DELETE FROM change_proposals WHERE proposal_id IN "
+                f"({placeholders})"
+            )
+            connection.execute(query, proposal_ids)  # noqa: S608
+            connection.commit()
 
     @staticmethod
     def _require_pending(proposal: _StoredProposal) -> None:

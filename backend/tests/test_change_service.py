@@ -72,6 +72,35 @@ class ChangeServiceTests(unittest.TestCase):
         with self.assertRaises(ChangeProposalStateError):
             self.service.approve(proposal["proposal_id"])
 
+    def test_generated_change_set_proposals_are_all_or_nothing(self):
+        existing = self.root / "existing.py"
+        existing.write_text("unchanged = True\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "identical"):
+            self.service.propose_change_set(
+                change_set_id="generated-set",
+                operations=[
+                    {
+                        "path": "new.py",
+                        "operation": "create",
+                        "summary": "Create the first file.",
+                        "content": "created = True\n",
+                    },
+                    {
+                        "path": "existing.py",
+                        "operation": "update",
+                        "summary": "Invalid no-op update.",
+                        "content": "unchanged = True\n",
+                    },
+                ],
+            )
+
+        self.assertEqual(
+            self.service.list_proposals(change_set_id="generated-set"),
+            [],
+        )
+        self.assertFalse((self.root / "new.py").exists())
+
     def test_stale_file_blocks_approval(self):
         target = self.root / "example.txt"
         target.write_text("one\n", encoding="utf-8")
