@@ -129,6 +129,38 @@ class ChangeServiceTests(unittest.TestCase):
             [],
         )
 
+    def test_change_set_treats_crlf_and_lf_content_as_identical(self):
+        existing = self.root / "windows.py"
+        existing.write_bytes(b"unchanged = True\r\n")
+
+        with self.assertRaisesRegex(ValueError, "identical"):
+            self.service.propose_change_set(
+                change_set_id="crlf-set",
+                operations=[
+                    {
+                        "path": "windows.py",
+                        "operation": "update",
+                        "summary": "Do not propose an EOL-only update.",
+                        "content": "unchanged = True\n",
+                    }
+                ],
+            )
+
+        self.assertEqual(
+            self.service.list_proposals(change_set_id="crlf-set"),
+            [],
+        )
+
+    def test_single_proposal_treats_crlf_and_lf_content_as_identical(self):
+        existing = self.root / "windows.py"
+        existing.write_bytes(b"unchanged = True\r\n")
+
+        with self.assertRaisesRegex(ValueError, "identical"):
+            self.service.propose(
+                file_path="windows.py",
+                content="unchanged = True\n",
+            )
+
     def test_stale_file_blocks_approval(self):
         target = self.root / "example.txt"
         target.write_text("one\n", encoding="utf-8")

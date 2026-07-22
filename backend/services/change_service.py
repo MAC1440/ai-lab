@@ -112,7 +112,7 @@ class ChangeService:
         base_exists = target.exists()
         before_content = self._read_current_content(target, clean_path)
 
-        if base_exists and before_content == content:
+        if base_exists and self._contents_equivalent(before_content, content):
             raise ValueError("The proposed content is identical to the file")
 
         operation: Literal["create", "update"] = (
@@ -360,7 +360,10 @@ class ChangeService:
                     target,
                     item["path"],
                 )
-                if current_content == item["content"]:
+                if self._contents_equivalent(
+                    current_content,
+                    item["content"],
+                ):
                     raise ValueError(
                         "The proposed content is identical to the file: "
                         f"{item['path']}"
@@ -791,6 +794,23 @@ class ChangeService:
     @staticmethod
     def _hash_text(content: str) -> str:
         return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _contents_equivalent(left: str, right: str) -> bool:
+        """Compare text without treating platform line endings as a change.
+
+        Workspace files are decoded from raw bytes so their exact contents can
+        be hashed for stale-file detection. On Windows, however, text written
+        with ``\n`` is commonly stored as ``\r\n``. Model output normally uses
+        ``\n`` on every platform. Normalizing only for equality prevents a
+        CRLF/LF-only update from bypassing no-op validation while keeping the
+        exact raw text available for conflict hashes and rollback snapshots.
+        """
+
+        def normalize_newlines(value: str) -> str:
+            return value.replace("\r\n", "\n").replace("\r", "\n")
+
+        return normalize_newlines(left) == normalize_newlines(right)
 
     @staticmethod
     def _validate_path(file_path: str) -> str:
