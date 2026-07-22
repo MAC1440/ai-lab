@@ -182,6 +182,79 @@ class ProjectTaskStore:
             events.append(event)
         return events
 
+    def put_artifact(
+        self,
+        task_id: str,
+        *,
+        artifact_type: str,
+        payload: Dict[str, Any],
+        created_at: str,
+    ) -> Dict[str, Any]:
+        if not artifact_type.strip():
+            raise ValueError("artifact_type must not be empty")
+        artifact_id = uuid4().hex
+        with self._lock, self._connect() as connection:
+            if connection.execute(
+                "SELECT 1 FROM project_tasks WHERE task_id = ?", (task_id,)
+            ).fetchone() is None:
+                raise ProjectTaskNotFoundError(f"Project task not found: {task_id}")
+            connection.execute(
+                """
+                INSERT INTO project_task_artifacts (
+                    artifact_id, task_id, artifact_type, payload_json, created_at
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    artifact_id,
+                    task_id,
+                    artifact_type.strip(),
+                    json.dumps(payload, ensure_ascii=False),
+                    created_at,
+                ),
+            )
+            connection.commit()
+        return {
+            "artifact_id": artifact_id,
+            "task_id": task_id,
+            "artifact_type": artifact_type.strip(),
+            "payload": payload,
+            "created_at": created_at,
+        }
+
+    def latest_artifact(
+        self, task_id: str, artifact_type: str
+    ) -> Optional[Dict[str, Any]]:
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM project_task_artifacts
+                WHERE task_id = ? AND artifact_type = ?
+                ORDER BY created_at DESC, artifact_id DESC LIMIT 1
+                """,
+                (task_id, artifact_type),
+            ).fetchone()
+        if row is None:
+            return None
+        artifact = dict(row)
+        artifact["payload"] = json.loads(artifact.pop("payload_json"))
+        return artifact
+
+    def list_artifacts(self, task_id: str) -> List[Dict[str, Any]]:
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM project_task_artifacts
+                WHERE task_id = ? ORDER BY created_at ASC, artifact_id ASC
+                """,
+                (task_id,),
+            ).fetchall()
+        result = []
+        for row in rows:
+            artifact = dict(row)
+            artifact["payload"] = json.loads(artifact.pop("payload_json"))
+            result.append(artifact)
+        return result
+
     def _initialize(self) -> None:
         with self._lock, self._connect() as connection:
             connection.executescript(
@@ -221,6 +294,19 @@ class ProjectTaskStore:
                 );
                 CREATE INDEX IF NOT EXISTS project_task_events_task_created
                 ON project_task_events (task_id, created_at ASC);
+
+                CREATE TABLE IF NOT EXISTS project_task_artifacts (
+                    artifact_id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    artifact_type TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (task_id) REFERENCES project_tasks(task_id)
+                );
+                CREATE INDEX IF NOT EXISTS project_task_artifacts_task_type
+                ON project_task_artifacts (
+                    task_id, artifact_type, created_at DESC
+                );
                 """
             )
             connection.execute(

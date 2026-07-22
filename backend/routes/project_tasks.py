@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Any, Dict, Literal, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -28,6 +28,12 @@ class CreateProjectTaskRequest(BaseModel):
         max_length=200,
     )
     max_attempts: int = Field(default=3, ge=1, le=5)
+
+
+class SaveProjectTaskPlanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plan: Dict[str, Any]
 
 
 @router.get("")
@@ -75,6 +81,30 @@ def resume_project_task(task_id: str):
     except ProjectTaskStateError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.put("/{task_id}/plan")
+def save_project_task_plan(task_id: str, request: SaveProjectTaskPlanRequest):
+    try:
+        return project_task_service.save_plan(task_id, request.plan)
+    except ProjectTaskNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ProjectTaskStateError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/{task_id}/context")
+def compile_project_task_context(task_id: str):
+    try:
+        return project_task_service.compile_context(task_id)
+    except ProjectTaskNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ProjectTaskStateError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except (OSError, UnicodeError, ValueError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 

@@ -138,6 +138,84 @@ class ProjectTaskServiceTests(unittest.TestCase):
         self.assertEqual(restarted["phase"], "interrupted")
         self.assertIsNone(restarted["current_agent_run_id"])
 
+    def test_plan_and_context_pack_survive_restart(self):
+        (self.root / "Assets").mkdir()
+        source = self.root / "Assets" / "Player.cs"
+        source.write_text("public class Player {}\n", encoding="utf-8")
+        task = self.service.create(
+            title="Add player health",
+            goal="Update Player and create Health.",
+            agent_id="unity",
+        )
+
+        planned = self.service.save_plan(
+            task["task_id"],
+            {
+                "summary": "Add a reusable health component.",
+                "files": [
+                    {
+                        "path": "Assets/Player.cs",
+                        "operation": "update",
+                        "reason": "Connect the existing player to health.",
+                    },
+                    {
+                        "path": "Assets/Health.cs",
+                        "operation": "create",
+                        "reason": "Provide the health implementation.",
+                    },
+                ],
+                "verification": ["unity-compile"],
+            },
+        )
+        self.assertEqual(planned["phase"], "context_collection")
+
+        compiled = self.service.compile_context(task["task_id"])
+        self.assertEqual(compiled["status"], "ready")
+        context = compiled["artifacts"][-1]["payload"]
+        self.assertEqual([item["path"] for item in context["files"]], ["Assets/Player.cs"])
+        self.assertEqual(len(context["files"][0]["sha256"]), 64)
+        self.assertNotIn("Assets/Health.cs", context["missing_required"])
+
+        restarted = ProjectTaskService(
+            workspace_service=self.workspace,
+            change_service=self.changes,
+            store=ProjectTaskStore(self.root / "tasks.sqlite3"),
+        ).get_task(task["task_id"])
+        self.assertEqual(len(restarted["artifacts"]), 2)
+
+    def test_plan_rejects_missing_update_and_duplicate_paths(self):
+        task = self.service.create(
+            title="Invalid task",
+            goal="Exercise plan validation.",
+            agent_id="coding",
+        )
+        with self.assertRaises(ValueError):
+            self.service.save_plan(
+                task["task_id"],
+                {
+                    "summary": "Invalid",
+                    "files": [
+                        {
+                            "path": "missing.py",
+                            "operation": "update",
+                            "reason": "It does not exist.",
+                        }
+                    ],
+                },
+            )
+
+        with self.assertRaises(ValueError):
+            self.service.save_plan(
+                task["task_id"],
+                {
+                    "summary": "Conflicting",
+                    "files": [
+                        {"path": "new.py", "operation": "create", "reason": "One"},
+                        {"path": "NEW.py", "operation": "create", "reason": "Two"},
+                    ],
+                },
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -11,6 +11,7 @@ from services.project_task_store import (
     ProjectTaskStore,
 )
 from services.workspace_service import WorkspaceService
+from services.task_context_service import ImplementationPlan, TaskContextService
 
 
 TERMINAL_STATUSES = {"completed", "cancelled"}
@@ -29,10 +30,81 @@ class ProjectTaskService:
         workspace_service: WorkspaceService,
         change_service: ChangeService,
         store: ProjectTaskStore,
+        task_context_service: Optional[TaskContextService] = None,
     ) -> None:
         self.workspace_service = workspace_service
         self.change_service = change_service
         self.store = store
+        self.task_context_service = task_context_service or TaskContextService(
+            workspace_service
+        )
+
+    def save_plan(
+        self, task_id: str, plan_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        task = self.get_task(task_id)
+        if task["status"] in TERMINAL_STATUSES:
+            raise ProjectTaskStateError("A terminal task cannot accept a plan")
+        if task["status"] in {"running", "verifying", "awaiting_approval"}:
+            raise ProjectTaskStateError("The task is not ready for planning")
+        plan = ImplementationPlan.model_validate(plan_data)
+        self._validate_plan_against_workspace(plan)
+        artifact = self.store.put_artifact(
+            task_id,
+            artifact_type="implementation_plan",
+            payload=plan.model_dump(),
+            created_at=self._utc_now(),
+        )
+        self.store.update(
+            task_id,
+            status="queued",
+            phase="context_collection",
+            last_error=None,
+            updated_at=self._utc_now(),
+        )
+        self._event(
+            task_id,
+            "plan_saved",
+            f"Implementation plan saved for {len(plan.files)} file(s).",
+            {"artifact_id": artifact["artifact_id"]},
+        )
+        return self.get_task(task_id)
+
+    def compile_context(self, task_id: str) -> Dict[str, Any]:
+        task = self.get_task(task_id)
+        if task["status"] in TERMINAL_STATUSES:
+            raise ProjectTaskStateError("A terminal task cannot compile context")
+        plan_artifact = self.store.latest_artifact(task_id, "implementation_plan")
+        if plan_artifact is None:
+            raise ProjectTaskStateError("Save an implementation plan first")
+        plan = ImplementationPlan.model_validate(plan_artifact["payload"])
+        context = self.task_context_service.compile(plan)
+        artifact = self.store.put_artifact(
+            task_id,
+            artifact_type="context_pack",
+            payload=context,
+            created_at=self._utc_now(),
+        )
+        status = "ready" if context["complete"] else "needs_attention"
+        phase = "generation" if context["complete"] else "context_incomplete"
+        error = None if context["complete"] else (
+            "Required context files are missing: "
+            + ", ".join(context["missing_required"])
+        )
+        self.store.update(
+            task_id,
+            status=status,
+            phase=phase,
+            last_error=error,
+            updated_at=self._utc_now(),
+        )
+        self._event(
+            task_id,
+            "context_compiled",
+            f"Compiled {len(context['files'])} exact file(s) for generation.",
+            {"artifact_id": artifact["artifact_id"], "bytes": context["bytes"]},
+        )
+        return self.get_task(task_id)
 
     def create(
         self,
@@ -337,6 +409,7 @@ class ProjectTaskService:
         result["proposals"] = proposals
         result["proposal_count"] = len(proposals)
         result["events"] = self.store.list_events(task["task_id"])
+        result["artifacts"] = self.store.list_artifacts(task["task_id"])
 
         if task["status"] not in TERMINAL_STATUSES and proposals:
             statuses = {proposal["status"] for proposal in proposals}
@@ -356,6 +429,26 @@ class ProjectTaskService:
         )
         result["execution_prompt"] = self.execution_prompt(result)
         return result
+
+    def _validate_plan_against_workspace(self, plan: ImplementationPlan) -> None:
+        root = self.workspace_service.get_workspace().resolve()
+        for item in plan.files:
+            target = (root / item.path).resolve()
+            try:
+                target.relative_to(root)
+            except ValueError as error:
+                raise ValueError(f"Path escapes workspace: {item.path}") from error
+            if item.operation == "create" and target.exists():
+                raise ValueError(f"Create target already exists: {item.path}")
+            if item.operation in {"update", "delete", "move"} and not target.is_file():
+                raise ValueError(f"Existing target was not found: {item.path}")
+            if item.destination_path:
+                destination = (root / item.destination_path).resolve()
+                destination.relative_to(root)
+                if destination.exists():
+                    raise ValueError(
+                        f"Move destination already exists: {item.destination_path}"
+                    )
 
     def _require_current_agent_run(
         self, task: Dict[str, Any], run_id: str
