@@ -98,6 +98,20 @@ class ProjectTaskServiceTests(unittest.TestCase):
         self.assertEqual(result["status"], "needs_attention")
         self.assertTrue(result["can_resume"])
 
+    def test_execution_prompt_describes_the_strict_change_set_contract(self):
+        task = self.service.create(
+            title="Authentication page",
+            goal="Add login and signup pages.",
+            agent_id="web",
+        )
+
+        prompt = task["execution_prompt"]
+
+        self.assertIn("file_path and new_text", prompt)
+        self.assertIn("Do not send an operation field", prompt)
+        self.assertIn("exactly once", prompt)
+        self.assertIn("normally no more than 8 files", prompt)
+
     def test_cancelled_task_cannot_restart(self):
         task = self.service.create(
             title="Cancelled work",

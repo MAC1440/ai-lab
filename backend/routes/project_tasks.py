@@ -21,7 +21,7 @@ class CreateProjectTaskRequest(BaseModel):
 
     title: str = Field(min_length=1, max_length=160)
     goal: str = Field(min_length=1, max_length=12_000)
-    agent_id: Literal["coding", "unity", "web"] = "unity"
+    agent_id: Literal["coding", "unity", "web"] = "coding"
     verification_profile_id: Optional[str] = Field(
         default=None,
         min_length=1,

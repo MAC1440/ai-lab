@@ -9,7 +9,7 @@ import {
   RefreshCwIcon,
   SquareIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,12 +30,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { getAgentRecommendation } from "@/features/agents/agent-api";
 import {
   cancelProjectTask,
   createProjectTask,
   listProjectTasks,
   resumeProjectTask,
 } from "@/features/project-tasks/project-task-api";
+import { resolveProjectTaskAgentId } from "@/features/project-tasks/project-task-agent.mjs";
 import { getProjectTaskAction } from "@/features/project-tasks/project-task-actions.mjs";
 import { requestProjectTaskRun } from "@/features/project-tasks/project-task-events";
 import type { ProjectTask } from "@/features/project-tasks/project-task-types";
@@ -63,10 +65,14 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [title, setTitle] = useState("");
   const [goal, setGoal] = useState("");
-  const [agentId, setAgentId] = useState<"unity" | "coding" | "web">("unity");
+  const [agentId, setAgentId] = useState<"unity" | "coding" | "web">("coding");
+  const [agentReason, setAgentReason] = useState(
+    "Coding is the safe fallback until the workspace recommendation loads.",
+  );
   const [loading, setLoading] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const agentSelectionTouchedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -87,8 +93,23 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
 
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) {
+      agentSelectionTouchedRef.current = false;
       setLoading(true);
       void refresh();
+      void getAgentRecommendation()
+        .then((recommendation) => {
+          if (agentSelectionTouchedRef.current) return;
+          setAgentId(
+            resolveProjectTaskAgentId(recommendation.agent_id) as typeof agentId,
+          );
+          setAgentReason(recommendation.reason);
+        })
+        .catch(() => {
+          setAgentId("coding");
+          setAgentReason(
+            "Workspace recommendation was unavailable; Coding is selected as the safe fallback.",
+          );
+        });
     }
     setOpen(nextOpen);
   }
@@ -182,7 +203,11 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Agent</Label>
-              <Select value={agentId} onValueChange={(value) => setAgentId(value as typeof agentId)}>
+              <Select value={agentId} onValueChange={(value) => {
+                agentSelectionTouchedRef.current = true;
+                setAgentId(value as typeof agentId);
+                setAgentReason("Selected manually for this task.");
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unity">Unity</SelectItem>
@@ -190,6 +215,7 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
                   <SelectItem value="web">Web</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs leading-5 text-zinc-500">{agentReason}</p>
             </div>
             <p className="text-xs leading-5 text-zinc-500">The agent can propose up to 20 related files. No filesystem write occurs until you approve the set.</p>
             <Button type="button" className="w-full" disabled={!title.trim() || !goal.trim() || actionId !== null} onClick={() => void createAndRun()}>

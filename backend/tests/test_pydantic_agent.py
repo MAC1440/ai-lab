@@ -1,10 +1,12 @@
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from pydantic_ai import ModelRetry
 
 from services.pydantic_agent import (
     AgentRunDeps,
+    FileChangeOperation,
     enforce_tool_policy,
     get_pydantic_agent,
     propose_file_change,
@@ -74,7 +76,13 @@ class PydanticAgentTests(unittest.TestCase):
 
     def test_change_set_requires_every_existing_target_to_be_read(self):
         context = SimpleNamespace(deps=AgentRunDeps(tool_policy="propose"))
-        with self.assertRaisesRegex(ModelRetry, "Missing read"):
+        with (
+            patch(
+                "services.pydantic_agent._read_file",
+                return_value={"path": "backend/app.py", "content": "old"},
+            ),
+            self.assertRaisesRegex(ModelRetry, "read_file\\('backend/app.py'\\)"),
+        ):
             propose_file_change_set(
                 context,
                 operations=[
@@ -84,6 +92,64 @@ class PydanticAgentTests(unittest.TestCase):
                     }
                 ],
             )
+
+    def test_change_set_operation_schema_rejects_vague_model_output(self):
+        result = propose_file_change_set(
+            SimpleNamespace(deps=AgentRunDeps(tool_policy="propose")),
+            operations=[
+                {
+                    "file_path": "src/app/features/auth.tsx",
+                    "operation": "create",
+                    "summary": "Create authentication UI",
+                }
+            ],
+        )
+
+        self.assertEqual(result["error_type"], "ValidationError")
+        self.assertIn("new_text", result["error"])
+        self.assertIn("operation", result["error"])
+
+    def test_change_set_schema_requires_content_and_forbids_operation_field(self):
+        schema = FileChangeOperation.model_json_schema()
+
+        self.assertEqual(schema["additionalProperties"], False)
+        self.assertEqual(set(schema["required"]), {"file_path", "new_text"})
+        self.assertNotIn("operation", schema["properties"])
+
+    def test_new_change_set_target_does_not_require_fake_read(self):
+        context = SimpleNamespace(deps=AgentRunDeps(tool_policy="propose"))
+        with (
+            patch(
+                "services.pydantic_agent._read_file",
+                side_effect=FileNotFoundError("not found"),
+            ),
+            patch(
+                "services.pydantic_agent._propose_file_change_set",
+                return_value={"change_set_id": "set-1", "proposals": []},
+            ) as propose_set,
+        ):
+            result = propose_file_change_set(
+                context,
+                operations=[
+                    {
+                        "file_path": "src/app/login/page.tsx",
+                        "new_text": "export default function Login() {}\n",
+                        "summary": "Add login page",
+                    }
+                ],
+            )
+
+        self.assertEqual(result["change_set_id"], "set-1")
+        self.assertIn("src/app/login/page.tsx", context.deps.proposed_paths)
+        self.assertEqual(
+            propose_set.call_args.kwargs["operations"][0],
+            {
+                "file_path": "src/app/login/page.tsx",
+                "new_text": "export default function Login() {}\n",
+                "old_text": "",
+                "summary": "Add login page",
+            },
+        )
 
 
 if __name__ == "__main__":

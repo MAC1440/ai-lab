@@ -46,7 +46,7 @@ class PydanticAgentRunner:
         rag_service: Optional[RAGService] = None,
         project_context_service: Optional[ProjectContextService] = None,
         max_rag_context_chars: int = 8000,
-        max_model_requests: int = 10,
+        max_model_requests: int = 16,
         provider_settings_service: Optional[ProviderSettingsService] = None,
         mcp_service: Optional[MCPService] = None,
     ) -> None:
@@ -96,11 +96,15 @@ class PydanticAgentRunner:
 
         if (
             tool_policy == "propose"
-            and "propose_file_change" not in allowed_tool_names
+            and not {
+                "propose_file_change",
+                "propose_file_change_set",
+                "propose_path_operation",
+            }.intersection(allowed_tool_names)
         ):
             raise ValueError(
-                "Enforced repair mode requires an agent with the "
-                "propose_file_change tool"
+                "Enforced proposal mode requires an agent with a "
+                "workspace proposal tool"
             )
         if (
             tool_policy == "inspect"
@@ -339,6 +343,19 @@ class PydanticAgentRunner:
                         "step": 1,
                     }
 
+                    yield {
+                        "type": "status",
+                        "stage": "model",
+                        "message": (
+                            f"{tool_record['name']} returned an error; "
+                            "the model is choosing a safe next action"
+                            if tool_record["status"] == "error"
+                            else f"{tool_record['name']} completed; the model "
+                            "is choosing the next action"
+                        ),
+                        "step": 1,
+                    }
+
                 elif isinstance(event, AgentRunResultEvent):
                     run_result = event.result
 
@@ -402,13 +419,21 @@ This request is in enforced inspection mode.
             """.strip()
 
         return """
-This request is in enforced repair mode.
-- Treat the failure output as the primary evidence.
-- Read files explicitly named in the traceback before searching broadly.
-- Diagnose only the reported failure; do not explain unrelated architecture.
-- Call propose_file_change one or more times for the required repair.
-- A text-only solution is not accepted as a completed repair.
-- The proposal is review-only and still requires human approval.
+This request is in enforced workspace-proposal mode.
+- Inspect the relevant manifest, project conventions, and directly related
+  files. Call read_file or read_file_range for every existing path that will
+  be modified before proposing it. Search results alone do not count as reads.
+- For a coherent group of creates/updates, call propose_file_change_set once.
+  Every operation must contain file_path and new_text. new_text is either the
+  complete desired file or the replacement for optional old_text. summary is
+  optional. Do not send an operation field: the backend determines create or
+  update from the actual workspace.
+- A genuinely new path does not require a fake read. Never label an existing
+  file as new to bypass inspection.
+- Keep the set as small as possible and within 20 files. A text-only solution
+  is not accepted as completed work.
+- Proposals are review-only. Files remain unchanged until human approval, and
+  completion must not be claimed before verification succeeds.
         """.strip()
 
     def _get_rag_service(self) -> RAGService:

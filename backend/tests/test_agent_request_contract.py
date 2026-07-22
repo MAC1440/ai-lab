@@ -3,6 +3,7 @@ import unittest
 from pydantic import ValidationError
 
 from routes.agents import AgentChatRequest
+from routes.project_tasks import CreateProjectTaskRequest
 
 
 class AgentRequestContractTests(unittest.TestCase):
@@ -33,6 +34,14 @@ class AgentRequestContractTests(unittest.TestCase):
             project_task_id="task-12345",
         )
         self.assertEqual(request.project_task_id, "task-12345")
+
+    def test_project_task_api_defaults_to_coding_not_unity(self):
+        request = CreateProjectTaskRequest(
+            title="Authentication page",
+            goal="Add login and signup pages.",
+        )
+
+        self.assertEqual(request.agent_id, "coding")
 
 
 if __name__ == "__main__":

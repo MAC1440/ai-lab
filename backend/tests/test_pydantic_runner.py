@@ -8,6 +8,7 @@ from services.pydantic_agent import (
     AgentRunDeps,
     enforce_tool_policy,
     propose_file_change,
+    propose_file_change_set,
     read_file,
 )
 from services.pydantic_runner import PydanticAgentRunner
@@ -16,6 +17,7 @@ from services.pydantic_runner import PydanticAgentRunner
 class PydanticAgentRunnerTests(unittest.IsolatedAsyncioTestCase):
     def test_rag_mode_overrides_general_profile(self):
         runner = PydanticAgentRunner()
+        self.assertEqual(runner.max_model_requests, 16)
         self.assertEqual(
             runner._resolve_rag(
                 profile_enabled=False,
@@ -192,6 +194,13 @@ class PydanticAgentRunnerTests(unittest.IsolatedAsyncioTestCase):
         event_types = [event["type"] for event in events]
         self.assertNotIn("answer_delta", event_types)
         self.assertEqual(event_types[-1], "done")
+        self.assertTrue(
+            any(
+                event["type"] == "status"
+                and "choosing the next action" in event["message"]
+                for event in events
+            )
+        )
 
         done_result = events[-1]["result"]
         self.assertEqual(done_result["answer"], "Proposal ready for review.")
@@ -207,12 +216,114 @@ class PydanticAgentRunnerTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
+    async def test_malformed_change_set_is_rejected_then_recovers(self):
+        request_count = 0
+
+        async def model_stream(messages, info):
+            nonlocal request_count
+            del messages, info
+            request_count += 1
+
+            if request_count == 1:
+                yield {
+                    0: DeltaToolCall(
+                        "propose_file_change_set",
+                        (
+                            '{"operations":[{"file_path":'
+                            '"src/app/features/auth.tsx","operation":'
+                            '"create","summary":"Add auth UI"}]}'
+                        ),
+                        tool_call_id="invalid-set",
+                    )
+                }
+            elif request_count == 2:
+                yield {
+                    0: DeltaToolCall(
+                        "read_file",
+                        '{"file_path":"src/app/features/auth.tsx"}',
+                        tool_call_id="read-auth",
+                    ),
+                    1: DeltaToolCall(
+                        "read_file",
+                        '{"file_path":"src/app/layout.tsx"}',
+                        tool_call_id="read-layout",
+                    ),
+                }
+            elif request_count == 3:
+                yield {
+                    0: DeltaToolCall(
+                        "propose_file_change_set",
+                        (
+                            '{"operations":['
+                            '{"file_path":"src/app/features/auth.tsx",'
+                            '"new_text":"export function Auth() {}\\n",'
+                            '"summary":"Add auth UI"},'
+                            '{"file_path":"src/app/layout.tsx",'
+                            '"new_text":"export default function Layout() {}\\n",'
+                            '"summary":"Render auth UI"}'
+                            ']}'
+                        ),
+                        tool_call_id="valid-set",
+                    )
+                }
+            else:
+                yield "Change set ready for review."
+
+        agent = Agent(
+            model=FunctionModel(stream_function=model_stream),
+            deps_type=AgentRunDeps,
+            tools=[read_file, propose_file_change_set],
+            retries={"tools": 2, "output": 2},
+        )
+        agent.output_validator(enforce_tool_policy)
+
+        def read_existing(path):
+            return {"path": path, "content": "existing"}
+
+        with (
+            patch(
+                "services.pydantic_agent._read_file",
+                side_effect=read_existing,
+            ),
+            patch(
+                "services.pydantic_agent._propose_file_change_set",
+                return_value={
+                    "change_set_id": "set-1",
+                    "proposal_count": 2,
+                    "proposals": [],
+                },
+            ) as propose_set,
+            patch(
+                "services.pydantic_runner.get_pydantic_agent",
+                return_value=agent,
+            ),
+        ):
+            events = [
+                event
+                async for event in PydanticAgentRunner(
+                    max_model_requests=8,
+                ).run_events(
+                    agent_id="web",
+                    prompt="Add login and signup pages",
+                    tool_policy="propose",
+                )
+            ]
+
+        self.assertEqual(request_count, 4)
+        self.assertEqual(events[-1]["type"], "done")
+        self.assertEqual(events[-1]["result"]["steps"], 4)
+        self.assertEqual(propose_set.call_count, 1)
+        operations = propose_set.call_args.kwargs["operations"]
+        self.assertEqual(len(operations), 2)
+        self.assertNotIn("operation", operations[0])
+        self.assertIn("new_text", operations[0])
+
     async def test_repair_policy_rejects_agent_without_proposal_tool(self):
         runner = PydanticAgentRunner()
 
         with self.assertRaisesRegex(
             ValueError,
-            "requires an agent with the propose_file_change tool",
+            "requires an agent with a workspace proposal tool",
         ):
             async for _ in runner.run_events(
                 agent_id="general",

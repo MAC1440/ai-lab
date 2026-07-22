@@ -1,7 +1,9 @@
+import os
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Callable, Collection, Dict, Literal
+from typing import Annotated, Any, Callable, Collection, Dict, Literal
 
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
 
 from services.agent_service import AgentService
@@ -19,6 +21,34 @@ from tools.file_tools import (
 
 ToolFunction = Callable[..., Any]
 ToolPolicy = Literal["auto", "inspect", "propose"]
+
+
+class FileChangeOperation(BaseModel):
+    """Strict contract for one create/update inside a reviewed change set."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    file_path: str = Field(
+        min_length=1,
+        description="Workspace-relative target path.",
+    )
+    new_text: str = Field(
+        description=(
+            "Replacement text when old_text is supplied, otherwise the "
+            "complete desired file content."
+        ),
+    )
+    old_text: str = Field(
+        default="",
+        description=(
+            "Optional exact unique text to replace in an existing file. "
+            "Leave empty when new_text is the complete file."
+        ),
+    )
+    summary: str = Field(
+        default="",
+        description="Brief reason for this file change.",
+    )
 
 
 @dataclass
@@ -54,7 +84,7 @@ def _normalized_path(path: str) -> str:
     normalized = path.strip().replace("\\", "/")
     while normalized.startswith("./"):
         normalized = normalized[2:]
-    return normalized
+    return os.path.normcase(normalized).replace("\\", "/")
 
 
 def _run_deps(ctx: RunContext[AgentRunDeps]) -> AgentRunDeps | None:
@@ -198,14 +228,39 @@ def propose_file_change(
 
 def propose_file_change_set(
     ctx: RunContext[AgentRunDeps],
-    operations: list[dict[str, str]],
+    operations: Annotated[
+        list[FileChangeOperation],
+        Field(
+            min_length=1,
+            max_length=20,
+            description=(
+                "One to twenty related file creates or updates. Every item "
+                "requires file_path and new_text."
+            ),
+        ),
+    ],
     summary: str = "",
 ) -> Any:
-    """Propose up to 20 related file creates/updates as one change set."""
+    """Propose up to 20 creates/updates with complete validated file text.
+
+    Each operation requires ``file_path`` and ``new_text``. Do not send an
+    ``operation`` field: the backend determines create versus update from the
+    workspace. Existing targets must first be inspected with ``read_file`` or
+    ``read_file_range``; genuinely new targets do not require a fake read.
+    """
     deps = _run_deps(ctx)
     try:
-        for operation in operations:
-            file_path = operation.get("file_path", "")
+        validated_operations = [
+            (
+                operation
+                if isinstance(operation, FileChangeOperation)
+                else FileChangeOperation.model_validate(operation)
+            )
+            for operation in operations
+        ]
+        missing_reads: list[str] = []
+        for operation in validated_operations:
+            file_path = operation.file_path
             normalized = _normalized_path(file_path)
             try:
                 _read_file(file_path)
@@ -216,22 +271,35 @@ def propose_file_change_set(
                 # require an explicit successful read before an update.
                 pass
             if deps is not None and normalized not in deps.inspected_paths:
-                raise ModelRetry(
-                    "Read every existing target before proposing a multi-file "
-                    f"change set. Missing read: {file_path}"
-                )
+                missing_reads.append(file_path)
+
+        if missing_reads:
+            quoted_paths = ", ".join(
+                f"read_file({path!r})" for path in missing_reads
+            )
+            raise ModelRetry(
+                "These targets already exist and must be inspected before "
+                "the change set can be proposed. Call each exact read now: "
+                f"{quoted_paths}. Then call propose_file_change_set again. "
+                "Every operation must contain file_path and new_text; optional "
+                "fields are old_text and summary. Do not send an operation "
+                "field because the backend determines create versus update."
+            )
+
+        operation_dicts = [
+            operation.model_dump() for operation in validated_operations
+        ]
 
         result = _propose_file_change_set(
-            operations=operations,
+            operations=operation_dicts,
             summary=summary,
             change_set_id=deps.change_set_id if deps is not None else None,
             repair_task_id=deps.repair_task_id if deps is not None else None,
         )
         if deps is not None:
             deps.proposed_paths.update(
-                _normalized_path(item.get("file_path", ""))
-                for item in operations
-                if item.get("file_path")
+                _normalized_path(item.file_path)
+                for item in validated_operations
             )
         return result
     except EXPECTED_TOOL_ERRORS as error:
@@ -292,9 +360,11 @@ def enforce_tool_policy(
     if deps.tool_policy == "propose" and not deps.proposed_paths:
         if not deps.inspected_paths:
             raise ModelRetry(
-                "This is an enforced repair request. Read the files named in "
-                "the failure output, then call propose_file_change or "
-                "propose_path_operation. A text-only solution is not accepted."
+                "This request requires a reviewable workspace proposal. "
+                "Inspect the relevant existing files with read_file or "
+                "read_file_range, then call propose_file_change_set for "
+                "related creates/updates or another appropriate proposal "
+                "tool. A text-only solution is not accepted."
             )
 
         inspected = ", ".join(sorted(deps.inspected_paths))

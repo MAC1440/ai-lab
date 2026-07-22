@@ -318,8 +318,9 @@ class ProjectTaskService:
                 f"Goal: {task['goal']}",
                 repair_note,
                 "First inspect the deterministic project context and read every existing file you intend to modify.",
-                "Create a concise implementation plan, then use propose_file_change_set once for all related creates and updates.",
-                "Keep the change set coherent and within 20 files. Do not write files directly and do not claim completion before approval and verification.",
+                "Create a concise implementation plan, then use propose_file_change_set exactly once for all related creates and updates.",
+                "Each operation must contain file_path and new_text with the complete desired content (or the replacement for optional old_text). summary is optional. Do not send an operation field; the backend determines create versus update from the workspace.",
+                "Keep the change set coherent and as small as possible, normally no more than 8 files and never more than 20. Do not write files directly and do not claim completion before approval and verification.",
                 "If the goal cannot be completed safely, explain the blocker without proposing unrelated changes.",
             )
             if part
