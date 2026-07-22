@@ -355,6 +355,16 @@ class ChangeService:
                     raise FileNotFoundError(
                         f"Existing target was not found: {item['path']}"
                     )
+            if item["operation"] == "update":
+                current_content = self._read_current_content(
+                    target,
+                    item["path"],
+                )
+                if current_content == item["content"]:
+                    raise ValueError(
+                        "The proposed content is identical to the file: "
+                        f"{item['path']}"
+                    )
             if item["operation"] == "move":
                 destination = self.workspace_service.resolve_workspace_path(
                     item["destination_path"]

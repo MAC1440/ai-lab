@@ -22,6 +22,36 @@ class ModelStageResult(Generic[OutputT]):
     provider_id: str
 
 
+class TaskModelOutputError(RuntimeError):
+    """Raised when a task model cannot satisfy a structured stage contract."""
+
+    def __init__(
+        self,
+        *,
+        stage: str,
+        model: str,
+        provider_id: str,
+        attempts: int,
+        detail: str = "",
+    ) -> None:
+        self.stage = stage
+        self.model = model
+        self.provider_id = provider_id
+        self.attempts = attempts
+        self.detail = detail
+        message = (
+            f"The {stage} stage could not produce valid structured output "
+            f"with model '{model}' after {attempts} request(s)."
+        )
+        if detail:
+            message += f" Last validation detail: {detail}"
+        message += (
+            " Use a model with reliable JSON-schema output or simplify the "
+            "task before retrying."
+        )
+        super().__init__(message)
+
+
 class TaskModelClient(Protocol):
     def prompt_budget(self, *, agent_id: str, stage: str) -> int: ...
 
@@ -81,7 +111,13 @@ class PydanticTaskModelClient:
     ) -> ModelStageResult[OutputT]:
         # Keep Pydantic AI imports lazy so contract/orchestration tests do not
         # require loading model-provider integrations.
-        from pydantic_ai import Agent, ModelSettings, UsageLimits
+        from pydantic_ai import (
+            Agent,
+            ModelSettings,
+            NativeOutput,
+            UnexpectedModelBehavior,
+            UsageLimits,
+        )
 
         from services.pydantic_model import build_pydantic_model
 
@@ -91,7 +127,6 @@ class PydanticTaskModelClient:
             profile.get("model", "granite4.1:3b"),
         )
         generation = runtime.get("generation", {})
-        configured_temperature = float(generation.get("temperature", 0.1))
         configured_max_tokens = int(generation.get("max_tokens", 2048))
         max_tokens = (
             min(configured_max_tokens, 4096)
@@ -99,20 +134,47 @@ class PydanticTaskModelClient:
             else configured_max_tokens
         )
         model = build_pydantic_model(runtime)
+
+        # Ollama exposes JSON-schema constrained responses through its native
+        # API and through the OpenAI-compatible ``response_format`` field.
+        # Using NativeOutput avoids asking a small local model to manufacture a
+        # special final-result tool call. Unknown OpenAI-compatible servers keep
+        # Pydantic AI's broadly supported tool-output default.
+        structured_output: Any = output_type
+        if runtime["provider"]["kind"] == "ollama":
+            structured_output = NativeOutput(
+                output_type,
+                name=f"{stage}_result",
+                description=(
+                    f"Return the validated structured result for the {stage} "
+                    "stage of a project coding task."
+                ),
+            )
         agent = Agent(
             model,
-            output_type=output_type,
+            output_type=structured_output,
             system_prompt=self._system_prompt(profile, stage),
             retries={"output": 2},
         )
-        result = await agent.run(
-            prompt,
-            usage_limits=UsageLimits(request_limit=self.request_limit),
-            model_settings=ModelSettings(
-                temperature=min(configured_temperature, 0.2),
-                max_tokens=max_tokens,
-            ),
-        )
+        try:
+            result = await agent.run(
+                prompt,
+                usage_limits=UsageLimits(request_limit=self.request_limit),
+                model_settings=ModelSettings(
+                    # Structured planning and code generation benefit from
+                    # deterministic sampling. User chat keeps its own setting.
+                    temperature=0.0,
+                    max_tokens=max_tokens,
+                ),
+            )
+        except UnexpectedModelBehavior as error:
+            raise TaskModelOutputError(
+                stage=stage,
+                model=runtime["model"],
+                provider_id=runtime["provider_id"],
+                attempts=self.request_limit,
+                detail=self._failure_detail(error),
+            ) from error
         return ModelStageResult(
             output=result.output,
             usage=self._usage_dict(result.usage),
@@ -152,3 +214,13 @@ class PydanticTaskModelClient:
             if value is not None:
                 result[name] = value
         return result
+
+    @staticmethod
+    def _failure_detail(error: BaseException) -> str:
+        """Return a bounded useful cause without leaking a full model response."""
+
+        cause = error.__cause__
+        detail = str(cause or error).strip()
+        if not detail or detail == str(error).strip():
+            return ""
+        return " ".join(detail.split())[:800]

@@ -15,6 +15,7 @@ from dependencies import (
 )
 from services.project_task_service import ProjectTaskStateError
 from services.project_task_store import ProjectTaskNotFoundError
+from services.task_model_client import TaskModelOutputError
 from services.verification_service import VerificationRunNotActiveError
 
 
@@ -123,7 +124,24 @@ def compile_project_task_context(task_id: str):
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
-@router.post("/{task_id}/run/stream")
+@router.post(
+    "/{task_id}/run/stream",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "description": "Newline-delimited project-task events.",
+            "content": {
+                "application/x-ndjson": {
+                    "schema": {"type": "string"},
+                    "example": (
+                        '{"type":"status","stage":"planning"}\n'
+                        '{"type":"plan","plan":{}}\n'
+                    ),
+                }
+            },
+        }
+    },
+)
 async def run_project_task_stream(
     task_id: str,
     request: RunProjectTaskRequest,
@@ -145,6 +163,17 @@ async def run_project_task_stream(
         except ProjectTaskStateError as error:
             yield _encode_ndjson(
                 {"type": "error", "status_code": 409, "message": str(error)}
+            )
+        except TaskModelOutputError as error:
+            yield _encode_ndjson(
+                {
+                    "type": "error",
+                    "status_code": 422,
+                    "code": "structured_output_failed",
+                    "stage": error.stage,
+                    "model": error.model,
+                    "message": str(error),
+                }
             )
         except (OSError, UnicodeError, ValueError, RuntimeError) as error:
             yield _encode_ndjson(

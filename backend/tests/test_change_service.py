@@ -101,6 +101,34 @@ class ChangeServiceTests(unittest.TestCase):
         )
         self.assertFalse((self.root / "new.py").exists())
 
+    def test_change_set_rejects_identical_update_during_preflight(self):
+        existing = self.root / "existing.py"
+        existing.write_text("unchanged = True\n", encoding="utf-8")
+
+        with patch.object(
+            self.service,
+            "propose",
+            wraps=self.service.propose,
+        ) as propose:
+            with self.assertRaisesRegex(ValueError, "identical"):
+                self.service.propose_change_set(
+                    change_set_id="preflight-set",
+                    operations=[
+                        {
+                            "path": "existing.py",
+                            "operation": "update",
+                            "summary": "Invalid no-op update.",
+                            "content": "unchanged = True\n",
+                        }
+                    ],
+                )
+
+        propose.assert_not_called()
+        self.assertEqual(
+            self.service.list_proposals(change_set_id="preflight-set"),
+            [],
+        )
+
     def test_stale_file_blocks_approval(self):
         target = self.root / "example.txt"
         target.write_text("one\n", encoding="utf-8")

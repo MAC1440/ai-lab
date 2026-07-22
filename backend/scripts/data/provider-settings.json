@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "providers": {
+    "ollama": {
+      "id": "ollama",
+      "name": "Local Ollama",
+      "kind": "ollama",
+      "base_url": "http://localhost:11434",
+      "built_in": true
+    }
+  },
+  "agents": {}
+}
