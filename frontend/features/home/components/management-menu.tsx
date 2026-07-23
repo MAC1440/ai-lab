@@ -9,6 +9,7 @@ import { ModelSettingsDialog } from "@/features/model-settings";
 import { ModelBenchmarkDialog } from "@/features/model-settings/model-benchmark-dialog";
 import { ProjectTaskDialog } from "@/features/project-tasks";
 import { RepairDialog } from "@/features/repairs";
+import { ReliabilityBenchmarkDialog } from "@/features/reliability";
 import { ScaffoldDialog } from "@/features/scaffolds";
 import { SystemDialog } from "@/features/system";
 import { VerificationDialog } from "@/features/verification";
@@ -31,6 +32,7 @@ export function ManagementMenu({ agents, disabled, workspaceReady, onAgentsChang
                 <ScaffoldDialog disabled={!workspaceReady || disabled} />
                 <ModelSettingsDialog agents={agents} disabled={disabled} onSaved={onAgentsChanged} />
                 <ModelBenchmarkDialog agents={agents} disabled={disabled} />
+                <ReliabilityBenchmarkDialog disabled={disabled} />
                 <MCPSettingsDialog agents={agents} disabled={disabled} />
                 <SystemDialog disabled={disabled} />
                 <KnowledgeSourcesDialog disabled={disabled} />

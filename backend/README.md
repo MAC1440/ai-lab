@@ -42,6 +42,8 @@ CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 VERIFICATION_DB_PATH=data/verification.sqlite3
 VERIFICATION_MAX_OUTPUT_CHARS=200000
 PROJECT_TASK_DB_PATH=data/project-tasks.sqlite3
+RELIABILITY_BENCHMARK_DB_PATH=data/reliability-benchmarks.sqlite3
+RELIABILITY_BENCHMARK_WORK_ROOT=data/reliability-workspaces
 ```
 
 The current agent profile model names live in

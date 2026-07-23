@@ -5,30 +5,31 @@ from services.agent_service import AgentService
 from services.change_service import ChangeService
 from services.conversation_service import ConversationService
 from services.conversation_store import ConversationStore
-from services.project_detection_service import ProjectDetectionService
+from services.knowledge_source_service import KnowledgeSourceService
+from services.mcp_service import MCPService
+from services.model_benchmark_service import ModelBenchmarkService
+from services.model_capability_service import ModelCapabilityService
 from services.project_context_service import ProjectContextService
-from services.project_task_service import ProjectTaskService
-from services.project_task_store import ProjectTaskStore
-from services.project_task_orchestrator import ProjectTaskOrchestrator
+from services.project_detection_service import ProjectDetectionService
 from services.project_repair_orchestrator import ProjectRepairOrchestrator
 from services.project_task_completion_service import ProjectTaskCompletionService
+from services.project_task_orchestrator import ProjectTaskOrchestrator
+from services.project_task_service import ProjectTaskService
+from services.project_task_store import ProjectTaskStore
 from services.provider_settings_service import ProviderSettingsService
-from services.task_model_client import PydanticTaskModelClient
-from services.mcp_service import MCPService
-from services.model_capability_service import ModelCapabilityService
-from services.model_benchmark_service import ModelBenchmarkService
+from services.reliability_benchmark_service import ReliabilityBenchmarkService
+from services.reliability_benchmark_store import ReliabilityBenchmarkStore
 from services.repair_service import RepairService
 from services.repair_store import RepairStore
+from services.run_cancellation_service import RunCancellationService
 from services.scaffold_service import ScaffoldService
+from services.source_validation_service import SourceValidationService
+from services.system_service import SystemService
+from services.task_model_client import PydanticTaskModelClient
+from services.unity_docs_service import UnityDocsService
 from services.verification_service import VerificationService
 from services.verification_store import VerificationStore
 from services.workspace_service import WorkspaceService
-from services.system_service import SystemService
-from services.unity_docs_service import UnityDocsService
-from services.run_cancellation_service import RunCancellationService
-from services.knowledge_source_service import KnowledgeSourceService
-from services.source_validation_service import SourceValidationService
-
 
 workspace_service = WorkspaceService()
 _backend_root = Path(__file__).resolve().parent
@@ -157,6 +158,31 @@ model_benchmark_service = ModelBenchmarkService(
     capability_service=model_capability_service,
 )
 
+_reliability_database_path = Path(
+    os.getenv(
+        "RELIABILITY_BENCHMARK_DB_PATH",
+        "data/reliability-benchmarks.sqlite3",
+    )
+).expanduser()
+if not _reliability_database_path.is_absolute():
+    _reliability_database_path = _backend_root / _reliability_database_path
+_reliability_work_root = Path(
+    os.getenv(
+        "RELIABILITY_BENCHMARK_WORK_ROOT",
+        "data/reliability-workspaces",
+    )
+).expanduser()
+if not _reliability_work_root.is_absolute():
+    _reliability_work_root = _backend_root / _reliability_work_root
+reliability_benchmark_store = ReliabilityBenchmarkStore(
+    _reliability_database_path
+)
+reliability_benchmark_service = ReliabilityBenchmarkService(
+    model_client=task_model_client,
+    store=reliability_benchmark_store,
+    work_root=_reliability_work_root,
+)
+
 system_service = SystemService(
     workspace_service=workspace_service,
     provider_settings_service=provider_settings_service,
@@ -168,6 +194,7 @@ system_service = SystemService(
         "conversations": _conversations_database_path,
         "repairs": _repairs_database_path,
         "project-tasks": _project_tasks_database_path,
+        "reliability-benchmarks": _reliability_database_path,
     },
     config_paths={
         "provider-settings": _provider_settings_path,
@@ -179,4 +206,6 @@ system_service = SystemService(
 
 unity_docs_service = UnityDocsService()
 run_cancellation_service = RunCancellationService()
-knowledge_source_service = KnowledgeSourceService(_backend_root / "data/knowledge-sources.json")
+knowledge_source_service = KnowledgeSourceService(
+    _backend_root / "data/knowledge-sources.json"
+)
