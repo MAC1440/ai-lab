@@ -445,7 +445,14 @@ class ProjectTaskService:
         profile_id: str,
     ) -> Dict[str, Any]:
         task = self.get_task(task_id)
-        if task["status"] not in {"ready_to_verify", "needs_attention"}:
+        retrying_cancelled_verification = (
+            task["status"] == "paused"
+            and task.get("phase") == "verification_cancelled"
+        )
+        if (
+            task["status"] not in {"ready_to_verify", "needs_attention"}
+            and not retrying_cancelled_verification
+        ):
             raise ProjectTaskStateError(
                 "Approve the task's current proposals before verification"
             )
@@ -499,6 +506,12 @@ class ProjectTaskService:
             last_error=error,
             updated_at=now,
             completed_at=now if passed else None,
+        )
+        self.store.put_artifact(
+            task["task_id"],
+            artifact_type="verification_result",
+            payload=dict(run),
+            created_at=now,
         )
         self._event(
             task["task_id"],

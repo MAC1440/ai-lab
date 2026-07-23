@@ -37,28 +37,52 @@ class ProjectTaskCompletionService:
         task_id: str,
     ) -> AsyncIterator[Dict[str, Any]]:
         task = self.task_service.get_task(task_id)
-        if task["status"] != "awaiting_approval":
+        retrying_verification = (
+            task["status"] == "ready_to_verify"
+            or (
+                task["status"] == "paused"
+                and task.get("phase") == "verification_cancelled"
+            )
+        )
+        if task["status"] != "awaiting_approval" and not retrying_verification:
             raise ProjectTaskStateError(
-                "The task must be awaiting approval before it can be applied"
+                "The task must be awaiting approval or ready to retry "
+                "verification"
             )
         change_set_id = task.get("current_change_set_id")
         if not change_set_id:
             raise ProjectTaskStateError("The task has no current change set")
 
         profile_id = self.select_profile(task)
-        yield {
-            "type": "status",
-            "stage": "approval",
-            "message": "Applying the complete change set transactionally",
-            "change_set_id": change_set_id,
-            "verification_profile_id": profile_id,
-        }
-        proposals = self.change_service.approve_change_set(change_set_id)
-        yield {
-            "type": "change_set_applied",
-            "change_set_id": change_set_id,
-            "proposals": proposals,
-        }
+        if retrying_verification:
+            proposals = task.get("proposals", [])
+            if not proposals or {
+                item.get("status") for item in proposals
+            } != {"approved"}:
+                raise ProjectTaskStateError(
+                    "Verification retry requires a fully applied change set"
+                )
+            yield {
+                "type": "status",
+                "stage": "approval",
+                "message": "Change set is already applied; retrying checks",
+                "change_set_id": change_set_id,
+                "verification_profile_id": profile_id,
+            }
+        else:
+            yield {
+                "type": "status",
+                "stage": "approval",
+                "message": "Applying the complete change set transactionally",
+                "change_set_id": change_set_id,
+                "verification_profile_id": profile_id,
+            }
+            proposals = self.change_service.approve_change_set(change_set_id)
+            yield {
+                "type": "change_set_applied",
+                "change_set_id": change_set_id,
+                "proposals": proposals,
+            }
 
         yield {
             "type": "status",

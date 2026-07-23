@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { KnowledgeSourcesDialog } from "@/features/knowledge-sources";
 import { MCPSettingsDialog } from "@/features/mcp";
 import { ModelSettingsDialog } from "@/features/model-settings";
+import { ModelBenchmarkDialog } from "@/features/model-settings/model-benchmark-dialog";
 import { ProjectTaskDialog } from "@/features/project-tasks";
 import { RepairDialog } from "@/features/repairs";
 import { ScaffoldDialog } from "@/features/scaffolds";
@@ -29,6 +30,7 @@ export function ManagementMenu({ agents, disabled, workspaceReady, onAgentsChang
                 <RepairDialog disabled={!workspaceReady || disabled} />
                 <ScaffoldDialog disabled={!workspaceReady || disabled} />
                 <ModelSettingsDialog agents={agents} disabled={disabled} onSaved={onAgentsChanged} />
+                <ModelBenchmarkDialog agents={agents} disabled={disabled} />
                 <MCPSettingsDialog agents={agents} disabled={disabled} />
                 <SystemDialog disabled={disabled} />
                 <KnowledgeSourcesDialog disabled={disabled} />

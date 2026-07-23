@@ -23,11 +23,18 @@ export type AgentModelSettings = {
     model: string;
     generation: GenerationSettings;
     provider: ModelProvider;
+    assignment_source?: string;
 };
+
+export type TaskStage = "planning" | "generation" | "repair";
 
 export type ModelSettingsSnapshot = {
     providers: ModelProvider[];
     agents: Record<string, AgentModelSettings>;
+    task_stages: Record<
+        string,
+        Partial<Record<TaskStage, AgentModelSettings>>
+    >;
 };
 
 export type DiscoveredModel = {
@@ -108,4 +115,28 @@ export function saveAgentModel(
         method: "PUT",
         body: JSON.stringify(value),
     });
+}
+
+export function saveTaskStageModel(
+    agentId: string,
+    stage: TaskStage,
+    value: Omit<AgentModelSettings, "provider" | "assignment_source">,
+): Promise<AgentModelSettings> {
+    return request(
+        `/settings/agents/${encodeURIComponent(agentId)}/stages/${stage}`,
+        {
+            method: "PUT",
+            body: JSON.stringify(value),
+        },
+    );
+}
+
+export function deleteTaskStageModel(
+    agentId: string,
+    stage: TaskStage,
+): Promise<void> {
+    return request(
+        `/settings/agents/${encodeURIComponent(agentId)}/stages/${stage}`,
+        { method: "DELETE" },
+    );
 }

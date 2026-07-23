@@ -4,6 +4,7 @@ from services.project_task_completion_service import (
     ProjectTaskCompletionService,
     VerificationProfileSelectionError,
 )
+from services.project_task_service import ProjectTaskStateError
 
 
 class FakeTaskService:
@@ -67,15 +68,28 @@ class FakeRepairService:
 
 
 class ProjectTaskCompletionServiceTests(unittest.IsolatedAsyncioTestCase):
-    def task(self, *, requested_profile=None):
+    def task(
+        self,
+        *,
+        requested_profile=None,
+        status="awaiting_approval",
+        phase="review",
+        proposal_status="pending",
+    ):
         return {
             "task_id": "task-1",
             "workspace": "/workspace",
-            "status": "awaiting_approval",
+            "status": status,
+            "phase": phase,
             "agent_id": "unity",
             "verification_profile_id": requested_profile,
             "current_change_set_id": "set-1",
-            "proposals": [{"file_path": "Assets/Player.cs"}],
+            "proposals": [
+                {
+                    "file_path": "Assets/Player.cs",
+                    "status": proposal_status,
+                }
+            ],
             "artifacts": [
                 {
                     "artifact_type": "implementation_plan",
@@ -156,6 +170,66 @@ class ProjectTaskCompletionServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(tasks.finished, [("task-1", "failed", "repair-1")])
         self.assertEqual(events[-1]["repair_task"]["task_id"], "repair-1")
+
+    async def test_retries_cancelled_verification_without_applying_again(self):
+        task = self.task(
+            requested_profile="unity-compile",
+            status="paused",
+            phase="verification_cancelled",
+            proposal_status="approved",
+        )
+        service, tasks, changes, verification = self.service(
+            task,
+            profiles=[
+                {
+                    "profile_id": "unity-compile",
+                    "available": True,
+                    "project_type": "unity",
+                    "working_directory": ".",
+                }
+            ],
+        )
+
+        events = [
+            event
+            async for event in service.approve_and_verify_events(
+                task_id="task-1"
+            )
+        ]
+
+        self.assertEqual(changes.approved, [])
+        self.assertEqual(verification.calls, [("unity-compile", None)])
+        self.assertIn("already applied", events[0]["message"])
+        self.assertEqual(tasks.started, [("task-1", "verify-1", "unity-compile")])
+
+    async def test_refuses_retry_if_change_set_is_not_fully_applied(self):
+        task = self.task(
+            requested_profile="unity-compile",
+            status="ready_to_verify",
+            phase="verification",
+            proposal_status="pending",
+        )
+        service, _, changes, verification = self.service(
+            task,
+            profiles=[
+                {
+                    "profile_id": "unity-compile",
+                    "available": True,
+                    "project_type": "unity",
+                    "working_directory": ".",
+                }
+            ],
+        )
+
+        with self.assertRaisesRegex(
+            ProjectTaskStateError,
+            "fully applied",
+        ):
+            async for _ in service.approve_and_verify_events(task_id="task-1"):
+                pass
+
+        self.assertEqual(changes.approved, [])
+        self.assertEqual(verification.calls, [])
 
     async def test_refuses_apply_without_available_profile(self):
         service, _, changes, _ = self.service(self.task(), profiles=[])

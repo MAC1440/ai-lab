@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test features/**/*.test.mjs"
+    "test": "node --test features/**/*.test.mjs lib/**/*.test.mjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.12.0",

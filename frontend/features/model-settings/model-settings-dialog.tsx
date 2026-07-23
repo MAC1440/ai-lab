@@ -40,6 +40,7 @@ import {
     saveProvider,
     testProvider,
 } from "@/features/model-settings/model-settings-api";
+import { ModelStageSettings } from "@/features/model-settings/model-stage-settings";
 
 type Props = {
     agents: AgentProfile[];
@@ -218,6 +219,16 @@ export function ModelSettingsDialog({ agents, disabled, onSaved }: Props) {
                                         <div><Label>Context budget</Label><Input type="number" min={1024} max={131072} step={1024} value={agentSettings.generation.context_window} onChange={(event) => setSnapshot((current) => current ? { ...current, agents: { ...current.agents, [selectedAgentId]: { ...agentSettings, generation: { ...agentSettings.generation, context_window: Number(event.target.value) } } } } : current)} /></div>
                                     </div>
                                     <Button disabled={busy} onClick={() => void updateAgent({ generation: agentSettings.generation })}>{busy ? <Loader2Icon className="mr-2 size-4 animate-spin" /> : null}Save generation settings</Button>
+                                    <ModelStageSettings
+                                        agentId={selectedAgentId}
+                                        snapshot={snapshot}
+                                        disabled={busy}
+                                        portalContainer={portalContainer}
+                                        onChanged={async () => {
+                                            await refresh();
+                                            await onSaved();
+                                        }}
+                                    />
                                 </> : null}
                             </section>
                         </div>

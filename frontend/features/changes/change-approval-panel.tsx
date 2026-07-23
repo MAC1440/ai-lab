@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 type ChangeApprovalPanelProps = {
   proposal: ChangeProposal;
   onResolved?: (proposal: ChangeProposal) => void;
+  reviewOnly?: boolean;
 };
 
 function statusClasses(status: ChangeProposal["status"]) {
@@ -37,6 +38,7 @@ function statusClasses(status: ChangeProposal["status"]) {
 export function ChangeApprovalPanel({
   proposal,
   onResolved,
+  reviewOnly = false,
 }: ChangeApprovalPanelProps) {
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +103,7 @@ export function ChangeApprovalPanel({
         </p>
       ) : null}
 
-      {proposal.status === "pending" ? (
+      {proposal.status === "pending" && !reviewOnly ? (
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-800 bg-zinc-900/70 px-4 py-3">
           <p className="mr-auto text-xs text-zinc-500">
             Review this operation before changing the workspace.
@@ -137,6 +139,11 @@ export function ChangeApprovalPanel({
             )}
             Approve operation
           </Button>
+        </footer>
+      ) : reviewOnly && proposal.status === "pending" ? (
+        <footer className="border-t border-zinc-800 bg-zinc-900/70 px-4 py-3 text-xs text-zinc-500">
+          This file belongs to one atomic task change set. Approve or reject the
+          complete set below.
         </footer>
       ) : null}
     </article>

@@ -2,6 +2,7 @@ import type { ProjectTaskStatus } from "./project-task-types";
 
 export function getProjectTaskAction(
   status: ProjectTaskStatus,
+  phase: string,
   canResume: boolean,
   hasRepairTask: boolean,
-): "verify" | "repair" | "start" | "continue" | null;
+): "review" | "verify" | "repair" | "start" | "continue" | "cancel" | null;

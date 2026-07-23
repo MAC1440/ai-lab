@@ -98,6 +98,59 @@ class ProjectTaskServiceTests(unittest.TestCase):
         self.assertEqual(result["status"], "needs_attention")
         self.assertTrue(result["can_resume"])
 
+    def test_cancelled_verification_can_restart_without_regeneration(self):
+        task = self.service.create(
+            title="Retry checks",
+            goal="Keep the applied source and retry a cancelled check.",
+            agent_id="coding",
+        )
+        self.service.start_agent_run(task["task_id"], "agent-run-retry")
+        self.changes.propose(
+            file_path="src/retry.py",
+            content="ready = True\n",
+            change_set_id="set-retry",
+        )
+        self.service.record_agent_result(
+            task["task_id"],
+            run_id="agent-run-retry",
+            result={"change_set_id": "set-retry"},
+        )
+        self.changes.approve_change_set("set-retry")
+        self.service.record_verification_started(
+            task["task_id"],
+            run_id="verify-cancelled",
+            profile_id="python-tests",
+        )
+        paused = self.service.record_verification_result(
+            task["task_id"],
+            run={
+                "run_id": "verify-cancelled",
+                "workspace": str(self.root.resolve()),
+                "status": "cancelled",
+                "output": "Verification stopped by the test.\n",
+            },
+        )
+
+        self.assertEqual(paused["status"], "paused")
+        self.assertEqual(paused["phase"], "verification_cancelled")
+        verification_artifact = next(
+            artifact
+            for artifact in paused["artifacts"]
+            if artifact["artifact_type"] == "verification_result"
+        )
+        self.assertEqual(
+            verification_artifact["payload"]["output"],
+            "Verification stopped by the test.\n",
+        )
+
+        retrying = self.service.record_verification_started(
+            task["task_id"],
+            run_id="verify-retry",
+            profile_id="python-tests",
+        )
+        self.assertEqual(retrying["status"], "verifying")
+        self.assertEqual(retrying["latest_verification_run_id"], "verify-retry")
+
     def test_execution_prompt_describes_the_strict_change_set_contract(self):
         task = self.service.create(
             title="Authentication page",
