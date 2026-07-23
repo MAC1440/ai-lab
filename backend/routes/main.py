@@ -13,6 +13,7 @@ from routes.changes import router as changes_router  # noqa: E402
 from routes.repairs import router as repairs_router  # noqa: E402
 from routes.project_tasks import router as project_tasks_router  # noqa: E402
 from routes.verifications import router as verifications_router  # noqa: E402
+from routes.model_benchmarks import router as model_benchmarks_router  # noqa: E402
 from routes.workspaces import router as workspaces_router  # noqa: E402
 
 
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(repairs_router)
     app.include_router(project_tasks_router)
     app.include_router(verifications_router)
+    app.include_router(model_benchmarks_router)
 
     return app
 

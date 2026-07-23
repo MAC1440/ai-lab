@@ -6,7 +6,7 @@ import sqlite3
 import tempfile
 from contextlib import contextmanager
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from difflib import unified_diff
 from pathlib import Path
@@ -15,6 +15,7 @@ from typing import Any, Dict, Iterator, List, Literal, Optional
 from uuid import uuid4
 
 from services.workspace_service import WorkspaceService
+from services.change_transaction_service import ChangeTransactionService
 
 
 ChangeProposalStatus = Literal["pending", "approved", "rejected"]
@@ -80,6 +81,10 @@ class ChangeService:
             self.database_path.parent.mkdir(parents=True, exist_ok=True)
             self._initialize_database()
             self._load_proposals()
+        self.transaction_service = ChangeTransactionService(self.database_path)
+        self.transaction_service.recover_incomplete(
+            self._reset_recovered_proposals
+        )
 
     def propose(
         self,
@@ -552,25 +557,62 @@ class ChangeService:
                             item.destination_path
                         )
                     )
-            snapshots = {
-                path: self._snapshot_path(path)
-                for path in touched
-            }
-
+            transaction = self.transaction_service.prepare(
+                change_set_id=clean_id,
+                workspace=self.workspace_service.get_workspace(),
+                proposal_ids=[item.proposal_id for item in proposals],
+                touched_paths=touched,
+                staged_payloads={
+                    item.proposal_id: item.proposed_content
+                    for item in proposals
+                    if item.operation in {"create", "update"}
+                },
+            )
+            transaction_id = transaction["transaction_id"]
             try:
-                for proposal, target in zip(proposals, targets):
-                    self._apply_proposal(proposal, target)
-            except Exception:
-                for path, snapshot in reversed(list(snapshots.items())):
-                    self._restore_snapshot(path, snapshot)
+                self.transaction_service.mark_applying(transaction_id)
+                for index, (proposal, target) in enumerate(
+                    zip(proposals, targets),
+                    start=1,
+                ):
+                    self._apply_transaction_proposal(
+                        transaction_id,
+                        proposal,
+                        target,
+                    )
+                    self.transaction_service.record_applied(
+                        transaction_id,
+                        index,
+                    )
+                resolved_at = self._utc_now()
+                for proposal in proposals:
+                    proposal.status = "approved"
+                    proposal.resolved_at = resolved_at
+                    self._save(proposal)
+                self.transaction_service.commit(transaction_id)
+            except Exception as error:
+                self.transaction_service.rollback(
+                    transaction_id,
+                    error=(
+                        "Change-set application failed; workspace restored: "
+                        f"{error}"
+                    ),
+                )
+                for proposal in proposals:
+                    proposal.status = "pending"
+                    proposal.resolved_at = None
+                    self._save(proposal)
                 raise
-
-            resolved_at = self._utc_now()
-            for proposal in proposals:
-                proposal.status = "approved"
-                proposal.resolved_at = resolved_at
-                self._save(proposal)
             return [self._public(item) for item in proposals]
+
+    def list_transactions(
+        self,
+        *,
+        change_set_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        return self.transaction_service.list_transactions(
+            change_set_id=change_set_id
+        )
 
     def _validate_for_approval(self, proposal: _StoredProposal) -> Path:
         self._require_pending(proposal)
@@ -635,6 +677,31 @@ class ChangeService:
         elif proposal.operation == "mkdir":
             target.mkdir(parents=True, exist_ok=False)
 
+    def _apply_transaction_proposal(
+        self,
+        transaction_id: str,
+        proposal: _StoredProposal,
+        target: Path,
+    ) -> None:
+        if proposal.operation not in {"create", "update"}:
+            self._apply_proposal(proposal, target)
+            return
+        staged_path = self.transaction_service.staged_payload_path(
+            transaction_id,
+            proposal.proposal_id,
+        )
+        staged_content = staged_path.read_bytes().decode("utf-8")
+        if self._hash_text(staged_content) != self._hash_text(
+            proposal.proposed_content
+        ):
+            raise ChangeProposalConflictError(
+                "The staged proposal payload changed before application"
+            )
+        self._apply_proposal(
+            replace(proposal, proposed_content=staged_content),
+            target,
+        )
+
     @staticmethod
     def _snapshot_path(path: Path) -> tuple[str, bytes | None, int | None]:
         if not path.exists():
@@ -664,6 +731,17 @@ class ChangeService:
             path.write_bytes(content or b"")
         if kind != "missing" and mode is not None and path.exists():
             os.chmod(path, mode)
+
+    def _reset_recovered_proposals(self, transaction: Dict[str, Any]) -> None:
+        """Return proposals to review after startup restores an interrupted set."""
+
+        for proposal_id in transaction.get("proposal_ids", []):
+            proposal = self._proposals.get(proposal_id)
+            if proposal is None:
+                continue
+            proposal.status = "pending"
+            proposal.resolved_at = None
+            self._save(proposal)
 
     def reject_change_set(self, change_set_id: str) -> List[Dict[str, Any]]:
         clean_id = self._required_id(change_set_id, "change_set_id")

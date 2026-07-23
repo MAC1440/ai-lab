@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 ProviderKind = Literal["ollama", "openai_compatible"]
+TaskStage = Literal["planning", "generation", "repair"]
 KEYRING_SERVICE = "ai-lab-model-providers"
 
 
@@ -68,7 +69,19 @@ class ProviderSettingsService:
             agent_id: self.resolve_agent(agent_id)
             for agent_id in agent_ids
         }
-        return {"providers": providers, "agents": agents}
+        document = self._read()
+        task_stages = {
+            agent_id: {
+                stage: self.resolve_agent(agent_id, stage=stage)
+                for stage in overrides
+            }
+            for agent_id, overrides in document["task_stages"].items()
+        }
+        return {
+            "providers": providers,
+            "agents": agents,
+            "task_stages": task_stages,
+        }
 
     def list_providers(self) -> list[Dict[str, Any]]:
         return [
@@ -117,6 +130,10 @@ class ProviderSettingsService:
                 for agent_id, override in document["agents"].items()
                 if override.get("provider_id") == provider_id
             ]
+            for agent_id, stage_overrides in document["task_stages"].items():
+                for stage, override in stage_overrides.items():
+                    if override.get("provider_id") == provider_id:
+                        in_use.append(f"{agent_id}:{stage}")
             if in_use:
                 raise ValueError(
                     "Provider is assigned to: " + ", ".join(sorted(in_use))
@@ -134,14 +151,49 @@ class ProviderSettingsService:
             self._write(document)
         return self.resolve_agent(agent_id)
 
+    def save_task_stage(
+        self,
+        agent_id: str,
+        stage: TaskStage,
+        data: AgentModelInput,
+    ) -> Dict[str, Any]:
+        with self._lock:
+            document = self._read()
+            if data.provider_id not in document["providers"]:
+                raise ValueError(f"Unknown provider: {data.provider_id}")
+            document["task_stages"].setdefault(agent_id, {})[stage] = (
+                data.model_dump()
+            )
+            self._write(document)
+        return self.resolve_agent(agent_id, stage=stage)
+
+    def delete_task_stage(self, agent_id: str, stage: TaskStage) -> None:
+        with self._lock:
+            document = self._read()
+            stages = document["task_stages"].get(agent_id, {})
+            if stage not in stages:
+                raise ValueError(
+                    f"No {stage} model override exists for agent '{agent_id}'"
+                )
+            del stages[stage]
+            if not stages:
+                document["task_stages"].pop(agent_id, None)
+            self._write(document)
+
     def resolve_agent(
         self,
         agent_id: str,
         *,
         fallback_model: str = "granite4.1:3b",
+        stage: TaskStage | None = None,
     ) -> Dict[str, Any]:
         document = self._read()
-        override = document["agents"].get(agent_id)
+        stage_override = (
+            document["task_stages"].get(agent_id, {}).get(stage)
+            if stage is not None
+            else None
+        )
+        override = stage_override or document["agents"].get(agent_id)
         if override is None:
             override = {
                 "provider_id": "ollama",
@@ -156,11 +208,24 @@ class ProviderSettingsService:
             )
         return {
             **deepcopy(override),
+            "assignment_source": (
+                f"task_stage:{stage}" if stage_override is not None else "agent"
+            ),
             "provider": self._public_provider(provider),
         }
 
-    def runtime_config(self, agent_id: str, fallback_model: str) -> Dict[str, Any]:
-        resolved = self.resolve_agent(agent_id, fallback_model=fallback_model)
+    def runtime_config(
+        self,
+        agent_id: str,
+        fallback_model: str,
+        *,
+        stage: TaskStage | None = None,
+    ) -> Dict[str, Any]:
+        resolved = self.resolve_agent(
+            agent_id,
+            fallback_model=fallback_model,
+            stage=stage,
+        )
         provider = self.get_provider(
             resolved["provider_id"], include_secret=True
         )
@@ -268,6 +333,7 @@ class ProviderSettingsService:
                     }
                 },
                 "agents": {},
+                "task_stages": {},
             }
         )
 
@@ -279,6 +345,7 @@ class ProviderSettingsService:
                 raise RuntimeError(f"Could not read provider settings: {error}") from error
             data.setdefault("providers", {})
             data.setdefault("agents", {})
+            data.setdefault("task_stages", {})
             return data
 
     def _write(self, document: Dict[str, Any]) -> None:

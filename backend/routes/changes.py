@@ -36,6 +36,15 @@ def list_change_proposals(
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+@router.get("/transactions")
+def list_change_transactions(change_set_id: Optional[str] = None):
+    return {
+        "transactions": change_service.list_transactions(
+            change_set_id=change_set_id
+        )
+    }
+
+
 @router.get("/{proposal_id}")
 def get_change_proposal(proposal_id: str):
     try:

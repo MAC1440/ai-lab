@@ -56,6 +56,16 @@ class FakeTaskModelClient:
         del agent_id, stage
         return self.budget
 
+    def estimate_tokens(
+        self,
+        *,
+        agent_id: str,
+        stage: str,
+        text: str,
+    ) -> int:
+        del agent_id, stage
+        return len(text)
+
     async def generate(
         self,
         *,
@@ -77,6 +87,7 @@ class FakeTaskModelClient:
             usage={"requests": 1, "input_tokens": 100, "output_tokens": 50},
             model="fake-coder",
             provider_id="test",
+            capability={"profile_source": "saved"},
         )
 
 

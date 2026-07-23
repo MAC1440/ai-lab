@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, is_dataclass
+from math import ceil
 from typing import TYPE_CHECKING, Any, Dict, Generic, Protocol, Type, TypeVar
 
 from pydantic import BaseModel
@@ -8,6 +9,7 @@ from pydantic import BaseModel
 from services.agent_service import AgentService
 
 if TYPE_CHECKING:
+    from services.model_capability_service import ModelCapabilityService
     from services.provider_settings_service import ProviderSettingsService
 
 
@@ -20,6 +22,7 @@ class ModelStageResult(Generic[OutputT]):
     usage: Dict[str, Any]
     model: str
     provider_id: str
+    capability: Dict[str, Any]
 
 
 class TaskModelOutputError(RuntimeError):
@@ -55,6 +58,14 @@ class TaskModelOutputError(RuntimeError):
 class TaskModelClient(Protocol):
     def prompt_budget(self, *, agent_id: str, stage: str) -> int: ...
 
+    def estimate_tokens(
+        self,
+        *,
+        agent_id: str,
+        stage: str,
+        text: str,
+    ) -> int: ...
+
     async def generate(
         self,
         *,
@@ -65,6 +76,38 @@ class TaskModelClient(Protocol):
     ) -> ModelStageResult[OutputT]: ...
 
 
+class _InferredCapabilityService:
+    """Compatibility adapter for older dependency modules during migration."""
+
+    @staticmethod
+    def resolve_runtime(runtime: Dict[str, Any]) -> Dict[str, Any]:
+        generation = runtime.get("generation", {})
+        context = int(generation.get("context_window", 8192))
+        output = int(generation.get("max_tokens", 2048))
+        return {
+            "provider_id": runtime["provider_id"],
+            "model": runtime["model"],
+            "structured_output_mode": (
+                "native"
+                if runtime.get("provider", {}).get("kind") == "ollama"
+                else "tool"
+            ),
+            "effective_context_window": context,
+            "effective_max_output_tokens": output,
+            "effective_safe_input_tokens": max(512, context - output - 768),
+            "estimated_characters_per_token": 3.0,
+            "profile_source": "inferred",
+        }
+
+    def require_structured_stage(
+        self,
+        runtime: Dict[str, Any],
+        stage: str,
+    ) -> Dict[str, Any]:
+        del stage
+        return self.resolve_runtime(runtime)
+
+
 class PydanticTaskModelClient:
     """Run one tool-free, structured model call for one bounded task stage."""
 
@@ -72,12 +115,16 @@ class PydanticTaskModelClient:
         self,
         *,
         provider_settings_service: "ProviderSettingsService",
+        model_capability_service: "ModelCapabilityService | None" = None,
         agent_service: AgentService | None = None,
         request_limit: int = 3,
     ) -> None:
         if request_limit < 1 or request_limit > 6:
             raise ValueError("request_limit must be between 1 and 6")
         self.provider_settings_service = provider_settings_service
+        self.model_capability_service = (
+            model_capability_service or _InferredCapabilityService()
+        )
         self.agent_service = agent_service or AgentService()
         self.request_limit = request_limit
 
@@ -86,20 +133,32 @@ class PydanticTaskModelClient:
         runtime = self.provider_settings_service.runtime_config(
             agent_id,
             profile.get("model", "granite4.1:3b"),
+            stage=stage,
         )
-        generation = runtime.get("generation", {})
-        context_window = int(generation.get("context_window", 8192))
-        configured_output = int(generation.get("max_tokens", 2048))
-        output_reserve = (
-            min(configured_output, 4096)
-            if stage == "planning"
-            else configured_output
+        capability = self.model_capability_service.require_structured_stage(
+            runtime,
+            stage,
         )
-        # Code commonly averages closer to three characters per token than
-        # prose. Reserve an additional 768 tokens for instructions and output
-        # schema overhead; never silently truncate a source file.
-        safe_input_tokens = max(1024, context_window - output_reserve - 768)
-        return safe_input_tokens * 3
+        return int(capability["effective_safe_input_tokens"])
+
+    def estimate_tokens(
+        self,
+        *,
+        agent_id: str,
+        stage: str,
+        text: str,
+    ) -> int:
+        profile = self.agent_service.get_agent(agent_id)
+        runtime = self.provider_settings_service.runtime_config(
+            agent_id,
+            profile.get("model", "granite4.1:3b"),
+            stage=stage,
+        )
+        capability = self.model_capability_service.resolve_runtime(runtime)
+        characters_per_token = float(
+            capability.get("estimated_characters_per_token", 3.0)
+        )
+        return max(1, ceil(len(text) / characters_per_token))
 
     async def generate(
         self,
@@ -125,9 +184,15 @@ class PydanticTaskModelClient:
         runtime = self.provider_settings_service.runtime_config(
             agent_id,
             profile.get("model", "granite4.1:3b"),
+            stage=stage,
         )
-        generation = runtime.get("generation", {})
-        configured_max_tokens = int(generation.get("max_tokens", 2048))
+        capability = self.model_capability_service.require_structured_stage(
+            runtime,
+            stage,
+        )
+        configured_max_tokens = int(
+            capability["effective_max_output_tokens"]
+        )
         max_tokens = (
             min(configured_max_tokens, 4096)
             if stage == "planning"
@@ -141,7 +206,7 @@ class PydanticTaskModelClient:
         # special final-result tool call. Unknown OpenAI-compatible servers keep
         # Pydantic AI's broadly supported tool-output default.
         structured_output: Any = output_type
-        if runtime["provider"]["kind"] == "ollama":
+        if capability["structured_output_mode"] == "native":
             structured_output = NativeOutput(
                 output_type,
                 name=f"{stage}_result",
@@ -180,6 +245,7 @@ class PydanticTaskModelClient:
             usage=self._usage_dict(result.usage),
             model=runtime["model"],
             provider_id=runtime["provider_id"],
+            capability=capability,
         )
 
     @staticmethod
@@ -197,6 +263,14 @@ class PydanticTaskModelClient:
                 "Return only the requested structured change set. Follow the "
                 "approved plan exactly and provide complete contents for every "
                 "create or update operation. Do not call tools."
+            )
+        elif stage == "repair":
+            stage_prompt = (
+                "You are the repair stage of a production coding workflow. "
+                "Return only the requested structured change set. Use the "
+                "verification failure and current affected files to make the "
+                "smallest complete-file correction. Do not call tools or touch "
+                "unlisted files."
             )
         else:
             raise ValueError(f"Unknown task model stage: {stage}")

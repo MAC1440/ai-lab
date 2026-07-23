@@ -10,9 +10,13 @@ from services.project_context_service import ProjectContextService
 from services.project_task_service import ProjectTaskService
 from services.project_task_store import ProjectTaskStore
 from services.project_task_orchestrator import ProjectTaskOrchestrator
+from services.project_repair_orchestrator import ProjectRepairOrchestrator
+from services.project_task_completion_service import ProjectTaskCompletionService
 from services.provider_settings_service import ProviderSettingsService
 from services.task_model_client import PydanticTaskModelClient
 from services.mcp_service import MCPService
+from services.model_capability_service import ModelCapabilityService
+from services.model_benchmark_service import ModelBenchmarkService
 from services.repair_service import RepairService
 from services.repair_store import RepairStore
 from services.scaffold_service import ScaffoldService
@@ -23,6 +27,7 @@ from services.system_service import SystemService
 from services.unity_docs_service import UnityDocsService
 from services.run_cancellation_service import RunCancellationService
 from services.knowledge_source_service import KnowledgeSourceService
+from services.source_validation_service import SourceValidationService
 
 
 workspace_service = WorkspaceService()
@@ -39,6 +44,13 @@ _provider_settings_path = Path(
 if not _provider_settings_path.is_absolute():
     _provider_settings_path = _backend_root / _provider_settings_path
 provider_settings_service = ProviderSettingsService(_provider_settings_path)
+
+_model_capabilities_path = Path(
+    os.getenv("MODEL_CAPABILITIES_PATH", "data/model-capabilities.json")
+).expanduser()
+if not _model_capabilities_path.is_absolute():
+    _model_capabilities_path = _backend_root / _model_capabilities_path
+model_capability_service = ModelCapabilityService(_model_capabilities_path)
 
 _mcp_settings_path = Path(
     os.getenv("MCP_SETTINGS_PATH", "data/mcp-settings.json")
@@ -106,13 +118,16 @@ project_task_service = ProjectTaskService(
 )
 task_model_client = PydanticTaskModelClient(
     provider_settings_service=provider_settings_service,
+    model_capability_service=model_capability_service,
     agent_service=AgentService(),
 )
+source_validation_service = SourceValidationService(workspace_service)
 project_task_orchestrator = ProjectTaskOrchestrator(
     task_service=project_task_service,
     project_context_service=project_context_service,
     change_service=change_service,
     model_client=task_model_client,
+    source_validation_service=source_validation_service,
 )
 verification_service = VerificationService(
     workspace_service=workspace_service,
@@ -121,6 +136,25 @@ verification_service = VerificationService(
     max_output_chars=int(
         os.getenv("VERIFICATION_MAX_OUTPUT_CHARS", "200000")
     ),
+)
+project_task_completion_service = ProjectTaskCompletionService(
+    task_service=project_task_service,
+    change_service=change_service,
+    project_detection_service=project_detection_service,
+    verification_service=verification_service,
+    repair_service=repair_service,
+)
+project_repair_orchestrator = ProjectRepairOrchestrator(
+    task_service=project_task_service,
+    change_service=change_service,
+    repair_service=repair_service,
+    verification_store=verification_store,
+    model_client=task_model_client,
+    source_validation_service=source_validation_service,
+)
+model_benchmark_service = ModelBenchmarkService(
+    model_client=task_model_client,
+    capability_service=model_capability_service,
 )
 
 system_service = SystemService(
@@ -138,6 +172,7 @@ system_service = SystemService(
     config_paths={
         "provider-settings": _provider_settings_path,
         "mcp-settings": _mcp_settings_path,
+        "model-capabilities": _model_capabilities_path,
     },
     data_directory=_backend_root / "data",
 )

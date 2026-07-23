@@ -9,6 +9,9 @@ from services.task_model_client import (
     PydanticTaskModelClient,
     TaskModelOutputError,
 )
+from services.model_capability_service import ModelCapabilityService
+import tempfile
+from pathlib import Path
 
 
 class ExampleOutput(BaseModel):
@@ -19,8 +22,8 @@ class FakeProviderSettingsService:
     def __init__(self, kind: str = "ollama") -> None:
         self.kind = kind
 
-    def runtime_config(self, agent_id: str, fallback_model: str):
-        del agent_id, fallback_model
+    def runtime_config(self, agent_id: str, fallback_model: str, *, stage=None):
+        del agent_id, fallback_model, stage
         return {
             "provider_id": "test-provider",
             "model": "test-model",
@@ -66,6 +69,15 @@ class FakeUnexpectedModelBehavior(RuntimeError):
 
 
 class TaskModelClientTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.capabilities = ModelCapabilityService(
+            Path(self.temp_dir.name) / "capabilities.json"
+        )
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
     def _fake_modules(self, agent_type):
         pydantic_ai = types.ModuleType("pydantic_ai")
         pydantic_ai.Agent = agent_type
@@ -96,6 +108,7 @@ class TaskModelClientTests(unittest.IsolatedAsyncioTestCase):
 
         client = PydanticTaskModelClient(
             provider_settings_service=FakeProviderSettingsService("ollama"),
+            model_capability_service=self.capabilities,
             agent_service=FakeAgentService(),
         )
         with patch.dict(
@@ -130,6 +143,7 @@ class TaskModelClientTests(unittest.IsolatedAsyncioTestCase):
             provider_settings_service=FakeProviderSettingsService(
                 "openai_compatible"
             ),
+            model_capability_service=self.capabilities,
             agent_service=FakeAgentService(),
         )
         with patch.dict(
@@ -159,6 +173,7 @@ class TaskModelClientTests(unittest.IsolatedAsyncioTestCase):
 
         client = PydanticTaskModelClient(
             provider_settings_service=FakeProviderSettingsService("ollama"),
+            model_capability_service=self.capabilities,
             agent_service=FakeAgentService(),
         )
         with patch.dict(
@@ -177,6 +192,15 @@ class TaskModelClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(error.stage, "planning")
         self.assertEqual(error.model, "test-model")
         self.assertIn("files.0.operation is required", str(error))
+
+    def test_repair_stage_has_bounded_system_prompt(self):
+        prompt = PydanticTaskModelClient._system_prompt(
+            {"system_prompt": "Be careful."},
+            "repair",
+        )
+
+        self.assertIn("smallest complete-file correction", prompt)
+        self.assertIn("Do not call tools or touch unlisted files", prompt)
 
 
 if __name__ == "__main__":

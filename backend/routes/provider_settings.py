@@ -1,7 +1,10 @@
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Response, status
 
-from dependencies import provider_settings_service
+from dependencies import model_capability_service, provider_settings_service
 from services.agent_service import AgentService
+from services.model_capability_service import ModelCapabilityInput
 from services.provider_settings_service import AgentModelInput, ProviderInput
 
 
@@ -65,3 +68,61 @@ def save_agent_model(agent_id: str, request: AgentModelInput):
         return provider_settings_service.save_agent(agent_id, request)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+TaskStage = Literal["planning", "generation", "repair"]
+
+
+@router.put("/agents/{agent_id}/stages/{stage}")
+def save_task_stage_model(
+    agent_id: str,
+    stage: TaskStage,
+    request: AgentModelInput,
+):
+    try:
+        agent_service.get_agent(agent_id)
+        return provider_settings_service.save_task_stage(
+            agent_id,
+            stage,
+            request,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.delete(
+    "/agents/{agent_id}/stages/{stage}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_task_stage_model(agent_id: str, stage: TaskStage):
+    try:
+        provider_settings_service.delete_task_stage(agent_id, stage)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/model-capabilities")
+def list_model_capabilities():
+    return {"profiles": model_capability_service.list_profiles()}
+
+
+@router.put("/model-capabilities")
+def save_model_capability(request: ModelCapabilityInput):
+    try:
+        provider_settings_service.get_provider(request.provider_id)
+        return model_capability_service.save_profile(request)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.delete(
+    "/model-capabilities",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_model_capability(provider_id: str, model: str):
+    try:
+        model_capability_service.delete_profile(provider_id, model)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -88,6 +88,50 @@ class ProviderSettingsServiceTests(unittest.TestCase):
         self.assertEqual(coding["model"], "qwen3:4b")
         self.assertEqual(unity["model"], "granite4.1:3b")
 
+    def test_task_stage_can_use_a_different_model_from_chat_agent(self):
+        self.service.save_agent(
+            "coding",
+            AgentModelInput(provider_id="ollama", model="chat:3b"),
+        )
+        self.service.save_task_stage(
+            "coding",
+            "generation",
+            AgentModelInput(provider_id="ollama", model="coder:7b"),
+        )
+
+        chat = self.service.runtime_config("coding", "fallback")
+        generation = self.service.runtime_config(
+            "coding",
+            "fallback",
+            stage="generation",
+        )
+
+        self.assertEqual(chat["model"], "chat:3b")
+        self.assertEqual(generation["model"], "coder:7b")
+        self.assertEqual(
+            generation["assignment_source"],
+            "task_stage:generation",
+        )
+
+    def test_deleting_stage_override_falls_back_to_agent_model(self):
+        self.service.save_agent(
+            "coding",
+            AgentModelInput(provider_id="ollama", model="chat:3b"),
+        )
+        self.service.save_task_stage(
+            "coding",
+            "planning",
+            AgentModelInput(provider_id="ollama", model="planner:7b"),
+        )
+        self.service.delete_task_stage("coding", "planning")
+
+        resolved = self.service.runtime_config(
+            "coding",
+            "fallback",
+            stage="planning",
+        )
+        self.assertEqual(resolved["model"], "chat:3b")
+
     def test_openai_url_is_normalized_to_v1(self):
         provider = self.service.save_provider(
             "lm-studio",

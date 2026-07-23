@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -327,6 +328,133 @@ class ChangeServiceTests(unittest.TestCase):
                 change_set_id="set-a"
             )},
             {"pending"},
+        )
+
+    def test_committed_change_set_has_durable_transaction_record(self):
+        database_path = self.root / "changes.sqlite3"
+        service = ChangeService(self.workspace, database_path=database_path)
+        service.propose(
+            file_path="created.txt",
+            content="committed\n",
+            change_set_id="durable-set",
+        )
+
+        service.approve_change_set("durable-set")
+
+        transactions = service.list_transactions(
+            change_set_id="durable-set"
+        )
+        self.assertEqual(len(transactions), 1)
+        self.assertEqual(transactions[0]["state"], "committed")
+        self.assertEqual(transactions[0]["applied_count"], 1)
+        self.assertEqual(transactions[0]["staged_payload_count"], 1)
+
+    def test_transaction_connections_close_after_database_operations(self):
+        database_path = self.root / "changes.sqlite3"
+        service = ChangeService(self.workspace, database_path=database_path)
+
+        with service.transaction_service._connect() as connection:
+            connection.execute("SELECT 1").fetchone()
+
+        with self.assertRaisesRegex(sqlite3.ProgrammingError, "closed"):
+            connection.execute("SELECT 1")
+
+    def test_restart_recovers_interrupted_change_set_and_keeps_it_pending(self):
+        database_path = self.root / "changes.sqlite3"
+        first_path = self.root / "one.txt"
+        second_path = self.root / "nested" / "two.txt"
+        first_path.write_text("old one\n", encoding="utf-8")
+        service = ChangeService(self.workspace, database_path=database_path)
+        service.propose(
+            file_path="one.txt",
+            content="new one\n",
+            change_set_id="crashed-set",
+        )
+        service.propose(
+            file_path="nested/two.txt",
+            content="new two\n",
+            change_set_id="crashed-set",
+        )
+        original_apply = service._apply_proposal
+        calls = 0
+
+        def terminate_process(proposal, target):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise KeyboardInterrupt("simulated process termination")
+            original_apply(proposal, target)
+
+        with patch.object(
+            service,
+            "_apply_proposal",
+            side_effect=terminate_process,
+        ):
+            with self.assertRaisesRegex(
+                KeyboardInterrupt,
+                "simulated process termination",
+            ):
+                service.approve_change_set("crashed-set")
+
+        self.assertEqual(first_path.read_text(encoding="utf-8"), "new one\n")
+        restarted = ChangeService(self.workspace, database_path=database_path)
+
+        self.assertEqual(first_path.read_text(encoding="utf-8"), "old one\n")
+        self.assertFalse(second_path.exists())
+        self.assertFalse((self.root / "nested").exists())
+        self.assertEqual(
+            {
+                item["status"]
+                for item in restarted.list_proposals(
+                    change_set_id="crashed-set"
+                )
+            },
+            {"pending"},
+        )
+        transaction = restarted.list_transactions(
+            change_set_id="crashed-set"
+        )[0]
+        self.assertEqual(transaction["state"], "recovered_rollback")
+
+    def test_tampered_staging_payload_rolls_back_without_approval(self):
+        database_path = self.root / "changes.sqlite3"
+        target = self.root / "one.txt"
+        target.write_text("old\n", encoding="utf-8")
+        service = ChangeService(self.workspace, database_path=database_path)
+        service.propose(
+            file_path="one.txt",
+            content="new\n",
+            change_set_id="tampered-set",
+        )
+        original_prepare = service.transaction_service.prepare
+
+        def tamper_after_prepare(**kwargs):
+            transaction = original_prepare(**kwargs)
+            proposal_id = kwargs["proposal_ids"][0]
+            staged = service.transaction_service.staged_payload_path(
+                transaction["transaction_id"],
+                proposal_id,
+            )
+            staged.write_text("tampered\n", encoding="utf-8")
+            return transaction
+
+        with patch.object(
+            service.transaction_service,
+            "prepare",
+            side_effect=tamper_after_prepare,
+        ):
+            with self.assertRaisesRegex(
+                ChangeProposalConflictError,
+                "staged proposal payload changed",
+            ):
+                service.approve_change_set("tampered-set")
+
+        self.assertEqual(target.read_text(encoding="utf-8"), "old\n")
+        self.assertEqual(
+            service.list_proposals(change_set_id="tampered-set")[0][
+                "status"
+            ],
+            "pending",
         )
 
     def test_reject_change_set_keeps_files_unchanged(self):

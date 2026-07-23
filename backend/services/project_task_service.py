@@ -146,8 +146,8 @@ class ProjectTaskService:
         run_id: str,
         stage: str,
     ) -> Dict[str, Any]:
-        if stage not in {"planning", "generation"}:
-            raise ValueError("stage must be planning or generation")
+        if stage not in {"planning", "generation", "repair"}:
+            raise ValueError("stage must be planning, generation, or repair")
         task = self.get_task(task_id)
         if task["status"] in TERMINAL_STATUSES:
             raise ProjectTaskStateError(
@@ -172,6 +172,15 @@ class ProjectTaskService:
             ):
                 raise ProjectTaskStateError(
                     "Generation requires a saved plan and context pack"
+                )
+        if stage == "repair":
+            if task.get("phase") != "repairing" or not task.get("repair_task_id"):
+                raise ProjectTaskStateError(
+                    "Repair generation requires a failed verification result"
+                )
+            if not task.get("latest_verification_run_id"):
+                raise ProjectTaskStateError(
+                    "Repair generation requires a verification run"
                 )
 
         clean_run_id = self._required_id(run_id)
@@ -224,6 +233,9 @@ class ProjectTaskService:
         if task.get("current_agent_run_id") != run_id:
             return task
         clean_stage = (
+            "repair"
+            if task.get("phase") == "repair_model"
+            else
             "generation"
             if task.get("phase") in {"generation_model", "validation"}
             else "planning"
@@ -554,12 +566,16 @@ class ProjectTaskService:
         result["events"] = self.store.list_events(task["task_id"])
         result["artifacts"] = self.store.list_artifacts(task["task_id"])
 
-        if task["status"] not in TERMINAL_STATUSES and proposals:
+        # Proposal status derives the review transition only while the durable
+        # task is actually awaiting review. After a failed verification the
+        # original proposals remain approved, but must not force the task back
+        # to ready_to_verify and hide its repairing state.
+        if task["status"] == "awaiting_approval" and proposals:
             statuses = {proposal["status"] for proposal in proposals}
             if "pending" in statuses:
                 result["status"] = "awaiting_approval"
                 result["phase"] = "review"
-            elif statuses == {"approved"} and task["status"] != "verifying":
+            elif statuses == {"approved"}:
                 result["status"] = "ready_to_verify"
                 result["phase"] = "verification"
             elif "rejected" in statuses:

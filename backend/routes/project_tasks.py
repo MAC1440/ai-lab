@@ -10,6 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from dependencies import (
     project_task_service,
     project_task_orchestrator,
+    project_repair_orchestrator,
+    project_task_completion_service,
     run_cancellation_service,
     verification_service,
 )
@@ -17,6 +19,9 @@ from services.project_task_service import ProjectTaskStateError
 from services.project_task_store import ProjectTaskNotFoundError
 from services.task_model_client import TaskModelOutputError
 from services.verification_service import VerificationRunNotActiveError
+from services.project_task_completion_service import (
+    VerificationProfileSelectionError,
+)
 
 
 router = APIRouter(prefix="/project-tasks", tags=["Project tasks"])
@@ -150,6 +155,123 @@ async def run_project_task_stream(
         try:
             await run_cancellation_service.register(request.run_id)
             async for event in project_task_orchestrator.run_events(
+                task_id=task_id,
+                run_id=request.run_id,
+            ):
+                yield _encode_ndjson(event)
+        except asyncio.CancelledError:
+            raise
+        except ProjectTaskNotFoundError as error:
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 404, "message": str(error)}
+            )
+        except ProjectTaskStateError as error:
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 409, "message": str(error)}
+            )
+        except TaskModelOutputError as error:
+            yield _encode_ndjson(
+                {
+                    "type": "error",
+                    "status_code": 422,
+                    "code": "structured_output_failed",
+                    "stage": error.stage,
+                    "model": error.model,
+                    "message": str(error),
+                }
+            )
+        except (OSError, UnicodeError, ValueError, RuntimeError) as error:
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 400, "message": str(error)}
+            )
+        except Exception as error:  # pragma: no cover - provider boundary
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 500, "message": str(error)}
+            )
+        finally:
+            await run_cancellation_service.unregister(request.run_id)
+
+    return StreamingResponse(
+        generate_events(),
+        media_type="application/x-ndjson",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
+@router.post(
+    "/{task_id}/approve-and-verify/stream",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "description": "Apply the task change set and stream verification.",
+            "content": {
+                "application/x-ndjson": {"schema": {"type": "string"}}
+            },
+        }
+    },
+)
+async def approve_and_verify_project_task_stream(task_id: str):
+    async def generate_events():
+        try:
+            async for event in (
+                project_task_completion_service.approve_and_verify_events(
+                    task_id=task_id
+                )
+            ):
+                yield _encode_ndjson(event)
+        except ProjectTaskNotFoundError as error:
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 404, "message": str(error)}
+            )
+        except ProjectTaskStateError as error:
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 409, "message": str(error)}
+            )
+        except VerificationProfileSelectionError as error:
+            yield _encode_ndjson(
+                {
+                    "type": "error",
+                    "status_code": 422,
+                    "code": "verification_profile_required",
+                    "message": str(error),
+                }
+            )
+        except (OSError, UnicodeError, ValueError, RuntimeError) as error:
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 400, "message": str(error)}
+            )
+        except Exception as error:  # pragma: no cover - process boundary
+            yield _encode_ndjson(
+                {"type": "error", "status_code": 500, "message": str(error)}
+            )
+
+    return StreamingResponse(
+        generate_events(),
+        media_type="application/x-ndjson",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
+@router.post(
+    "/{task_id}/repair/stream",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "description": "Generate a bounded repair for a failed task check.",
+            "content": {
+                "application/x-ndjson": {"schema": {"type": "string"}}
+            },
+        }
+    },
+)
+async def repair_project_task_stream(
+    task_id: str,
+    request: RunProjectTaskRequest,
+):
+    async def generate_events():
+        try:
+            await run_cancellation_service.register(request.run_id)
+            async for event in project_repair_orchestrator.run_events(
                 task_id=task_id,
                 run_id=request.run_id,
             ):

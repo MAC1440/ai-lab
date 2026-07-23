@@ -8,6 +8,7 @@ from uuid import uuid4
 from services.change_service import ChangeService
 from services.project_context_service import ProjectContextService
 from services.project_task_service import ProjectTaskService
+from services.source_validation_service import SourceValidationService
 from services.task_context_service import (
     GeneratedChangeSet,
     ImplementationPlan,
@@ -28,11 +29,16 @@ class ProjectTaskOrchestrator:
         project_context_service: ProjectContextService,
         change_service: ChangeService,
         model_client: TaskModelClient,
+        source_validation_service: SourceValidationService | None = None,
     ) -> None:
         self.task_service = task_service
         self.project_context_service = project_context_service
         self.change_service = change_service
         self.model_client = model_client
+        self.source_validation_service = (
+            source_validation_service
+            or SourceValidationService(task_service.workspace_service)
+        )
 
     async def run_events(
         self,
@@ -116,6 +122,20 @@ class ProjectTaskOrchestrator:
             self._validate_generated(plan, generated_result.output)
             self.task_service.task_context_service.assert_fresh(context)
             self.task_service.validate_plan_workspace(plan)
+            source_validation = self.source_validation_service.validate(
+                generated_result.output
+            )
+            self.task_service.record_artifact(
+                task_id,
+                artifact_type="source_validation",
+                payload=source_validation,
+                run_id=run_id,
+            )
+            yield {
+                "type": "source_validation",
+                "run_id": run_id,
+                "validation": source_validation,
+            }
 
             change_set_id = uuid4().hex
             proposals = self.change_service.propose_change_set(
@@ -219,10 +239,15 @@ class ProjectTaskOrchestrator:
             agent_id=task["agent_id"],
             stage=stage,
         )
-        if len(prompt) > budget:
+        required = self.model_client.estimate_tokens(
+            agent_id=task["agent_id"],
+            stage=stage,
+            text=prompt,
+        )
+        if required > budget:
             raise ValueError(
-                f"The {stage} prompt requires {len(prompt):,} characters but "
-                f"the selected model's safe budget is {budget:,}. Split the "
+                f"The {stage} prompt requires about {required:,} tokens but "
+                f"the selected model's safe budget is {budget:,} tokens. Split the "
                 "task, reduce affected files, or configure a model with a "
                 "larger context window. No source file was truncated."
             )
@@ -361,6 +386,7 @@ class ProjectTaskOrchestrator:
         return {
             "model": result.model,
             "provider_id": result.provider_id,
+            "capability": result.capability,
             "usage": result.usage,
             "output": result.output.model_dump(),
             **extra,
