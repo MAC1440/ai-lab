@@ -11,6 +11,7 @@ from services.model_benchmark_service import ModelBenchmarkService
 from services.model_capability_service import ModelCapabilityService
 from services.project_context_service import ProjectContextService
 from services.project_detection_service import ProjectDetectionService
+from services.project_index_service import ProjectIndexService
 from services.project_repair_orchestrator import ProjectRepairOrchestrator
 from services.project_task_completion_service import ProjectTaskCompletionService
 from services.project_task_orchestrator import ProjectTaskOrchestrator
@@ -34,9 +35,23 @@ from services.workspace_service import WorkspaceService
 workspace_service = WorkspaceService()
 _backend_root = Path(__file__).resolve().parent
 project_detection_service = ProjectDetectionService(workspace_service)
+_project_index_database_path = Path(
+    os.getenv("PROJECT_INDEX_DB_PATH", "data/project-index.sqlite3")
+).expanduser()
+if not _project_index_database_path.is_absolute():
+    _project_index_database_path = _backend_root / _project_index_database_path
+project_index_service = ProjectIndexService(
+    workspace_service,
+    _project_index_database_path,
+    max_files=int(os.getenv("PROJECT_INDEX_MAX_FILES", "20000")),
+    max_file_bytes=int(
+        os.getenv("PROJECT_INDEX_MAX_FILE_BYTES", "1500000")
+    ),
+)
 project_context_service = ProjectContextService(
     workspace_service,
     project_detection_service,
+    project_index_service=project_index_service,
 )
 
 _provider_settings_path = Path(
@@ -194,6 +209,7 @@ system_service = SystemService(
         "conversations": _conversations_database_path,
         "repairs": _repairs_database_path,
         "project-tasks": _project_tasks_database_path,
+        "project-index": _project_index_database_path,
         "reliability-benchmarks": _reliability_database_path,
     },
     config_paths={

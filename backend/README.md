@@ -9,6 +9,7 @@ This backend provides a small FastAPI service for:
 - reviewable workspace file changes
 - safe streamed workspace verification with persistent run history
 - durable multi-file project tasks with approval, verification, and repair
+- persistent relevant-file indexing with symbols and dependency edges
 
 ## Quick start
 
@@ -42,6 +43,9 @@ CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 VERIFICATION_DB_PATH=data/verification.sqlite3
 VERIFICATION_MAX_OUTPUT_CHARS=200000
 PROJECT_TASK_DB_PATH=data/project-tasks.sqlite3
+PROJECT_INDEX_DB_PATH=data/project-index.sqlite3
+PROJECT_INDEX_MAX_FILES=20000
+PROJECT_INDEX_MAX_FILE_BYTES=1500000
 RELIABILITY_BENCHMARK_DB_PATH=data/reliability-benchmarks.sqlite3
 RELIABILITY_BENCHMARK_WORK_ROOT=data/reliability-workspaces
 ```
@@ -63,6 +67,13 @@ and repair. The browser sends `project_task_id` with the agent request. The
 model still has no direct write or shell access: all file changes remain
 validated proposals, and verification remains restricted to detected profile
 IDs.
+
+Before planning, the project index incrementally scans supported source files,
+extracts symbols and import relationships, and ranks likely relevant files from
+the task goal. It honors `.gitignore`, skips generated directories, and stores
+metadata rather than source contents. Use **Manage → Index** to inspect,
+incrementally refresh, rebuild, or test relevance results. See
+[Project Index](../docs/project-index.md).
 
 ## Example endpoints
 

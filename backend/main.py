@@ -13,6 +13,7 @@ from routes.changes import router as changes_router  # noqa: E402
 from routes.conversations import router as conversations_router  # noqa: E402
 from routes.knowledge_sources import router as knowledge_sources_router  # noqa: E402
 from routes.mcp_settings import router as mcp_settings_router  # noqa: E402
+from routes.project_index import router as project_index_router  # noqa: E402
 from routes.project_tasks import router as project_tasks_router  # noqa: E402
 from routes.provider_settings import router as provider_settings_router  # noqa: E402
 from routes.reliability_benchmarks import (  # noqa: E402
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(system_router)
     app.include_router(unity_docs_router)
     app.include_router(knowledge_sources_router)
+    app.include_router(project_index_router)
     app.include_router(project_tasks_router)
     app.include_router(reliability_benchmarks_router)
 

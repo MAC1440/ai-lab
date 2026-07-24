@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -9,8 +10,8 @@ from services.project_detection_service import (
     IGNORED_DIRECTORIES,
     ProjectDetectionService,
 )
+from services.project_index_service import ProjectIndexService
 from services.workspace_service import WorkspaceService
-
 
 TEXT_EXTENSIONS = {
     ".cs",
@@ -101,10 +102,12 @@ class ProjectContextService:
         project_detection_service: ProjectDetectionService,
         *,
         budget: Optional[ContextBudget] = None,
+        project_index_service: Optional[ProjectIndexService] = None,
     ) -> None:
         self.workspace_service = workspace_service
         self.project_detection_service = project_detection_service
         self.budget = budget or ContextBudget()
+        self.project_index_service = project_index_service
 
     def build(
         self,
@@ -125,7 +128,42 @@ class ProjectContextService:
         project_root = self._project_root(workspace, selected_project)
 
         manifests = self._manifest_paths(project_root, workspace)
-        initial_paths = self._unique_paths([*prompt_paths, *manifests])
+        index_trace: Dict[str, Any] = {
+            "status": "disabled",
+            "relevant_files": [],
+        }
+        indexed_paths: List[Path] = []
+        if self.project_index_service is not None:
+            try:
+                selected_root = self._relative(project_root, workspace)
+                index_result = self.project_index_service.query(
+                    prompt,
+                    limit=max(1, min(5, self.budget.max_files)),
+                    project_root=selected_root,
+                )
+                indexed_paths = [
+                    workspace / str(item["path"])
+                    for item in index_result["results"]
+                ]
+                index_trace = {
+                    "status": "ready",
+                    "relevant_files": index_result["results"],
+                    "tokens": index_result["tokens"],
+                    "refresh": index_result["refresh"],
+                    "indexed_at": index_result["index"]["indexed_at"],
+                    "file_count": index_result["index"]["file_count"],
+                }
+            except (OSError, RuntimeError, ValueError, sqlite3.Error) as error:
+                # Indexing improves selection but must never block the existing
+                # deterministic context collector.
+                index_trace = {
+                    "status": "fallback",
+                    "relevant_files": [],
+                    "error": str(error),
+                }
+        initial_paths = self._unique_paths(
+            [*prompt_paths, *manifests, *indexed_paths]
+        )
 
         file_sections: List[str] = []
         included_paths: List[str] = []
@@ -204,6 +242,7 @@ class ProjectContextService:
             "characters": len(context),
             "max_characters": self.budget.max_total_chars,
             "skipped_paths": skipped_paths,
+            "project_index": index_trace,
         }
         return trace, context
 
@@ -406,7 +445,11 @@ class ProjectContextService:
                 candidate = self._resolve_reference(
                     reference, source.parent, project_root, workspace
                 )
-                if candidate and candidate not in excluded and candidate not in resolved:
+                if (
+                    candidate
+                    and candidate not in excluded
+                    and candidate not in resolved
+                ):
                     resolved.append(candidate)
                     if len(resolved) >= self.budget.max_import_files:
                         break

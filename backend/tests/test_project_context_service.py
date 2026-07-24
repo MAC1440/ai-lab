@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +13,30 @@ class TemporaryWorkspaceService:
 
     def get_workspace(self) -> Path:
         return self.root
+
+
+class FakeProjectIndexService:
+    def __init__(self, results=None, error=None):
+        self.results = results or []
+        self.error = error
+        self.calls = []
+
+    def query(self, text, *, limit, project_root):
+        self.calls.append(
+            {
+                "text": text,
+                "limit": limit,
+                "project_root": project_root,
+            }
+        )
+        if self.error:
+            raise self.error
+        return {
+            "results": self.results,
+            "tokens": ["inventory"],
+            "refresh": {"changed_files": 0},
+            "index": {"indexed_at": "2026-07-24T00:00:00+00:00", "file_count": 3},
+        }
 
 
 class ProjectContextServiceTests(unittest.TestCase):
@@ -133,6 +158,72 @@ class ProjectContextServiceTests(unittest.TestCase):
         )
 
         self.assertEqual(trace["selected_project_root"], "backend")
+
+    def test_project_index_adds_ranked_current_file_to_planning_context(self):
+        frontend = self.root / "frontend"
+        component = frontend / "features" / "inventory-panel.tsx"
+        component.parent.mkdir(parents=True)
+        (frontend / "package.json").write_text("{}", encoding="utf-8")
+        component.write_text(
+            "export function InventoryPanel() { return null; }\n",
+            encoding="utf-8",
+        )
+        project_index = FakeProjectIndexService(
+            results=[
+                {
+                    "path": "frontend/features/inventory-panel.tsx",
+                    "language": "typescript",
+                    "score": 60,
+                    "reasons": ["symbols: InventoryPanel"],
+                    "matching_symbols": ["InventoryPanel"],
+                }
+            ]
+        )
+        service = ProjectContextService(
+            self.workspace_service,
+            self.detection_service,
+            project_index_service=project_index,
+            budget=self.service.budget,
+        )
+
+        trace, context = service.build(
+            prompt="Add stock counts to InventoryPanel",
+            agent_id="web",
+        )
+
+        self.assertIn(
+            "frontend/features/inventory-panel.tsx",
+            trace["files_included"],
+        )
+        self.assertIn("InventoryPanel", context)
+        self.assertEqual(trace["project_index"]["status"], "ready")
+        self.assertEqual(
+            project_index.calls[0]["project_root"],
+            "frontend",
+        )
+
+    def test_project_index_failure_falls_back_to_existing_context(self):
+        (self.root / "requirements.txt").write_text(
+            "pytest\n",
+            encoding="utf-8",
+        )
+        project_index = FakeProjectIndexService(
+            error=sqlite3.OperationalError("index unavailable")
+        )
+        service = ProjectContextService(
+            self.workspace_service,
+            self.detection_service,
+            project_index_service=project_index,
+            budget=self.service.budget,
+        )
+
+        trace, context = service.build(
+            prompt="Explain this Python project",
+            agent_id="web",
+        )
+
+        self.assertEqual(trace["project_index"]["status"], "fallback")
+        self.assertIn("requirements.txt", context)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import {
   AlertTriangleIcon,
   CheckCircle2Icon,
   CircleDotIcon,
+  DatabaseIcon,
   FileCode2Icon,
   Loader2Icon,
   PlayIcon,
@@ -79,6 +80,20 @@ export function ProjectTaskDetails({
   onCancel,
 }: Props) {
   const plan = latestArtifact<ImplementationPlan>(task, "implementation_plan");
+  const planningRun = latestArtifact<{
+    trace?: {
+      project_index?: {
+        status?: string;
+        file_count?: number;
+        relevant_files?: Array<{
+          path?: string;
+          score?: number;
+          reasons?: string[];
+        }>;
+      };
+    };
+  }>(task, "planning_model_run");
+  const projectIndex = planningRun?.trace?.project_index;
   const context = latestArtifact<{
     files?: Array<{ path: string; sha256: string; bytes: number }>;
     bytes?: number;
@@ -229,6 +244,39 @@ export function ProjectTaskDetails({
               </li>
             ))}
           </ol>
+        </section>
+      ) : null}
+
+      {projectIndex?.status === "ready" ? (
+        <section className="rounded-xl border border-violet-900/60 bg-violet-950/20 p-4">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-violet-200">
+            <DatabaseIcon className="size-4" />
+            Indexed planning evidence
+          </h3>
+          <p className="mt-2 text-xs text-zinc-500">
+            Ranked from {projectIndex.file_count ?? 0} indexed source files
+            before the planning model ran.
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {projectIndex.relevant_files?.map((file) => (
+              <div
+                key={file.path}
+                className="rounded-lg border border-violet-900/40 bg-zinc-950/70 p-2.5"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <code className="min-w-0 truncate text-xs text-zinc-200">
+                    {file.path}
+                  </code>
+                  <span className="shrink-0 text-[10px] text-violet-400">
+                    {file.score ?? 0}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-[11px] leading-4 text-zinc-500">
+                  {file.reasons?.join(" · ") || "Relevant path match"}
+                </p>
+              </div>
+            ))}
+          </div>
         </section>
       ) : null}
 

@@ -29,6 +29,7 @@ aiosqlite>=0.21,<1.0
 alembic>=1.16,<2.0
 platformdirs>=4.3,<5.0
 keyring>=25.6,<26.0
+pathspec>=0.12,<2.0
 
 # Local RAG/vector storage
 chromadb~=1.5.9

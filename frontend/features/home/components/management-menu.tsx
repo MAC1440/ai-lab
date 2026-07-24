@@ -7,6 +7,7 @@ import { KnowledgeSourcesDialog } from "@/features/knowledge-sources";
 import { MCPSettingsDialog } from "@/features/mcp";
 import { ModelSettingsDialog } from "@/features/model-settings";
 import { ModelBenchmarkDialog } from "@/features/model-settings/model-benchmark-dialog";
+import { ProjectIndexDialog } from "@/features/project-index";
 import { ProjectTaskDialog } from "@/features/project-tasks";
 import { RepairDialog } from "@/features/repairs";
 import { ReliabilityBenchmarkDialog } from "@/features/reliability";
@@ -27,6 +28,7 @@ export function ManagementMenu({ agents, disabled, workspaceReady, onAgentsChang
             <p className="mb-3 text-xs font-medium uppercase tracking-wide text-zinc-500">Workspace and application tools</p>
             <div className="grid grid-cols-2 gap-2">
                 <ProjectTaskDialog disabled={!workspaceReady || disabled} />
+                <ProjectIndexDialog disabled={!workspaceReady || disabled} />
                 <VerificationDialog disabled={!workspaceReady || disabled} />
                 <RepairDialog disabled={!workspaceReady || disabled} />
                 <ScaffoldDialog disabled={!workspaceReady || disabled} />
