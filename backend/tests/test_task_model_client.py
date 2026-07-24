@@ -1,17 +1,17 @@
 import sys
+import tempfile
 import types
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from pydantic import BaseModel
 
+from services.model_capability_service import ModelCapabilityService
 from services.task_model_client import (
     PydanticTaskModelClient,
     TaskModelOutputError,
 )
-from services.model_capability_service import ModelCapabilityService
-import tempfile
-from pathlib import Path
 
 
 class ExampleOutput(BaseModel):
@@ -158,6 +158,99 @@ class TaskModelClientTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertIs(captured["output_type"], ExampleOutput)
+
+    async def test_ollama_retries_tool_output_when_native_grammar_is_rejected(
+        self,
+    ):
+        output_types = []
+
+        class GrammarRejectingAgent:
+            def __init__(self, model, **kwargs):
+                del model
+                self.output_type = kwargs["output_type"]
+                output_types.append(self.output_type)
+
+            async def run(self, prompt, **kwargs):
+                del prompt, kwargs
+                if isinstance(self.output_type, FakeNativeOutput):
+                    raise RuntimeError(
+                        "status_code: 400, body: Failed to initialize samplers: "
+                        "failed to parse grammar"
+                    )
+                return FakeResult()
+
+        client = PydanticTaskModelClient(
+            provider_settings_service=FakeProviderSettingsService("ollama"),
+            model_capability_service=self.capabilities,
+            agent_service=FakeAgentService(),
+        )
+        with patch.dict(
+            sys.modules,
+            self._fake_modules(GrammarRejectingAgent),
+        ):
+            result = await client.generate(
+                agent_id="coding",
+                stage="generation",
+                prompt="Generate it.",
+                output_type=ExampleOutput,
+            )
+
+        self.assertEqual(len(output_types), 2)
+        self.assertIsInstance(output_types[0], FakeNativeOutput)
+        self.assertIs(output_types[1], ExampleOutput)
+        self.assertEqual(
+            result.capability["structured_output_mode"],
+            "tool",
+        )
+        self.assertEqual(
+            result.capability["structured_output_fallback"],
+            "native_grammar_rejected",
+        )
+
+        with patch.dict(
+            sys.modules,
+            self._fake_modules(GrammarRejectingAgent),
+        ):
+            await client.generate(
+                agent_id="coding",
+                stage="repair",
+                prompt="Repair it.",
+                output_type=ExampleOutput,
+            )
+
+        self.assertEqual(len(output_types), 3)
+        self.assertIs(output_types[2], ExampleOutput)
+
+    async def test_ollama_does_not_retry_unrelated_provider_failure(self):
+        calls = 0
+
+        class UnavailableAgent:
+            def __init__(self, model, **kwargs):
+                del model, kwargs
+
+            async def run(self, prompt, **kwargs):
+                nonlocal calls
+                del prompt, kwargs
+                calls += 1
+                raise RuntimeError("connection refused")
+
+        client = PydanticTaskModelClient(
+            provider_settings_service=FakeProviderSettingsService("ollama"),
+            model_capability_service=self.capabilities,
+            agent_service=FakeAgentService(),
+        )
+        with patch.dict(
+            sys.modules,
+            self._fake_modules(UnavailableAgent),
+        ), self.assertRaisesRegex(RuntimeError, "connection refused"):
+            await client.generate(
+                agent_id="coding",
+                stage="generation",
+                prompt="Generate it.",
+                output_type=ExampleOutput,
+            )
+
+        self.assertEqual(calls, 1)
 
     async def test_structured_output_failure_has_stage_and_model_context(self):
         class FailingAgent:

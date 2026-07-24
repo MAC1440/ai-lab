@@ -127,6 +127,7 @@ class PydanticTaskModelClient:
         )
         self.agent_service = agent_service or AgentService()
         self.request_limit = request_limit
+        self._native_grammar_rejections: set[tuple[str, str]] = set()
 
     def prompt_budget(self, *, agent_id: str, stage: str) -> int:
         profile = self.agent_service.get_agent(agent_id)
@@ -190,6 +191,16 @@ class PydanticTaskModelClient:
             runtime,
             stage,
         )
+        runtime_key = (runtime["provider_id"], runtime["model"])
+        if (
+            capability["structured_output_mode"] == "native"
+            and runtime_key in self._native_grammar_rejections
+        ):
+            capability = {
+                **capability,
+                "structured_output_mode": "tool",
+                "structured_output_fallback": "native_grammar_rejected",
+            }
         configured_max_tokens = int(
             capability["effective_max_output_tokens"]
         )
@@ -215,31 +226,65 @@ class PydanticTaskModelClient:
                     "stage of a project coding task."
                 ),
             )
-        agent = Agent(
-            model,
-            output_type=structured_output,
-            system_prompt=self._system_prompt(profile, stage),
-            retries={"output": 2},
-        )
-        try:
-            result = await agent.run(
-                prompt,
-                usage_limits=UsageLimits(request_limit=self.request_limit),
-                model_settings=ModelSettings(
-                    # Structured planning and code generation benefit from
-                    # deterministic sampling. User chat keeps its own setting.
-                    temperature=0.0,
-                    max_tokens=max_tokens,
-                ),
+        system_prompt = self._system_prompt(profile, stage)
+        run_arguments = {
+            "usage_limits": UsageLimits(request_limit=self.request_limit),
+            "model_settings": ModelSettings(
+                # Structured planning and code generation benefit from
+                # deterministic sampling. User chat keeps its own setting.
+                temperature=0.0,
+                max_tokens=max_tokens,
+            ),
+        }
+
+        def build_agent(result_type: Any):
+            return Agent(
+                model,
+                output_type=result_type,
+                system_prompt=system_prompt,
+                retries={"output": 2},
             )
-        except UnexpectedModelBehavior as error:
-            raise TaskModelOutputError(
-                stage=stage,
-                model=runtime["model"],
-                provider_id=runtime["provider_id"],
-                attempts=self.request_limit,
-                detail=self._failure_detail(error),
-            ) from error
+
+        agent = build_agent(structured_output)
+        try:
+            result = await agent.run(prompt, **run_arguments)
+        except Exception as error:
+            # Some Ollama models advertise JSON-schema responses but their
+            # llama.cpp grammar converter rejects schemas used by real task
+            # contracts before the model can generate a token. Granite 4.1 is
+            # one known example. Retry only this provider-level grammar failure
+            # with Pydantic AI's final-result tool contract; unrelated provider
+            # and validation errors must keep their original behavior.
+            if (
+                capability["structured_output_mode"] == "native"
+                and runtime.get("provider", {}).get("kind") == "ollama"
+                and self._is_native_grammar_error(error)
+            ):
+                self._native_grammar_rejections.add(runtime_key)
+                capability = {
+                    **capability,
+                    "structured_output_mode": "tool",
+                    "structured_output_fallback": "native_grammar_rejected",
+                }
+                try:
+                    result = await build_agent(output_type).run(
+                        prompt,
+                        **run_arguments,
+                    )
+                except UnexpectedModelBehavior as fallback_error:
+                    raise self._output_error(
+                        fallback_error,
+                        stage=stage,
+                        runtime=runtime,
+                    ) from fallback_error
+            elif isinstance(error, UnexpectedModelBehavior):
+                raise self._output_error(
+                    error,
+                    stage=stage,
+                    runtime=runtime,
+                ) from error
+            else:
+                raise
         return ModelStageResult(
             output=result.output,
             usage=self._usage_dict(result.usage),
@@ -247,6 +292,38 @@ class PydanticTaskModelClient:
             provider_id=runtime["provider_id"],
             capability=capability,
         )
+
+    def _output_error(
+        self,
+        error: BaseException,
+        *,
+        stage: str,
+        runtime: Dict[str, Any],
+    ) -> TaskModelOutputError:
+        return TaskModelOutputError(
+            stage=stage,
+            model=runtime["model"],
+            provider_id=runtime["provider_id"],
+            attempts=self.request_limit,
+            detail=self._failure_detail(error),
+        )
+
+    @staticmethod
+    def _is_native_grammar_error(error: BaseException) -> bool:
+        """Recognize Ollama/llama.cpp grammar setup failures through wrappers."""
+
+        current: BaseException | None = error
+        seen: set[int] = set()
+        while current is not None and id(current) not in seen:
+            seen.add(id(current))
+            message = str(current).casefold()
+            if "failed to parse grammar" in message or (
+                "failed to initialize samplers" in message
+                and "grammar" in message
+            ):
+                return True
+            current = current.__cause__ or current.__context__
+        return False
 
     @staticmethod
     def _system_prompt(profile: Dict[str, Any], stage: str) -> str:
