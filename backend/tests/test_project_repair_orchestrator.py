@@ -186,6 +186,25 @@ class ProjectRepairOrchestratorTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(proposals, [])
 
+    def test_repair_prompt_shows_exact_update_shape(self):
+        orchestrator = self.orchestrator(self.generated())
+        prompt = orchestrator._repair_prompt(
+            self.tasks.get_task(self.task_id),
+            FakeVerificationStore().get_run("verify-1"),
+            [
+                {
+                    "path": "src/calculator.py",
+                    "content": (
+                        "def add(a: int, b: int) -> int:\n"
+                        "    return a - b\n"
+                    ),
+                }
+            ],
+        )
+
+        self.assertIn('"operation":"update"', prompt)
+        self.assertIn('"summary":"Correct the failing behavior."', prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

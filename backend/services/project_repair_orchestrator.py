@@ -275,10 +275,20 @@ class ProjectRepairOrchestrator:
         ]
         return "\n\n".join(
             (
-                "Repair this failed bounded task. Return one structured change "
-                "set containing only complete-file updates for the supplied "
-                "workspace files. Do not create, delete, move, or mention any "
-                "other file. Make the smallest coherent correction.",
+                (
+                    "Repair this failed bounded task. Return one structured "
+                    "change set containing only complete-file updates for the "
+                    "supplied workspace files. Do not create, delete, move, or "
+                    "mention any other file. Make the smallest coherent "
+                    "correction."
+                ),
+                (
+                    "Required shape example (replace every example value):\n"
+                    '{"summary":"Repair the failed check.","operations":['
+                    '{"path":"src/example.py","operation":"update",'
+                    '"summary":"Correct the failing behavior.",'
+                    '"content":"complete corrected UTF-8 file content"}]}'
+                ),
                 f"Original goal: {task['goal']}",
                 "Verification failure:\n" + (failure or "[No output captured]"),
                 "Current affected files:\n" + "\n\n".join(sections),

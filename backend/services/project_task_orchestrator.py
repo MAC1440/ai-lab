@@ -303,11 +303,21 @@ class ProjectTaskOrchestrator:
     def _planning_prompt(task: Dict[str, Any], project_context: str) -> str:
         return "\n\n".join(
             (
-                "Plan this bounded project task. Use exact workspace-relative "
-                "paths visible in the deterministic context. Mark an existing "
-                "file as update/delete/move and a genuinely new file as create. "
-                "Normally use at most eight files; never exceed twenty. Do not "
-                "write source code in the plan.",
+                (
+                    "Plan this bounded project task. Use exact workspace-relative "
+                    "paths visible in the deterministic context. Mark an existing "
+                    "file as update/delete/move and a genuinely new file as create. "
+                    "Normally use at most eight files; never exceed twenty. Do not "
+                    "write source code in the plan. Only include destination_path "
+                    "for a move operation."
+                ),
+                (
+                    "Required shape example (replace every example value):\n"
+                    '{"summary":"Implement the requested change.",'
+                    '"assumptions":[],"files":[{"path":"src/example.py",'
+                    '"operation":"update","reason":"Change existing behavior."}],'
+                    '"verification":["python-tests"],"risks":[]}'
+                ),
                 f"Task title: {task['title']}\nTask goal: {task['goal']}",
                 project_context,
             )
@@ -328,10 +338,21 @@ class ProjectTaskOrchestrator:
             )
         return "\n\n".join(
             (
-                "Generate the planned change set exactly. Include every planned "
-                "operation once and no others. For create/update, content must "
-                "be the complete desired UTF-8 file—not a diff, placeholder, or "
-                "partial excerpt. Delete/move operations must not contain content.",
+                (
+                    "Generate the planned change set exactly. Include every "
+                    "planned operation once and no others. For create/update, "
+                    "content must be the complete desired UTF-8 file—not a diff, "
+                    "placeholder, or partial excerpt. Delete/move operations must "
+                    "not contain content. Only include destination_path for a "
+                    "move operation."
+                ),
+                (
+                    "Required shape example (replace every example value):\n"
+                    '{"summary":"Implement the approved plan.","operations":['
+                    '{"path":"src/example.py","operation":"update",'
+                    '"summary":"Update existing behavior.",'
+                    '"content":"complete UTF-8 file content"}]}'
+                ),
                 f"Task title: {task['title']}\nTask goal: {task['goal']}",
                 "Approved plan:\n" + plan.model_dump_json(indent=2),
                 "Frozen existing files:\n" + (

@@ -249,6 +249,22 @@ class ProjectTaskOrchestratorTests(unittest.IsolatedAsyncioTestCase):
         failed = self.task_service.get_task(task["task_id"])
         self.assertEqual(failed["phase"], "planning_failed")
 
+    def test_stage_prompts_show_exact_structured_shapes(self):
+        planning = ProjectTaskOrchestrator._planning_prompt(
+            self.create_task(),
+            "Selected project root: .",
+        )
+        generation = ProjectTaskOrchestrator._generation_prompt(
+            self.create_task(),
+            self.plan,
+            {"files": []},
+        )
+
+        self.assertIn('"operation":"update"', planning)
+        self.assertIn("Only include destination_path for a move", planning)
+        self.assertIn('"content":"complete UTF-8 file content"', generation)
+        self.assertIn("Only include destination_path for a move", generation)
+
 
 if __name__ == "__main__":
     unittest.main()

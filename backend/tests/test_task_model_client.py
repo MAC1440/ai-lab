@@ -8,10 +8,12 @@ from unittest.mock import patch
 from pydantic import BaseModel
 
 from services.model_capability_service import ModelCapabilityService
+from services.task_context_service import GeneratedChangeSet
 from services.task_model_client import (
     PydanticTaskModelClient,
     TaskModelOutputError,
 )
+from services.task_model_output_adapter import ModelGeneratedChangeSet
 
 
 class ExampleOutput(BaseModel):
@@ -158,6 +160,101 @@ class TaskModelClientTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertIs(captured["output_type"], ExampleOutput)
+
+    async def test_task_contract_uses_boundary_then_returns_strict_output(self):
+        captured = {}
+
+        class BoundaryAgent:
+            def __init__(self, model, **kwargs):
+                del model
+                captured.update(kwargs)
+                self.output_type = kwargs["output_type"]
+
+            async def run(self, prompt, **kwargs):
+                del prompt, kwargs
+                return types.SimpleNamespace(
+                    output=self.output_type.model_validate(
+                        {
+                            "summary": "Update example.",
+                            "operations": [
+                                {
+                                    "path": "src/example.py",
+                                    "operation": "update",
+                                    "content": "value = 2\n",
+                                    "destination_path": "/src/example.py",
+                                }
+                            ],
+                        }
+                    ),
+                    usage=FakeUsage(),
+                )
+
+        client = PydanticTaskModelClient(
+            provider_settings_service=FakeProviderSettingsService(
+                "openai_compatible"
+            ),
+            model_capability_service=self.capabilities,
+            agent_service=FakeAgentService(),
+        )
+        with patch.dict(
+            sys.modules,
+            self._fake_modules(BoundaryAgent),
+        ):
+            result = await client.generate(
+                agent_id="coding",
+                stage="generation",
+                prompt="Generate it.",
+                output_type=GeneratedChangeSet,
+            )
+
+        self.assertIs(captured["output_type"], ModelGeneratedChangeSet)
+        self.assertIsInstance(result.output, GeneratedChangeSet)
+        self.assertEqual(
+            result.output.operations[0].summary,
+            "Update src/example.py.",
+        )
+        self.assertIsNone(result.output.operations[0].destination_path)
+        self.assertEqual(
+            result.capability["output_normalization"]["actions"],
+            [
+                "derived_operation_summary:0",
+                "discarded_non_move_destination:0",
+            ],
+        )
+
+    async def test_can_omit_agent_specialization_for_neutral_benchmark(self):
+        captured = {}
+
+        class FakeAgent:
+            def __init__(self, model, **kwargs):
+                del model
+                captured.update(kwargs)
+
+            async def run(self, prompt, **kwargs):
+                del prompt, kwargs
+                return FakeResult()
+
+        client = PydanticTaskModelClient(
+            provider_settings_service=FakeProviderSettingsService(
+                "openai_compatible"
+            ),
+            model_capability_service=self.capabilities,
+            agent_service=FakeAgentService(),
+        )
+        with patch.dict(
+            sys.modules,
+            self._fake_modules(FakeAgent),
+        ):
+            await client.generate(
+                agent_id="unity",
+                stage="planning",
+                prompt="Benchmark planning.",
+                output_type=ExampleOutput,
+                use_agent_prompt=False,
+            )
+
+        self.assertNotIn("Be careful.", captured["system_prompt"])
+        self.assertIn("planning stage", captured["system_prompt"])
 
     async def test_ollama_retries_tool_output_when_native_grammar_is_rejected(
         self,

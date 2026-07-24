@@ -9,8 +9,20 @@ from services.task_model_client import ModelStageResult
 
 
 class FakeBenchmarkModelClient:
-    async def generate(self, *, agent_id, stage, prompt, output_type):
+    def __init__(self):
+        self.use_agent_prompt_values = []
+
+    async def generate(
+        self,
+        *,
+        agent_id,
+        stage,
+        prompt,
+        output_type,
+        use_agent_prompt=True,
+    ):
         del agent_id, prompt
+        self.use_agent_prompt_values.append(use_agent_prompt)
         if stage == "planning":
             output = ImplementationPlan.model_validate(
                 {
@@ -100,8 +112,9 @@ class ModelBenchmarkServiceTests(unittest.IsolatedAsyncioTestCase):
             capabilities = ModelCapabilityService(
                 Path(directory) / "capabilities.json"
             )
+            model_client = FakeBenchmarkModelClient()
             service = ModelBenchmarkService(
-                model_client=FakeBenchmarkModelClient(),
+                model_client=model_client,
                 capability_service=capabilities,
             )
 
@@ -130,6 +143,10 @@ class ModelBenchmarkServiceTests(unittest.IsolatedAsyncioTestCase):
                 "benchmark-model",
             )
             self.assertFalse(recommendations["applied"])
+            self.assertEqual(
+                model_client.use_agent_prompt_values,
+                [False, False, False],
+            )
 
 
 if __name__ == "__main__":

@@ -51,6 +51,7 @@ class ModelBenchmarkService:
                     stage=stage,
                     prompt=prompt,
                     output_type=output_type,
+                    use_agent_prompt=False,
                 )
                 duration_seconds = max(0.001, time.monotonic() - started)
                 score, assertions = self._score(stage, result.output)
@@ -116,6 +117,12 @@ Goal: update src/existing.py so it imports greet from src/greeting.py, and
 create src/greeting.py containing the greet function.
 Use exactly these two files. Mark src/existing.py as update and
 src/greeting.py as create. Request python-tests verification.
+Only include destination_path for move operations.
+Use this exact shape with task-specific values:
+{"summary":"Implement greeting.","assumptions":[],"files":[
+{"path":"src/existing.py","operation":"update","reason":"Use greet."},
+{"path":"src/greeting.py","operation":"create","reason":"Add greet."}],
+"verification":["python-tests"],"risks":[]}
 """.strip(),
             )
         if stage == "generation":
@@ -129,6 +136,12 @@ message = greet("Mac")
 2. create src/greeting.py with a typed greet(name: str) function returning
 f"Hello, {name}".
 Do not add other files.
+Use this exact shape with the requested complete contents:
+{"summary":"Implement greeting.","operations":[
+{"path":"src/existing.py","operation":"update","summary":"Use greet.",
+"content":"complete file content"},
+{"path":"src/greeting.py","operation":"create","summary":"Add greet.",
+"content":"complete file content"}]}
 """.strip(),
             )
         if stage == "repair":
@@ -141,6 +154,10 @@ Return exactly one update operation for src/calculator.py with complete content
 def add(a: int, b: int) -> int:
     return a + b
 Do not add, delete, move, or mention other files.
+Use this exact shape with the requested complete content:
+{"summary":"Repair addition.","operations":[
+{"path":"src/calculator.py","operation":"update","summary":"Add values.",
+"content":"complete corrected file content"}]}
 """.strip(),
             )
         raise ValueError(f"Unknown benchmark stage: {stage}")

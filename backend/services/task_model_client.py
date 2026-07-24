@@ -7,6 +7,10 @@ from typing import TYPE_CHECKING, Any, Dict, Generic, Protocol, Type, TypeVar
 from pydantic import BaseModel
 
 from services.agent_service import AgentService
+from services.task_model_output_adapter import (
+    model_output_type,
+    normalize_model_output,
+)
 
 if TYPE_CHECKING:
     from services.model_capability_service import ModelCapabilityService
@@ -73,6 +77,7 @@ class TaskModelClient(Protocol):
         stage: str,
         prompt: str,
         output_type: Type[OutputT],
+        use_agent_prompt: bool = True,
     ) -> ModelStageResult[OutputT]: ...
 
 
@@ -168,6 +173,7 @@ class PydanticTaskModelClient:
         stage: str,
         prompt: str,
         output_type: Type[OutputT],
+        use_agent_prompt: bool = True,
     ) -> ModelStageResult[OutputT]:
         # Keep Pydantic AI imports lazy so contract/orchestration tests do not
         # require loading model-provider integrations.
@@ -216,17 +222,22 @@ class PydanticTaskModelClient:
         # Using NativeOutput avoids asking a small local model to manufacture a
         # special final-result tool call. Unknown OpenAI-compatible servers keep
         # Pydantic AI's broadly supported tool-output default.
-        structured_output: Any = output_type
+        boundary_output_type = model_output_type(output_type)
+        structured_output: Any = boundary_output_type
         if capability["structured_output_mode"] == "native":
             structured_output = NativeOutput(
-                output_type,
+                boundary_output_type,
                 name=f"{stage}_result",
                 description=(
                     f"Return the validated structured result for the {stage} "
                     "stage of a project coding task."
                 ),
             )
-        system_prompt = self._system_prompt(profile, stage)
+        system_prompt = self._system_prompt(
+            profile,
+            stage,
+            use_agent_prompt=use_agent_prompt,
+        )
         run_arguments = {
             "usage_limits": UsageLimits(request_limit=self.request_limit),
             "model_settings": ModelSettings(
@@ -267,7 +278,7 @@ class PydanticTaskModelClient:
                     "structured_output_fallback": "native_grammar_rejected",
                 }
                 try:
-                    result = await build_agent(output_type).run(
+                    result = await build_agent(boundary_output_type).run(
                         prompt,
                         **run_arguments,
                     )
@@ -285,8 +296,19 @@ class PydanticTaskModelClient:
                 ) from error
             else:
                 raise
+        normalized_output, normalization_actions = normalize_model_output(
+            result.output,
+            output_type,
+        )
+        capability = {
+            **capability,
+            "output_normalization": {
+                "applied": bool(normalization_actions),
+                "actions": normalization_actions,
+            },
+        }
         return ModelStageResult(
-            output=result.output,
+            output=normalized_output,
             usage=self._usage_dict(result.usage),
             model=runtime["model"],
             provider_id=runtime["provider_id"],
@@ -326,8 +348,17 @@ class PydanticTaskModelClient:
         return False
 
     @staticmethod
-    def _system_prompt(profile: Dict[str, Any], stage: str) -> str:
-        profile_prompt = str(profile.get("system_prompt", "")).strip()
+    def _system_prompt(
+        profile: Dict[str, Any],
+        stage: str,
+        *,
+        use_agent_prompt: bool = True,
+    ) -> str:
+        profile_prompt = (
+            str(profile.get("system_prompt", "")).strip()
+            if use_agent_prompt
+            else ""
+        )
         if stage == "planning":
             stage_prompt = (
                 "You are the planning stage of a production coding workflow. "
