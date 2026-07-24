@@ -25,6 +25,7 @@ from routes.system import router as system_router  # noqa: E402
 from routes.unity_docs import router as unity_docs_router  # noqa: E402
 from routes.verifications import router as verifications_router  # noqa: E402
 from routes.workspaces import router as workspaces_router  # noqa: E402
+from routes.model_benchmarks import router as model_benchmarks_router
 
 
 def create_app() -> FastAPI:
@@ -64,7 +65,7 @@ def create_app() -> FastAPI:
     app.include_router(project_index_router)
     app.include_router(project_tasks_router)
     app.include_router(reliability_benchmarks_router)
-
+    app.include_router(model_benchmarks_router)
     return app
 
 
