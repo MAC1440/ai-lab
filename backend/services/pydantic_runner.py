@@ -6,8 +6,6 @@ from dataclasses import asdict, is_dataclass
 from math import ceil
 from typing import TYPE_CHECKING
 
-from backend.services import runtime_metrics_service
-
 if TYPE_CHECKING:
     from services.runtime_metrics_service import RuntimeMetricsService
     from services.runtime_settings_service import RuntimeSettingsService

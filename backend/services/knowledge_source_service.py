@@ -361,7 +361,8 @@ class KnowledgeSourceService:
         )
         temporary.replace(self.catalog_path)
 
-        def roots(self) -> dict[str, Any]: """Return filesystem roots that can be selected in the browser."""
+    def roots(self) -> dict[str, Any]: 
+        """Return filesystem roots that can be selected in the browser."""
 
         if os.name == "nt":
             bitmask = ctypes.windll.kernel32.GetLogicalDrives()
@@ -388,7 +389,6 @@ class KnowledgeSourceService:
                 "roots": roots,
                 "platform": "windows",
             }
-        else:
             return {
                 "roots": [{"name": "/", "path": "/"}],
                 "platform": os.name,
