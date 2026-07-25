@@ -58,6 +58,7 @@ export const primaryNavigation: NavigationItem[] = [
     description: "Local indexed sources",
     href: "/knowledge",
     icon: LibraryIcon,
+    available: true,
   },
 ];
 

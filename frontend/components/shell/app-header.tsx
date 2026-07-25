@@ -30,6 +30,10 @@ const sectionDetails: Record<
     title: "Verification",
     description: "Inspect workspace checks, failures, and repair readiness.",
   },
+  "/knowledge": {
+    title: "Knowledge and Context",
+    description: "Inspect indexed sources, project retrieval, and workspace context.",
+  },
   "/models": {
     title: "Models and Runtime",
     description: "Manage local providers, assignments, limits, and hardware fit.",
