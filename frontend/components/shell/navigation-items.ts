@@ -42,6 +42,7 @@ export const primaryNavigation: NavigationItem[] = [
     description: "Review proposed files",
     href: "/changes",
     icon: FileDiffIcon,
+    available: true,
   },
   {
     id: "verification",
@@ -49,6 +50,7 @@ export const primaryNavigation: NavigationItem[] = [
     description: "Checks and repair runs",
     href: "/verification",
     icon: CheckCircle2Icon,
+    available: true,
   },
   {
     id: "knowledge",

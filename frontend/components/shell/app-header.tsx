@@ -22,6 +22,14 @@ const sectionDetails: Record<
     title: "Project Tasks",
     description: "Run bounded coding work from planning through verification.",
   },
+  "/changes": {
+    title: "Changes",
+    description: "Review task-linked change sets and proposed file operations.",
+  },
+  "/verification": {
+    title: "Verification",
+    description: "Inspect workspace checks, failures, and repair readiness.",
+  },
   "/models": {
     title: "Models and Runtime",
     description: "Manage local providers, assignments, limits, and hardware fit.",
