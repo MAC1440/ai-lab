@@ -3,45 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  MenuIcon,
-  PanelLeftCloseIcon,
-  PanelLeftOpenIcon,
-  PlusIcon,
-  SparklesIcon,
+  MenuIcon, PanelLeftCloseIcon, PanelLeftOpenIcon,
+  PlusIcon, SparklesIcon,
 } from "lucide-react";
 
-const sectionDetails: Record<
-  string,
-  { title: string; description: string }
-> = {
-  "/": {
-    title: "Agent Chat",
-    description: "Inspect, reason, propose changes, and verify work.",
-  },
-  "/tasks": {
-    title: "Project Tasks",
-    description: "Run bounded coding work from planning through verification.",
-  },
-  "/changes": {
-    title: "Changes",
-    description: "Review task-linked change sets and proposed file operations.",
-  },
-  "/verification": {
-    title: "Verification",
-    description: "Inspect workspace checks, failures, and repair readiness.",
-  },
-  "/knowledge": {
-    title: "Knowledge and Context",
-    description: "Inspect indexed sources, project retrieval, and workspace context.",
-  },
-  "/models": {
-    title: "Models and Runtime",
-    description: "Manage local providers, assignments, limits, and hardware fit.",
-  },
-  "/performance": {
-    title: "Performance",
-    description: "Review persisted model speed, duration, and token usage.",
-  },
+const sections: Record<string, { title: string; description: string }> = {
+  "/": { title: "Agent Chat", description: "Inspect, reason, propose changes, and verify work." },
+  "/tasks": { title: "Project Tasks", description: "Run bounded coding work from planning through verification." },
+  "/changes": { title: "Changes", description: "Review task-linked change sets and proposed file operations." },
+  "/verification": { title: "Verification", description: "Inspect workspace checks, failures, and repair readiness." },
+  "/knowledge": { title: "Knowledge and Context", description: "Inspect indexed sources, project retrieval, and workspace context." },
+  "/models": { title: "Models and Runtime", description: "Manage local providers, assignments, limits, and hardware fit." },
+  "/performance": { title: "Performance", description: "Review persisted model speed, duration, and token usage." },
+  "/settings": { title: "Settings and System", description: "Inspect application health, workspace state, and configuration." },
 };
 
 export function AppHeader({
@@ -52,7 +26,7 @@ export function AppHeader({
   onOpenMobileNavigation: () => void;
 }) {
   const pathname = usePathname();
-  const details = sectionDetails[pathname] ?? {
+  const details = sections[pathname] ?? {
     title: "AI Lab",
     description: "Local agent workspace.",
   };
@@ -69,37 +43,25 @@ export function AppHeader({
       </button>
 
       <div className="hidden text-zinc-400 lg:block">
-        {sidebarCollapsed ? (
-          <PanelLeftOpenIcon className="size-4" />
-        ) : (
-          <PanelLeftCloseIcon className="size-4" />
-        )}
+        {sidebarCollapsed ? <PanelLeftOpenIcon className="size-4" /> : <PanelLeftCloseIcon className="size-4" />}
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <h1 className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            {details.title}
-          </h1>
+          <h1 className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{details.title}</h1>
           <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 sm:inline dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
             Local workspace
           </span>
         </div>
-        <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-          {details.description}
-        </p>
+        <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">{details.description}</p>
       </div>
 
       <div className="hidden items-center gap-2 sm:flex">
         <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-500 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
           <SparklesIcon className="size-3.5 text-emerald-500" />
-          <span>AI Lab workspace</span>
+          AI Lab workspace
         </div>
-
-        <Link
-          href="/tasks?create=1"
-          className="flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
-        >
+        <Link href="/tasks?create=1" className="flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
           <PlusIcon className="size-3.5" />
           New task
         </Link>
