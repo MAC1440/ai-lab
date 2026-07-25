@@ -42,13 +42,13 @@ class KnowledgeSourceServiceTests(unittest.TestCase):
             chroma = FakeChroma()
             service = KnowledgeSourceService(root / "catalog.json", FakeEmbeddings(), chroma)
 
-            list(service.index_stream(source_id="a", name="A", source_directory=str(source_a)))
+            list(service.index_stream(source_id="a", name="A", selections=[str(source_a)]))
             a_count = chroma.count()
-            list(service.index_stream(source_id="b", name="B", source_directory=str(source_b)))
+            list(service.index_stream(source_id="b", name="B", selections=[str(source_b)]))
             self.assertGreater(chroma.count(), a_count)
 
             (source_a / "app.py").write_text("print('updated')", encoding="utf-8")
-            list(service.index_stream(source_id="a", name="A", source_directory=str(source_a)))
+            list(service.index_stream(source_id="a", name="A", selections=[str(source_a)]))
             sources = {item["id"]: item for item in service.status()["sources"]}
             self.assertEqual(set(sources), {"a", "b"})
             self.assertTrue(any(row["metadata"]["knowledge_source"] == "b" for row in chroma.rows.values()))
@@ -61,7 +61,7 @@ class KnowledgeSourceServiceTests(unittest.TestCase):
             (root / "main.ts").write_text("export const value = 1", encoding="utf-8")
             chroma = FakeChroma()
             service = KnowledgeSourceService(root / "catalog.json", FakeEmbeddings(), chroma)
-            result = list(service.index_stream(source_id="web", name="Web", source_directory=str(root)))[-1]
+            result = list(service.index_stream(source_id="web", name="Web", selections=[str(root)]))[-1]
             self.assertEqual(result["result"]["document_count"], 1)
 
 

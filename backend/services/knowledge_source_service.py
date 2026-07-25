@@ -5,7 +5,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Sequence
 
 TEXT_EXTENSIONS = {
     ".c", ".cc", ".cpp", ".cs", ".css", ".go", ".h", ".hpp", ".html",
@@ -20,7 +20,7 @@ IGNORED_PARTS = {
 
 
 class KnowledgeSourceService:
-    """Incrementally adds independent local folders to the shared RAG index."""
+    """Browse, preview and incrementally index selected local files/folders."""
 
     def __init__(
         self,
@@ -49,8 +49,97 @@ class KnowledgeSourceService:
     def status(self) -> dict[str, Any]:
         return {
             "total_chunk_count": self.chroma_service.count(),
-            "embedding_model": os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text"),
+            "embedding_model": os.getenv(
+                "OLLAMA_EMBEDDING_MODEL",
+                "nomic-embed-text",
+            ),
             "sources": self._load(),
+        }
+
+    def browse(self, path: str | None) -> dict[str, Any]:
+        root = self._resolve_browse_root(path)
+        entries = []
+        try:
+            children = sorted(
+                root.iterdir(),
+                key=lambda item: (not item.is_dir(), item.name.casefold()),
+            )
+        except OSError as error:
+            raise ValueError(f"Cannot browse {root}: {error}") from error
+
+        for child in children:
+            try:
+                if child.name in IGNORED_PARTS:
+                    continue
+                is_directory = child.is_dir()
+                suffix = child.suffix.lower()
+                supported = is_directory or suffix in TEXT_EXTENSIONS
+                size = None if is_directory else child.stat().st_size
+                entries.append(
+                    {
+                        "name": child.name,
+                        "path": str(child),
+                        "kind": "directory" if is_directory else "file",
+                        "supported": supported,
+                        "size_bytes": size,
+                        "reason": (
+                            None if supported
+                            else f"{suffix or 'No extension'} is not supported"
+                        ),
+                    }
+                )
+            except OSError:
+                continue
+
+        return {
+            "path": str(root),
+            "parent": str(root.parent) if root.parent != root else None,
+            "entries": entries,
+            "supported_extensions": sorted(TEXT_EXTENSIONS),
+        }
+
+    def preview(self, selections: Sequence[str]) -> dict[str, Any]:
+        paths = self._collect_paths(selections)
+        total_bytes = 0
+        estimated_chunks = 0
+        by_extension: dict[str, int] = {}
+        files = []
+        skipped = []
+
+        for path, base in paths:
+            relative = path.relative_to(base).as_posix()
+            try:
+                size = path.stat().st_size
+                if size > self.max_file_bytes:
+                    raise ValueError("File exceeds size limit")
+                total_bytes += size
+                estimated_chunks += max(
+                    1,
+                    (max(1, size) + self.chunk_characters - 1)
+                    // self.chunk_characters,
+                )
+                suffix = path.suffix.lower()
+                by_extension[suffix] = by_extension.get(suffix, 0) + 1
+                files.append(
+                    {
+                        "path": str(path),
+                        "relative_path": relative,
+                        "size_bytes": size,
+                        "extension": suffix,
+                    }
+                )
+            except (OSError, ValueError) as error:
+                skipped.append({"path": str(path), "reason": str(error)})
+
+        return {
+            "selection_count": len(selections),
+            "document_count": len(files),
+            "total_bytes": total_bytes,
+            "estimated_chunks": estimated_chunks,
+            "extensions": by_extension,
+            "files": files[:500],
+            "truncated": len(files) > 500,
+            "skipped": skipped[:100],
         }
 
     def remove(self, source_id: str) -> dict[str, Any]:
@@ -66,50 +155,67 @@ class KnowledgeSourceService:
         *,
         source_id: str,
         name: str,
-        source_directory: str,
+        selections: Sequence[str],
         batch_size: int = 24,
     ) -> Iterator[dict[str, Any]]:
         clean_id = self._clean_id(source_id)
-        root = Path(source_directory).expanduser().resolve()
-        if not root.is_dir():
-            raise ValueError(f"Knowledge folder does not exist: {root}")
-        paths = sorted(
-            path for path in root.rglob("*")
-            if path.is_file()
-            and path.suffix.lower() in TEXT_EXTENSIONS
-            and not IGNORED_PARTS.intersection(path.relative_to(root).parts)
-        )
-        if not paths:
-            raise ValueError(f"No supported text or code files found under: {root}")
-        yield {"type": "status", "stage": "scanning", "message": f"Found {len(paths)} files", "file_count": len(paths)}
+        collected = self._collect_paths(selections)
+        if not collected:
+            raise ValueError("No supported text or code files were selected")
+
+        yield {
+            "type": "status",
+            "stage": "scanning",
+            "message": f"Found {len(collected)} supported files",
+            "file_count": len(collected),
+        }
 
         chunks: list[str] = []
         metadatas: list[dict[str, Any]] = []
         ids: list[str] = []
         skipped: list[dict[str, str]] = []
-        for index, path in enumerate(paths, start=1):
-            relative = path.relative_to(root).as_posix()
+
+        for index, (path, base) in enumerate(collected, start=1):
+            relative = path.relative_to(base).as_posix()
             try:
                 if path.stat().st_size > self.max_file_bytes:
                     raise ValueError("File exceeds size limit")
                 content = path.read_text(encoding="utf-8")
+                content_hash = hashlib.sha256(content.encode()).hexdigest()
                 for chunk_index, chunk in enumerate(self._chunks(content)):
-                    header = f"Knowledge source: {name}\nFile: {relative}\n\n"
+                    header = (
+                        f"Knowledge source: {name}\n"
+                        f"File: {relative}\n\n"
+                    )
                     text = header + chunk
-                    identity = f"{clean_id}|{relative}|{chunk_index}|{hashlib.sha256(content.encode()).hexdigest()}"
+                    identity = (
+                        f"{clean_id}|{path}|{chunk_index}|{content_hash}"
+                    )
                     chunks.append(text)
                     ids.append(hashlib.sha256(identity.encode()).hexdigest())
-                    metadatas.append({
-                        "knowledge_source": clean_id,
-                        "knowledge_name": name.strip(),
-                        "source": relative,
-                        "chunk_index": chunk_index,
-                        "file_extension": path.suffix.lower(),
-                    })
+                    metadatas.append(
+                        {
+                            "knowledge_source": clean_id,
+                            "knowledge_name": name.strip(),
+                            "source": relative,
+                            "absolute_source": str(path),
+                            "chunk_index": chunk_index,
+                            "file_extension": path.suffix.lower(),
+                        }
+                    )
             except (OSError, UnicodeError, ValueError) as error:
-                skipped.append({"source": relative, "reason": str(error)})
-            if index % 100 == 0 or index == len(paths):
-                yield {"type": "progress", "stage": "reading", "completed": index, "total": len(paths), "chunk_count": len(chunks), "skipped_count": len(skipped)}
+                skipped.append(
+                    {"source": str(path), "reason": str(error)}
+                )
+            if index % 100 == 0 or index == len(collected):
+                yield {
+                    "type": "progress",
+                    "stage": "reading",
+                    "completed": index,
+                    "total": len(collected),
+                    "chunk_count": len(chunks),
+                    "skipped_count": len(skipped),
+                }
 
         if not chunks:
             raise ValueError("No indexable content was produced")
@@ -118,31 +224,93 @@ class KnowledgeSourceService:
         for start in range(0, len(chunks), batch_size):
             batch = chunks[start:start + batch_size]
             embedded.extend(self.embedding_service.embed_texts(batch))
-            yield {"type": "progress", "stage": "embedding", "completed": min(start + len(batch), len(chunks)), "total": len(chunks)}
-        if len(embedded) != len(chunks):
-            raise RuntimeError("Embedding service returned an unexpected vector count")
+            yield {
+                "type": "progress",
+                "stage": "embedding",
+                "completed": min(start + len(batch), len(chunks)),
+                "total": len(chunks),
+            }
 
-        # Replacement is scoped to this source only. Unity and every other
-        # source remain untouched.
+        if len(embedded) != len(chunks):
+            raise RuntimeError(
+                "Embedding service returned an unexpected vector count"
+            )
+
         try:
-            self.chroma_service.delete_where({"knowledge_source": clean_id})
+            self.chroma_service.delete_where(
+                {"knowledge_source": clean_id}
+            )
         except Exception:
             pass
+
         for start in range(0, len(chunks), 5000):
             end = start + 5000
-            self.chroma_service.add_chunks(chunks[start:end], embedded[start:end], metadatas[start:end], ids[start:end])
+            self.chroma_service.add_chunks(
+                chunks[start:end],
+                embedded[start:end],
+                metadatas[start:end],
+                ids[start:end],
+            )
 
         source = {
             "id": clean_id,
             "name": name.strip(),
-            "source_directory": str(root),
-            "document_count": len(paths) - len(skipped),
+            "selections": [str(Path(item).resolve()) for item in selections],
+            "document_count": len(collected) - len(skipped),
             "chunk_count": len(chunks),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
-        sources = [item for item in self._load() if item["id"] != clean_id]
+        sources = [
+            item for item in self._load() if item["id"] != clean_id
+        ]
         self._save([*sources, source])
-        yield {"type": "done", "result": {**source, "skipped_count": len(skipped), "skipped": skipped[:100]}}
+        yield {
+            "type": "done",
+            "result": {
+                **source,
+                "skipped_count": len(skipped),
+                "skipped": skipped[:100],
+            },
+        }
+
+    def _collect_paths(
+        self,
+        selections: Sequence[str],
+    ) -> list[tuple[Path, Path]]:
+        result: dict[Path, Path] = {}
+        for raw in selections:
+            selected = Path(raw).expanduser().resolve()
+            if selected.is_file():
+                if (
+                    selected.suffix.lower() in TEXT_EXTENSIONS
+                    and selected.name not in IGNORED_PARTS
+                ):
+                    result[selected] = selected.parent
+                continue
+            if not selected.is_dir():
+                continue
+            for path in selected.rglob("*"):
+                if (
+                    path.is_file()
+                    and path.suffix.lower() in TEXT_EXTENSIONS
+                    and not IGNORED_PARTS.intersection(
+                        path.relative_to(selected).parts
+                    )
+                ):
+                    result.setdefault(path, selected)
+        return sorted(result.items(), key=lambda item: str(item[0]).casefold())
+
+    @staticmethod
+    def _resolve_browse_root(path: str | None) -> Path:
+        if path:
+            root = Path(path).expanduser().resolve()
+        elif os.name == "nt":
+            root = Path.home()
+        else:
+            root = Path.home()
+        if not root.exists() or not root.is_dir():
+            raise ValueError(f"Folder does not exist: {root}")
+        return root
 
     def _chunks(self, content: str) -> list[str]:
         clean = content.replace("\r\n", "\n").strip()
@@ -164,7 +332,10 @@ class KnowledgeSourceService:
 
     @staticmethod
     def _clean_id(value: str) -> str:
-        clean = "".join(character.lower() if character.isalnum() else "-" for character in value.strip())
+        clean = "".join(
+            character.lower() if character.isalnum() else "-"
+            for character in value.strip()
+        )
         clean = "-".join(part for part in clean.split("-") if part)
         if not clean:
             raise ValueError("source_id must contain letters or numbers")
@@ -174,12 +345,17 @@ class KnowledgeSourceService:
         if not self.catalog_path.exists():
             return []
         try:
-            value = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+            value = json.loads(
+                self.catalog_path.read_text(encoding="utf-8")
+            )
             return value if isinstance(value, list) else []
         except (OSError, json.JSONDecodeError):
             return []
 
     def _save(self, value: list[dict[str, Any]]) -> None:
         temporary = self.catalog_path.with_suffix(".tmp")
-        temporary.write_text(json.dumps(value, indent=2), encoding="utf-8")
+        temporary.write_text(
+            json.dumps(value, indent=2),
+            encoding="utf-8",
+        )
         temporary.replace(self.catalog_path)

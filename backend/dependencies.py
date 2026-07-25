@@ -3,6 +3,7 @@ from pathlib import Path
 
 from services.agent_service import AgentService
 from services.change_service import ChangeService
+from services.hardware_profile_service import HardwareProfileService
 from services.conversation_service import ConversationService
 from services.conversation_store import ConversationStore
 from services.knowledge_source_service import KnowledgeSourceService
@@ -23,6 +24,8 @@ from services.reliability_benchmark_store import ReliabilityBenchmarkStore
 from services.repair_service import RepairService
 from services.repair_store import RepairStore
 from services.run_cancellation_service import RunCancellationService
+from services.runtime_metrics_service import RuntimeMetricsService
+from services.runtime_settings_service import RuntimeSettingsService
 from services.scaffold_service import ScaffoldService
 from services.source_validation_service import SourceValidationService
 from services.system_service import SystemService
@@ -60,6 +63,17 @@ _provider_settings_path = Path(
 if not _provider_settings_path.is_absolute():
     _provider_settings_path = _backend_root / _provider_settings_path
 provider_settings_service = ProviderSettingsService(_provider_settings_path)
+
+_runtime_settings_path = Path(
+    os.getenv("RUNTIME_SETTINGS_PATH", "data/runtime-settings.json")
+).expanduser()
+if not _runtime_settings_path.is_absolute():
+    _runtime_settings_path = _backend_root / _runtime_settings_path
+runtime_settings_service = RuntimeSettingsService(_runtime_settings_path)
+runtime_metrics_service = RuntimeMetricsService(history_size=100)
+hardware_profile_service = HardwareProfileService(
+    provider_settings_service.get_provider("ollama")["base_url"]
+)
 
 _model_capabilities_path = Path(
     os.getenv("MODEL_CAPABILITIES_PATH", "data/model-capabilities.json")
@@ -136,6 +150,8 @@ task_model_client = PydanticTaskModelClient(
     provider_settings_service=provider_settings_service,
     model_capability_service=model_capability_service,
     agent_service=AgentService(),
+    runtime_settings_service=runtime_settings_service,
+    runtime_metrics_service=runtime_metrics_service,
 )
 source_validation_service = SourceValidationService(workspace_service)
 project_task_orchestrator = ProjectTaskOrchestrator(

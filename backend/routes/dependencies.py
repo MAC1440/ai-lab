@@ -11,6 +11,8 @@ from services.project_task_service import ProjectTaskService
 from services.project_task_store import ProjectTaskStore
 from services.project_task_orchestrator import ProjectTaskOrchestrator
 from services.provider_settings_service import ProviderSettingsService
+from services.runtime_metrics_service import RuntimeMetricsService
+from services.runtime_settings_service import RuntimeSettingsService
 from services.task_model_client import PydanticTaskModelClient
 from services.mcp_service import MCPService
 from services.repair_service import RepairService
@@ -39,6 +41,14 @@ _provider_settings_path = Path(
 if not _provider_settings_path.is_absolute():
     _provider_settings_path = _backend_root / _provider_settings_path
 provider_settings_service = ProviderSettingsService(_provider_settings_path)
+
+_runtime_settings_path = Path(
+    os.getenv("RUNTIME_SETTINGS_PATH", "data/runtime-settings.json")
+).expanduser()
+if not _runtime_settings_path.is_absolute():
+    _runtime_settings_path = _backend_root / _runtime_settings_path
+runtime_settings_service = RuntimeSettingsService(_runtime_settings_path)
+runtime_metrics_service = RuntimeMetricsService(history_size=100)
 
 _mcp_settings_path = Path(
     os.getenv("MCP_SETTINGS_PATH", "data/mcp-settings.json")
@@ -107,6 +117,8 @@ project_task_service = ProjectTaskService(
 task_model_client = PydanticTaskModelClient(
     provider_settings_service=provider_settings_service,
     agent_service=AgentService(),
+    runtime_settings_service=runtime_settings_service,
+    runtime_metrics_service=runtime_metrics_service,
 )
 project_task_orchestrator = ProjectTaskOrchestrator(
     task_service=project_task_service,

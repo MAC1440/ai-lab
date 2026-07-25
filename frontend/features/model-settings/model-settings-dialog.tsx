@@ -41,6 +41,7 @@ import {
     testProvider,
 } from "@/features/model-settings/model-settings-api";
 import { ModelStageSettings } from "@/features/model-settings/model-stage-settings";
+import { RuntimeMetricsCard } from "@/features/runtime";
 
 type Props = {
     agents: AgentProfile[];
@@ -229,6 +230,7 @@ export function ModelSettingsDialog({ agents, disabled, onSaved }: Props) {
                                             await onSaved();
                                         }}
                                     />
+                                    <RuntimeMetricsCard />
                                 </> : null}
                             </section>
                         </div>

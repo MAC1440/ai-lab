@@ -15,6 +15,8 @@ from services.task_model_output_adapter import (
 if TYPE_CHECKING:
     from services.model_capability_service import ModelCapabilityService
     from services.provider_settings_service import ProviderSettingsService
+    from services.runtime_metrics_service import RuntimeMetricsService
+    from services.runtime_settings_service import RuntimeSettingsService
 
 
 OutputT = TypeVar("OutputT", bound=BaseModel)
@@ -122,6 +124,8 @@ class PydanticTaskModelClient:
         provider_settings_service: "ProviderSettingsService",
         model_capability_service: "ModelCapabilityService | None" = None,
         agent_service: AgentService | None = None,
+        runtime_settings_service: "RuntimeSettingsService | None" = None,
+        runtime_metrics_service: "RuntimeMetricsService | None" = None,
         request_limit: int = 3,
     ) -> None:
         if request_limit < 1 or request_limit > 6:
@@ -131,6 +135,8 @@ class PydanticTaskModelClient:
             model_capability_service or _InferredCapabilityService()
         )
         self.agent_service = agent_service or AgentService()
+        self.runtime_settings_service = runtime_settings_service
+        self.runtime_metrics_service = runtime_metrics_service
         self.request_limit = request_limit
         self._native_grammar_rejections: set[tuple[str, str]] = set()
 
@@ -207,14 +213,46 @@ class PydanticTaskModelClient:
                 "structured_output_mode": "tool",
                 "structured_output_fallback": "native_grammar_rejected",
             }
-        configured_max_tokens = int(
-            capability["effective_max_output_tokens"]
+        stage_settings = (
+            self.runtime_settings_service.stage(stage)
+            if self.runtime_settings_service is not None
+            else None
+        )
+
+        configured_context = int(capability["effective_context_window"])
+        configured_max_tokens = int(capability["effective_max_output_tokens"])
+
+        context_window = (
+            min(configured_context, stage_settings.num_ctx)
+            if stage_settings is not None
+            else configured_context
         )
         max_tokens = (
-            min(configured_max_tokens, 4096)
-            if stage == "planning"
+            min(configured_max_tokens, stage_settings.max_tokens)
+            if stage_settings is not None
             else configured_max_tokens
         )
+        temperature = (
+            stage_settings.temperature if stage_settings is not None else 0.0
+        )
+        safe_input_tokens = (
+            min(
+                int(capability["effective_safe_input_tokens"]),
+                stage_settings.safe_input_tokens,
+            )
+            if stage_settings is not None
+            else int(capability["effective_safe_input_tokens"])
+        )
+
+        capability = {
+            **capability,
+            "effective_context_window": context_window,
+            "effective_max_output_tokens": max_tokens,
+            "effective_safe_input_tokens": safe_input_tokens,
+            "runtime_settings_source": (
+                "runtime-settings" if stage_settings is not None else "capability"
+            ),
+        }
         model = build_pydantic_model(runtime)
 
         # Ollama exposes JSON-schema constrained responses through its native
@@ -241,10 +279,11 @@ class PydanticTaskModelClient:
         run_arguments = {
             "usage_limits": UsageLimits(request_limit=self.request_limit),
             "model_settings": ModelSettings(
-                # Structured planning and code generation benefit from
-                # deterministic sampling. User chat keeps its own setting.
-                temperature=0.0,
+                temperature=temperature,
                 max_tokens=max_tokens,
+                extra_body={"options": {"num_ctx": context_window}}
+                if runtime.get("provider", {}).get("kind") == "ollama"
+                else None,
             ),
         }
 
@@ -257,6 +296,11 @@ class PydanticTaskModelClient:
             )
 
         agent = build_agent(structured_output)
+        started_at = (
+            self.runtime_metrics_service.timer()
+            if self.runtime_metrics_service is not None
+            else None
+        )
         try:
             result = await agent.run(prompt, **run_arguments)
         except Exception as error:
@@ -307,9 +351,22 @@ class PydanticTaskModelClient:
                 "actions": normalization_actions,
             },
         }
+        usage = self._usage_dict(result.usage)
+        if self.runtime_metrics_service is not None and started_at is not None:
+            usage["runtime_metric"] = self.runtime_metrics_service.record(
+                started_at=started_at,
+                agent_id=agent_id,
+                stage=stage,
+                runtime=runtime,
+                usage=usage,
+                context_window=context_window,
+                max_tokens=max_tokens,
+                safe_input_tokens=safe_input_tokens,
+                temperature=temperature,
+            )
         return ModelStageResult(
             output=normalized_output,
-            usage=self._usage_dict(result.usage),
+            usage=usage,
             model=runtime["model"],
             provider_id=runtime["provider_id"],
             capability=capability,
