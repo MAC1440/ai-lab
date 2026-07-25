@@ -34,6 +34,7 @@ export const primaryNavigation: NavigationItem[] = [
     description: "Bounded coding work",
     href: "/tasks",
     icon: FolderKanbanIcon,
+    available: true,
   },
   {
     id: "changes",
