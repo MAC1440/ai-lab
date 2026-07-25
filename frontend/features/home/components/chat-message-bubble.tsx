@@ -1,15 +1,14 @@
 "use client";
 
 import {
-    AlertCircleIcon,
     BotIcon,
-    Loader2Icon,
     UserIcon,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AgentExecutionDetails } from "@/features/home/components/agent-execution-details";
+import { AgentRunStatus } from "@/features/home/components/agent-run-status";
 import { ModelRunMetrics } from "@/features/home/components/model-run-metrics";
 import type { HomeChatMessage } from "@/features/home/types";
 import { cn } from "@/lib/utils";
@@ -24,7 +23,7 @@ export function ChatMessageBubble({
     const isUser = message.role === "user";
 
     return (
-        <div
+        <article
             className={cn(
                 "flex gap-3 px-4 py-4",
                 isUser
@@ -49,31 +48,34 @@ export function ChatMessageBubble({
             </Avatar>
 
             <div className="min-w-0 flex-1 space-y-3">
-                <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                    {isUser
-                        ? "You"
-                        : message.agentResult
-                            ? `${message.agentResult.agent_id} agent`
-                            : "Assistant"}
-                </p>
+                <header className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                        {isUser
+                            ? "You"
+                            : message.agentResult
+                                ? `${message.agentResult.agent_id} agent`
+                                : "Assistant"}
+                    </p>
+                </header>
 
-                {!isUser && message.streamingStatus ? (
-                    <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                        <Loader2Icon className="size-3.5 animate-spin" />
-                        <span>{message.streamingStatus}</span>
-                    </div>
+                {!isUser ? (
+                    <AgentRunStatus
+                        status={message.streamingStatus}
+                        error={message.streamError}
+                        isStreaming={isStreaming}
+                    />
                 ) : null}
 
                 <div className="space-y-2 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
                     {message.reasoning ? (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-2 text-xs italic text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
-                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-80">
-                                Thinking
-                            </p>
-                            <p className="whitespace-pre-wrap">
+                        <details className="rounded-lg border border-amber-200 bg-amber-50/80 p-2 text-xs text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+                            <summary className="cursor-pointer select-none font-semibold">
+                                Reasoning
+                            </summary>
+                            <p className="mt-2 whitespace-pre-wrap italic">
                                 {message.reasoning}
                             </p>
-                        </div>
+                        </details>
                     ) : null}
 
                     <div className="prose prose-sm max-w-none dark:prose-invert">
@@ -87,21 +89,16 @@ export function ChatMessageBubble({
                     </div>
                 </div>
 
-                {!isUser && message.streamError ? (
-                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-                        <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
-                        <span>{message.streamError}</span>
-                    </div>
-                ) : null}
-
                 {!isUser && message.agentResult ? (
-                    <AgentExecutionDetails result={message.agentResult} />
+                    <AgentExecutionDetails
+                        result={message.agentResult}
+                    />
                 ) : null}
 
                 {!isUser && message.metrics ? (
                     <ModelRunMetrics metrics={message.metrics} />
                 ) : null}
             </div>
-        </div>
+        </article>
     );
 }

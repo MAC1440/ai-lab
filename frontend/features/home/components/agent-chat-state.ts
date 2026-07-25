@@ -2,14 +2,15 @@ import {
     type AgentChatHistoryMessage,
     type AgentChatResponse,
     type AgentProfile,
-    type AgentRuntimeMetric,
     type AgentStreamEvent,
     type AgentToolExecution,
 } from "@/features/agents/agent-api";
-import type {
-    HomeChatMessage,
-    OllamaCompletionMetrics,
-} from "@/features/home/types";
+import { mapRuntimeMetric } from "@/features/home/components/agent-chat-metrics";
+import {
+    toolStatusMessage,
+    upsertAgentTool,
+} from "@/features/home/components/agent-chat-tools";
+import type { HomeChatMessage } from "@/features/home/types";
 
 export type AgentChatSettings = {
     ragTopK: number;
@@ -81,188 +82,283 @@ export function createInitialAgentResult(
     };
 }
 
-function mapRuntimeMetric(
-    metric: AgentRuntimeMetric,
-    current?: OllamaCompletionMetrics,
-): OllamaCompletionMetrics {
-    return {
-        ...current,
-        totalDurationMs: metric.duration_seconds * 1000,
-        promptEvalCount: metric.input_tokens ?? current?.promptEvalCount,
-        evalCount: metric.output_tokens,
-        tokensPerSecond: metric.tokens_per_second ?? undefined,
-        contextWindow: metric.context_window,
-        contextUsedTokens:
-            metric.context_used_tokens ?? current?.contextUsedTokens,
-        contextRemainingTokens:
-            metric.context_remaining_tokens ?? current?.contextRemainingTokens,
-        maxOutputTokens: metric.max_tokens,
-        safeInputTokens: metric.safe_input_tokens ?? current?.safeInputTokens,
-        temperature: metric.temperature,
-        live: !metric.final,
-        metricKind: metric.metric_kind,
-    };
-}
-
-function upsertTool(
-    tools: AgentToolExecution[],
-    callId: string,
-    tool: AgentToolExecution,
-): AgentToolExecution[] {
-    const existingIndex = tools.findIndex((item) => item.id === callId);
-    if (existingIndex < 0) {
-        return [...tools, tool];
-    }
-
-    return tools.map((item, index) =>
-        index === existingIndex ? tool : item
-    );
-}
-
 export function applyAgentStreamEvent(
     message: HomeChatMessage,
     event: AgentStreamEvent,
 ): HomeChatMessage {
-    const result = message.agentResult;
-
     switch (event.type) {
         case "status":
-            return {
-                ...message,
-                streamingStatus: event.message,
-                agentResult: result
-                    ? {
-                        ...result,
-                        steps: event.step ?? result.steps,
-                    }
-                    : result,
-            };
+            return applyStatusEvent(message, event);
 
         case "rag":
-            return result
-                ? {
-                    ...message,
-                    agentResult: {
-                        ...result,
-                        rag: event.rag,
-                    },
-                }
-                : message;
+            return applyRagEvent(message, event);
 
         case "context":
-            return result
-                ? {
-                    ...message,
-                    agentResult: {
-                        ...result,
-                        context: event.context,
-                    },
-                }
-                : message;
+            return applyContextEvent(message, event);
 
         case "answer_delta":
-            return {
-                ...message,
-                content: message.content + event.content,
-                agentResult: result
-                    ? {
-                        ...result,
-                        steps: event.step,
-                    }
-                    : result,
-            };
+            return applyAnswerDeltaEvent(message, event);
 
         case "answer_reset":
-            return {
-                ...message,
-                content: "",
-                agentResult: result
-                    ? {
-                        ...result,
-                        steps: event.step,
-                    }
-                    : result,
-            };
+            return applyAnswerResetEvent(message, event);
 
-        case "tool_start": {
-            if (!result) return message;
-
-            const runningTool: AgentToolExecution = {
-                id: event.call_id,
-                name: event.name,
-                arguments: event.arguments,
-                status: "running",
-            };
-
-            return {
-                ...message,
-                streamingStatus: `Running ${event.name}`,
-                agentResult: {
-                    ...result,
-                    steps: event.step,
-                    tools_used: upsertTool(
-                        result.tools_used,
-                        event.call_id,
-                        runningTool,
-                    ),
-                },
-            };
-        }
+        case "tool_start":
+            return applyToolStartEvent(message, event);
 
         case "tool_result":
-            return result
-                ? {
-                    ...message,
-                    streamingStatus: event.tool.status === "success"
-                        ? `${event.tool.name} completed`
-                        : `${event.tool.name} failed`,
-                    agentResult: {
-                        ...result,
-                        steps: event.step,
-                        tools_used: upsertTool(
-                            result.tools_used,
-                            event.call_id,
-                            event.tool,
-                        ),
-                    },
-                }
-                : message;
+            return applyToolResultEvent(message, event);
 
         case "metrics":
-            return {
-                ...message,
-                metrics: mapRuntimeMetric(event.metrics, message.metrics),
-            };
+            return applyMetricsEvent(message, event);
 
         case "done":
-            return {
-                ...message,
-                content: event.result.answer,
-                agentResult: event.result,
-                metrics: event.result.runtime_metric
-                    ? mapRuntimeMetric(
-                        {
-                            ...event.result.runtime_metric,
-                            metric_kind: "measured",
-                            final: true,
-                        },
-                        message.metrics,
-                    )
-                    : message.metrics,
-                streamingStatus: undefined,
-                streamError: undefined,
-            };
+            return applyDoneEvent(message, event);
 
         case "error":
-            return {
-                ...message,
-                streamingStatus: undefined,
-                streamError: event.message,
-            };
+            return applyErrorEvent(message, event);
 
-        default: {
-            const exhaustive: never = event;
-            return exhaustive;
-        }
+        default:
+            return assertNever(event);
     }
+}
+
+type StatusEvent = Extract<
+    AgentStreamEvent,
+    { type: "status" }
+>;
+
+type RagEvent = Extract<
+    AgentStreamEvent,
+    { type: "rag" }
+>;
+
+type ContextEvent = Extract<
+    AgentStreamEvent,
+    { type: "context" }
+>;
+
+type AnswerDeltaEvent = Extract<
+    AgentStreamEvent,
+    { type: "answer_delta" }
+>;
+
+type AnswerResetEvent = Extract<
+    AgentStreamEvent,
+    { type: "answer_reset" }
+>;
+
+type ToolStartEvent = Extract<
+    AgentStreamEvent,
+    { type: "tool_start" }
+>;
+
+type ToolResultEvent = Extract<
+    AgentStreamEvent,
+    { type: "tool_result" }
+>;
+
+type MetricsEvent = Extract<
+    AgentStreamEvent,
+    { type: "metrics" }
+>;
+
+type DoneEvent = Extract<
+    AgentStreamEvent,
+    { type: "done" }
+>;
+
+type ErrorEvent = Extract<
+    AgentStreamEvent,
+    { type: "error" }
+>;
+
+function applyStatusEvent(
+    message: HomeChatMessage,
+    event: StatusEvent,
+): HomeChatMessage {
+    return {
+        ...message,
+        streamingStatus: event.message,
+        agentResult: message.agentResult
+            ? {
+                ...message.agentResult,
+                steps: event.step
+                    ?? message.agentResult.steps,
+            }
+            : undefined,
+    };
+}
+
+function applyRagEvent(
+    message: HomeChatMessage,
+    event: RagEvent,
+): HomeChatMessage {
+    if (!message.agentResult) {
+        return message;
+    }
+
+    return {
+        ...message,
+        agentResult: {
+            ...message.agentResult,
+            rag: event.rag,
+        },
+    };
+}
+
+function applyContextEvent(
+    message: HomeChatMessage,
+    event: ContextEvent,
+): HomeChatMessage {
+    if (!message.agentResult) {
+        return message;
+    }
+
+    return {
+        ...message,
+        agentResult: {
+            ...message.agentResult,
+            context: event.context,
+        },
+    };
+}
+
+function applyAnswerDeltaEvent(
+    message: HomeChatMessage,
+    event: AnswerDeltaEvent,
+): HomeChatMessage {
+    return {
+        ...message,
+        content: message.content + event.content,
+        agentResult: message.agentResult
+            ? {
+                ...message.agentResult,
+                steps: event.step,
+            }
+            : undefined,
+    };
+}
+
+function applyAnswerResetEvent(
+    message: HomeChatMessage,
+    event: AnswerResetEvent,
+): HomeChatMessage {
+    return {
+        ...message,
+        content: "",
+        agentResult: message.agentResult
+            ? {
+                ...message.agentResult,
+                steps: event.step,
+            }
+            : undefined,
+    };
+}
+
+function applyToolStartEvent(
+    message: HomeChatMessage,
+    event: ToolStartEvent,
+): HomeChatMessage {
+    if (!message.agentResult) {
+        return message;
+    }
+
+    const tool: AgentToolExecution = {
+        id: event.call_id,
+        name: event.name,
+        arguments: event.arguments,
+        status: "running",
+    };
+
+    return {
+        ...message,
+        streamingStatus: toolStatusMessage(tool),
+        agentResult: {
+            ...message.agentResult,
+            steps: event.step,
+            tools_used: upsertAgentTool(
+                message.agentResult.tools_used,
+                event.call_id,
+                tool,
+            ),
+        },
+    };
+}
+
+function applyToolResultEvent(
+    message: HomeChatMessage,
+    event: ToolResultEvent,
+): HomeChatMessage {
+    if (!message.agentResult) {
+        return message;
+    }
+
+    return {
+        ...message,
+        streamingStatus: toolStatusMessage(event.tool),
+        agentResult: {
+            ...message.agentResult,
+            steps: event.step,
+            tools_used: upsertAgentTool(
+                message.agentResult.tools_used,
+                event.call_id,
+                event.tool,
+            ),
+        },
+    };
+}
+
+function applyMetricsEvent(
+    message: HomeChatMessage,
+    event: MetricsEvent,
+): HomeChatMessage {
+    return {
+        ...message,
+        metrics: mapRuntimeMetric(
+            event.metrics,
+            message.metrics,
+        ),
+    };
+}
+
+function applyDoneEvent(
+    message: HomeChatMessage,
+    event: DoneEvent,
+): HomeChatMessage {
+    const finalMetrics = event.result.runtime_metric
+        ? mapRuntimeMetric(
+            {
+                ...event.result.runtime_metric,
+                metric_kind: "measured",
+                final: true,
+            },
+            message.metrics,
+        )
+        : message.metrics;
+
+    return {
+        ...message,
+        content: event.result.answer,
+        agentResult: event.result,
+        metrics: finalMetrics,
+        streamingStatus: undefined,
+        streamError: undefined,
+    };
+}
+
+function applyErrorEvent(
+    message: HomeChatMessage,
+    event: ErrorEvent,
+): HomeChatMessage {
+    return {
+        ...message,
+        streamingStatus: undefined,
+        streamError: event.message,
+    };
+}
+
+function assertNever(value: never): never {
+    throw new Error(
+        `Unhandled agent stream event: ${JSON.stringify(value)}`,
+    );
 }
