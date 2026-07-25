@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f4f5;
+  --foreground: #18181b;
+  --surface: #ffffff;
+  --surface-muted: #fafafa;
+  --border: #e4e4e7;
+  --accent: #10b981;
+  --accent-foreground: #052e24;
 }
 
 @theme inline {
@@ -14,13 +19,63 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #09090b;
+    --foreground: #f4f4f5;
+    --surface: #111113;
+    --surface-muted: #18181b;
+    --border: #27272a;
+    --accent: #34d399;
+    --accent-foreground: #022c22;
   }
 }
 
+* {
+  border-color: var(--border);
+}
+
+html,
 body {
-  background: var(--background);
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgb(16 185 129 / 0.06),
+      transparent 32rem
+    ),
+    var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgb(16 185 129 / 0.22);
+}
+
+.ai-lab-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(113 113 122 / 0.45) transparent;
+}
+
+.ai-lab-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.ai-lab-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(113 113 122 / 0.35);
+}
+
+.ai-lab-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
