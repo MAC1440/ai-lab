@@ -17,6 +17,10 @@ const sectionDetails: Record<
     title: "Agent Chat",
     description: "Inspect, reason, propose changes, and verify work.",
   },
+  "/models": {
+    title: "Models and Runtime",
+    description: "Manage local providers, assignments, limits, and hardware fit.",
+  },
   "/performance": {
     title: "Performance",
     description: "Review persisted model speed, duration, and token usage.",
@@ -78,7 +82,7 @@ export function AppHeader({
         <button
           type="button"
           disabled
-          title="New task workflow arrives in a later drop"
+          title="New task workflow arrives in the next task drop"
           className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
         >
           <PlusIcon className="size-3.5" />

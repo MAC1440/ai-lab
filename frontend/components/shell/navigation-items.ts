@@ -65,6 +65,7 @@ export const secondaryNavigation: NavigationItem[] = [
     description: "Providers and runtime fit",
     href: "/models",
     icon: BotIcon,
+    available: true,
   },
   {
     id: "performance",
