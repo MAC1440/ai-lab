@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Sequence
+import ctypes
 
 TEXT_EXTENSIONS = {
     ".c", ".cc", ".cpp", ".cs", ".css", ".go", ".h", ".hpp", ".html",
@@ -359,3 +360,36 @@ class KnowledgeSourceService:
             encoding="utf-8",
         )
         temporary.replace(self.catalog_path)
+
+        def roots(self) -> dict[str, Any]: """Return filesystem roots that can be selected in the browser."""
+
+        if os.name == "nt":
+            bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+            roots: list[dict[str, str]] = []
+
+            for index in range(26):
+                if not bitmask & (1 << index):
+                    continue
+
+                drive = f"{chr(ord('A') + index)}:\\"
+                path = Path(drive)
+
+                if not path.exists():
+                    continue
+
+                roots.append(
+                    {
+                        "name": drive,
+                        "path": str(path),
+                    }
+                )
+
+            return {
+                "roots": roots,
+                "platform": "windows",
+            }
+        else:
+            return {
+                "roots": [{"name": "/", "path": "/"}],
+                "platform": os.name,
+            }

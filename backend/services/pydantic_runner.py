@@ -1,6 +1,16 @@
 import json
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 from uuid import uuid4
+import time
+from dataclasses import asdict, is_dataclass
+from math import ceil
+from typing import TYPE_CHECKING
+
+from backend.services import runtime_metrics_service
+
+if TYPE_CHECKING:
+    from services.runtime_metrics_service import RuntimeMetricsService
+    from services.runtime_settings_service import RuntimeSettingsService
 
 from pydantic_ai import (
     AgentRunResultEvent,
@@ -49,6 +59,8 @@ class PydanticAgentRunner:
         max_model_requests: int = 16,
         provider_settings_service: Optional[ProviderSettingsService] = None,
         mcp_service: Optional[MCPService] = None,
+        runtime_settings_service: Optional["RuntimeSettingsService"] = None,
+        runtime_metrics_service: Optional["RuntimeMetricsService"] = None,
     ) -> None:
         if max_model_requests < 2:
             raise ValueError("max_model_requests must be at least 2")
@@ -60,6 +72,8 @@ class PydanticAgentRunner:
         self.max_model_requests = max_model_requests
         self.provider_settings_service = provider_settings_service
         self.mcp_service = mcp_service
+        self.runtime_settings_service = runtime_settings_service
+        self.runtime_metrics_service = runtime_metrics_service
 
     async def run_events(
         self,
@@ -125,6 +139,24 @@ class PydanticAgentRunner:
             if self.provider_settings_service is not None
             else None
         )
+        chat_settings = (
+        self.runtime_settings_service.stage("chat")
+        if self.runtime_settings_service is not None
+        else None
+    )
+
+        if runtime is not None and chat_settings is not None:
+            existing_generation = runtime.get("generation", {})
+
+            runtime = {
+                **runtime,
+                "generation": {
+                    **existing_generation,
+                    "temperature": chat_settings.temperature,
+                    "max_tokens": chat_settings.max_tokens,
+                    "context_window": chat_settings.num_ctx,
+                },
+            }
         mcp_toolsets = (
             self.mcp_service.build_toolsets(agent_id)
             if self.mcp_service is not None
@@ -233,6 +265,26 @@ class PydanticAgentRunner:
         tool_records: Dict[str, Dict[str, Any]] = {}
         run_result = None
 
+        started_at = time.perf_counter()
+        last_metrics_at = started_at
+        streamed_characters = 0
+
+        context_window = int(
+            runtime.get("generation", {}).get("context_window", 8192)
+            if runtime is not None
+            else 8192
+        )
+        max_tokens = int(
+            runtime.get("generation", {}).get("max_tokens", 2048)
+            if runtime is not None
+            else 2048
+        )
+        temperature = float(
+            runtime.get("generation", {}).get("temperature", 0.1)
+            if runtime is not None
+            else 0.1
+        )
+        
         async with agent.run_stream_events(
             clean_prompt,
             message_history=message_history,
@@ -250,7 +302,36 @@ class PydanticAgentRunner:
 
                         if content:
                             answer += content
+                            streamed_characters += len(content)
+                            now = time.perf_counter()
 
+                            if now - last_metrics_at >= 0.5:
+                                elapsed = max(0.001, now - started_at)
+                                estimated_output_tokens = max(
+                                    1,
+                                    ceil(streamed_characters / 4),
+                                )
+
+                                yield {
+                                    "type": "metrics",
+                                    "metrics": {
+                                        "final": False,
+                                        "duration_seconds": round(elapsed, 3),
+                                        "input_tokens": 0,
+                                        "output_tokens": estimated_output_tokens,
+                                        "tokens_per_second": round(
+                                            estimated_output_tokens / elapsed,
+                                            2,
+                                        ),
+                                        "context_window": context_window,
+                                        "context_used_tokens": 0,
+                                        "context_remaining_tokens": context_window,
+                                        "max_tokens": max_tokens,
+                                        "temperature": temperature,
+                                    },
+                                }
+
+                                last_metrics_at = now
                             if stream_answer_text:
                                 yield {
                                     "type": "answer_delta",
@@ -264,6 +345,36 @@ class PydanticAgentRunner:
 
                         if content:
                             answer += content
+                            streamed_characters += len(content)
+                            now = time.perf_counter()
+
+                            if now - last_metrics_at >= 0.5:
+                                elapsed = max(0.001, now - started_at)
+                                estimated_output_tokens = max(
+                                    1,
+                                    ceil(streamed_characters / 4),
+                                )
+
+                                yield {
+                                    "type": "metrics",
+                                    "metrics": {
+                                        "final": False,
+                                        "duration_seconds": round(elapsed, 3),
+                                        "input_tokens": 0,
+                                        "output_tokens": estimated_output_tokens,
+                                        "tokens_per_second": round(
+                                            estimated_output_tokens / elapsed,
+                                            2,
+                                        ),
+                                        "context_window": context_window,
+                                        "context_used_tokens": 0,
+                                        "context_remaining_tokens": context_window,
+                                        "max_tokens": max_tokens,
+                                        "temperature": temperature,
+                                    },
+                                }
+
+                                last_metrics_at = now
 
                             if stream_answer_text:
                                 yield {
@@ -377,6 +488,37 @@ class PydanticAgentRunner:
             answer = str(final_output)
 
         usage = run_result.usage
+        usage_dict = self._usage_dict(usage)
+
+        safe_input_tokens = max(
+            128,
+            context_window - max_tokens - 512,
+        )
+
+        runtime_metric = None
+        if (
+            self.runtime_metrics_service is not None
+            and runtime is not None
+        ):
+            runtime_metric = self.runtime_metrics_service.record(
+                started_at=started_at,
+                agent_id=agent_id,
+                stage="chat",
+                runtime=runtime,
+                usage=usage_dict,
+                context_window=context_window,
+                max_tokens=max_tokens,
+                safe_input_tokens=safe_input_tokens,
+                temperature=temperature,
+            )
+
+            yield {
+                "type": "metrics",
+                "metrics": {
+                    **runtime_metric,
+                    "final": True,
+                },
+            }
         steps = max(
             1,
             int(getattr(usage, "requests", 1) or 1),
@@ -400,7 +542,7 @@ class PydanticAgentRunner:
                 "rag": rag_trace,
                 "context": project_context_trace,
                 "change_set_id": run_deps.change_set_id,
-                "repair_task_id": run_deps.repair_task_id,
+                "runtime_metric": runtime_metric,
             },
         }
 
@@ -685,3 +827,25 @@ Rules:
                 )
 
         return messages
+    @staticmethod
+    def _usage_dict(usage: Any) -> Dict[str, Any]:
+        if is_dataclass(usage):
+            return asdict(usage)
+
+        if hasattr(usage, "model_dump"):
+            return dict(usage.model_dump())
+
+        result: Dict[str, Any] = {}
+
+        for name in (
+            "requests",
+            "input_tokens",
+            "output_tokens",
+            "total_tokens",
+            "tool_calls",
+        ):
+            value = getattr(usage, name, None)
+            if value is not None:
+                result[name] = value
+
+        return result

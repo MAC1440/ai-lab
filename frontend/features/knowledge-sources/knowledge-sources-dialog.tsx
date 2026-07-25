@@ -5,6 +5,7 @@ import {
   DatabaseIcon,
   FileIcon,
   FolderIcon,
+  HardDriveIcon,
   Loader2Icon,
   PlusIcon,
   Trash2Icon,
@@ -26,10 +27,12 @@ import {
   previewKnowledgeSelection,
   removeKnowledgeSource,
   streamKnowledgeIndex,
+  getKnowledgeBrowseRoots,
   type BrowseResult,
   type KnowledgeIndexEvent,
   type KnowledgeStatus,
   type SelectionPreview,
+  type KnowledgeBrowseRoot,
 } from "./knowledge-sources-api";
 
 function formatBytes(bytes: number) {
@@ -53,14 +56,18 @@ export function KnowledgeSourcesDialog({
   const [progress, setProgress] = useState<KnowledgeIndexEvent | null>(null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [roots, setRoots] = useState<KnowledgeBrowseRoot[]>([]);
 
   async function refresh() {
-    const [statusResult, browserResult] = await Promise.all([
+    const [statusResult, browserResult, rootsResult] = await Promise.all([
       getKnowledgeStatus(),
       browseKnowledgeFiles(browser?.path),
+      getKnowledgeBrowseRoots(),
     ]);
+
     setStatus(statusResult);
     setBrowser(browserResult);
+    setRoots(rootsResult.roots);
   }
 
   useEffect(() => {
@@ -144,8 +151,8 @@ export function KnowledgeSourcesDialog({
     () =>
       preview
         ? Object.entries(preview.extensions)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 8)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
         : [],
     [preview],
   );
@@ -186,6 +193,22 @@ export function KnowledgeSourcesDialog({
               >
                 <ChevronLeftIcon className="size-4" />
               </Button>
+              <div className="flex shrink-0 gap-1">
+                {roots.map((root) => (
+                  <Button
+                    key={root.path}
+                    type="button"
+                    size="sm"
+                    variant={browser?.path === root.path ? "secondary" : "ghost"}
+                    disabled={working}
+                    onClick={() => void navigate(root.path)}
+                    title={`Open ${root.path}`}
+                  >
+                    <HardDriveIcon className="mr-1 size-3.5" />
+                    {root.name}
+                  </Button>
+                ))}
+              </div>
               <p className="min-w-0 flex-1 truncate text-sm">
                 {browser?.path ?? "Loading…"}
               </p>
@@ -318,21 +341,21 @@ export function KnowledgeSourcesDialog({
               ? progress.message
               : progress.type === "progress"
                 ? (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="capitalize">{progress.stage}</span>
-                        <span>
-                          {progress.completed}/{progress.total} ({percentage}%)
-                        </span>
-                      </div>
-                      <div className="mt-2 h-2 rounded bg-muted">
-                        <div
-                          className="h-full rounded bg-primary"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </>
-                  )
+                  <>
+                    <div className="flex justify-between">
+                      <span className="capitalize">{progress.stage}</span>
+                      <span>
+                        {progress.completed}/{progress.total} ({percentage}%)
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 rounded bg-muted">
+                      <div
+                        className="h-full rounded bg-primary"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </>
+                )
                 : progress.type === "done"
                   ? `Indexed ${progress.result.document_count} files into ${progress.result.chunk_count} chunks.`
                   : progress.message}

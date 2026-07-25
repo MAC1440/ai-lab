@@ -143,3 +143,15 @@ export const removeKnowledgeSource = (sourceId: string) =>
     `/knowledge/sources/${encodeURIComponent(sourceId)}`,
     { method: "DELETE" },
   );
+export type KnowledgeBrowseRoot = {
+  name: string;
+  path: string;
+};
+
+export type KnowledgeBrowseRoots = {
+  roots: KnowledgeBrowseRoot[];
+  platform: string;
+};
+
+export const getKnowledgeBrowseRoots = () =>
+  json<KnowledgeBrowseRoots>("/knowledge/sources/browse/roots");

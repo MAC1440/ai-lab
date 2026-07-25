@@ -42,6 +42,9 @@ def preview(request: SelectionPreviewRequest):
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
+@router.get("/browse/roots")
+def browse_roots():
+    return knowledge_source_service.roots()
 
 @router.delete("/{source_id}")
 def remove(source_id: str):

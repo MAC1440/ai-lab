@@ -431,6 +431,12 @@ def _build_pydantic_agent(
         "temperature": generation["temperature"],
         "max_tokens": generation["max_tokens"],
     }
+    if runtime.get("provider", {}).get("kind") == "ollama":
+        model_settings["extra_body"] = {
+            "options":{
+                "num_ctx": generation["context_window"]
+            }
+        }
     agent = Agent(
         model=model,
         instructions=config["system_prompt"],

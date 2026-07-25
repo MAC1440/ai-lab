@@ -113,6 +113,7 @@ export type AgentChatResponse = {
     repair_task_id?: string | null;
     project_task_id?: string | null;
     session_id?: string | null;
+    runtime_metric?: AgentRuntimeMetric | null;
 };
 
 export type AgentStatusEvent = {
@@ -170,16 +171,36 @@ export type AgentErrorEvent = {
 };
 
 export type AgentStreamEvent =
-    | AgentStatusEvent
-    | AgentRagEvent
-    | AgentContextEvent
-    | AgentAnswerDeltaEvent
-    | AgentAnswerResetEvent
-    | AgentToolStartEvent
-    | AgentToolResultEvent
-    | AgentDoneEvent
-    | AgentErrorEvent;
+  | AgentStatusEvent
+  | AgentRagEvent
+  | AgentContextEvent
+  | AgentAnswerDeltaEvent
+  | AgentAnswerResetEvent
+  | AgentToolStartEvent
+  | AgentToolResultEvent
+  | AgentMetricsEvent
+  | AgentDoneEvent
+  | AgentErrorEvent;
 
+export type AgentRuntimeMetric = {
+    final: boolean;
+    duration_seconds: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens?: number;
+    tokens_per_second: number | null;
+    context_window: number;
+    max_tokens: number;
+    safe_input_tokens?: number;
+    context_used_tokens: number;
+    context_remaining_tokens: number;
+    temperature: number;
+};
+
+export type AgentMetricsEvent = {
+    type: "metrics";
+    metrics: AgentRuntimeMetric;
+};
 const API_BASE_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8000";
 

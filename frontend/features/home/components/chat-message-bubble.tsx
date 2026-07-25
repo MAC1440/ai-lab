@@ -92,7 +92,38 @@ export function ChatMessageBubble({
                 {!isUser && message.agentResult ? (
                     <AgentExecutionDetails result={message.agentResult} />
                 ) : null}
+                {message?.metrics?.contextWindow != null ? (
+                    <span>
+                        Context:{" "}
+                        {message.metrics.contextUsedTokens?.toLocaleString() ?? 0}/
+                        {message.metrics.contextWindow.toLocaleString()}
+                    </span>
+                ) : null}
 
+                {message?.metrics?.contextRemainingTokens != null ? (
+                    <span>
+                        Remaining:{" "}
+                        {message.metrics.contextRemainingTokens.toLocaleString()}
+                    </span>
+                ) : null}
+
+                {message?.metrics?.maxOutputTokens != null ? (
+                    <span>
+                        Max output: {message.metrics.maxOutputTokens.toLocaleString()}
+                    </span>
+                ) : null}
+
+                {message?.metrics?.temperature != null ? (
+                    <span>
+                        Temperature: {message.metrics.temperature}
+                    </span>
+                ) : null}
+
+                {message?.metrics?.live ? (
+                    <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                        Live estimate
+                    </span>
+                ) : null}
                 {!isUser && message.metrics ? (
                     <div className="rounded-md border border-zinc-200 bg-zinc-100/80 p-2 text-[11px] text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/70 dark:text-zinc-300">
                         <div className="flex flex-wrap gap-3">

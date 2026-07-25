@@ -15,6 +15,8 @@ from dependencies import (
     project_detection_service,
     project_task_service,
     run_cancellation_service,
+    runtime_metrics_service,
+    runtime_settings_service,
 )
 from services.agent_runner import AgentRunner
 from services.agent_service import AgentService
@@ -36,8 +38,9 @@ pydantic_runner = PydanticAgentRunner(
     project_context_service=project_context_service,
     provider_settings_service=provider_settings_service,
     mcp_service=mcp_service,
+    runtime_settings_service=runtime_settings_service,
+    runtime_metrics_service=runtime_metrics_service,
 )
-
 
 class HistoryMessage(BaseModel):
     role: Literal["user", "assistant"]

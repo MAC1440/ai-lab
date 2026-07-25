@@ -102,6 +102,23 @@ export function applyAgentStreamEvent(
                         : [...result.tools_used, event.tool],
                 },
             } : message;
+        case "metrics":
+            return {
+                ...message,
+                metrics: {
+                    ...message.metrics,
+                    totalDurationMs: event.metrics.duration_seconds * 1000,
+                    promptEvalCount: event.metrics.input_tokens,
+                    evalCount: event.metrics.output_tokens,
+                    tokensPerSecond: event.metrics.tokens_per_second ?? undefined,
+                    contextWindow: event.metrics.context_window,
+                    contextUsedTokens: event.metrics.context_used_tokens,
+                    contextRemainingTokens: event.metrics.context_remaining_tokens,
+                    maxOutputTokens: event.metrics.max_tokens,
+                    temperature: event.metrics.temperature,
+                    live: !event.metrics.final,
+                },
+            };
         case "done":
             return { ...message, content: event.result.answer, agentResult: event.result, streamingStatus: undefined, streamError: undefined };
         case "error":
