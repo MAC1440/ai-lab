@@ -184,16 +184,17 @@ export type AgentStreamEvent =
 
 export type AgentRuntimeMetric = {
     final: boolean;
+    metric_kind: "estimated" | "measured";
     duration_seconds: number;
-    input_tokens: number;
+    input_tokens: number | null;
     output_tokens: number;
     total_tokens?: number;
     tokens_per_second: number | null;
     context_window: number;
     max_tokens: number;
     safe_input_tokens?: number;
-    context_used_tokens: number;
-    context_remaining_tokens: number;
+    context_used_tokens: number | null;
+    context_remaining_tokens: number | null;
     temperature: number;
 };
 

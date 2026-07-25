@@ -2,9 +2,14 @@ import {
     type AgentChatHistoryMessage,
     type AgentChatResponse,
     type AgentProfile,
+    type AgentRuntimeMetric,
     type AgentStreamEvent,
+    type AgentToolExecution,
 } from "@/features/agents/agent-api";
-import type { HomeChatMessage } from "@/features/home/types";
+import type {
+    HomeChatMessage,
+    OllamaCompletionMetrics,
+} from "@/features/home/types";
 
 export type AgentChatSettings = {
     ragTopK: number;
@@ -20,10 +25,15 @@ export const defaultAgentSettings: AgentChatSettings = {
     toolsMode: "default",
 };
 
-export function buildHistory(messages: HomeChatMessage[]): AgentChatHistoryMessage[] {
+export function buildHistory(
+    messages: HomeChatMessage[],
+): AgentChatHistoryMessage[] {
     return messages
         .filter((message) => message.content.trim().length > 0)
-        .map((message) => ({ role: message.role, content: message.content }))
+        .map((message) => ({
+            role: message.role,
+            content: message.content,
+        }))
         .slice(-12);
 }
 
@@ -35,6 +45,7 @@ export function createInitialAgentResult(
     const ragEnabled = settings.ragMode === "default"
         ? agent.use_rag
         : settings.ragMode === "enabled";
+
     return {
         answer: "",
         agent_id: agent.id,
@@ -43,7 +54,9 @@ export function createInitialAgentResult(
         tools_used: [],
         rag: {
             enabled: ragEnabled,
-            resolved_from: settings.ragMode === "default" ? "profile" : "request",
+            resolved_from: settings.ragMode === "default"
+                ? "profile"
+                : "request",
             context_found: false,
             retrieved_count: 0,
             included_count: 0,
@@ -68,62 +81,188 @@ export function createInitialAgentResult(
     };
 }
 
+function mapRuntimeMetric(
+    metric: AgentRuntimeMetric,
+    current?: OllamaCompletionMetrics,
+): OllamaCompletionMetrics {
+    return {
+        ...current,
+        totalDurationMs: metric.duration_seconds * 1000,
+        promptEvalCount: metric.input_tokens ?? current?.promptEvalCount,
+        evalCount: metric.output_tokens,
+        tokensPerSecond: metric.tokens_per_second ?? undefined,
+        contextWindow: metric.context_window,
+        contextUsedTokens:
+            metric.context_used_tokens ?? current?.contextUsedTokens,
+        contextRemainingTokens:
+            metric.context_remaining_tokens ?? current?.contextRemainingTokens,
+        maxOutputTokens: metric.max_tokens,
+        safeInputTokens: metric.safe_input_tokens ?? current?.safeInputTokens,
+        temperature: metric.temperature,
+        live: !metric.final,
+        metricKind: metric.metric_kind,
+    };
+}
+
+function upsertTool(
+    tools: AgentToolExecution[],
+    callId: string,
+    tool: AgentToolExecution,
+): AgentToolExecution[] {
+    const existingIndex = tools.findIndex((item) => item.id === callId);
+    if (existingIndex < 0) {
+        return [...tools, tool];
+    }
+
+    return tools.map((item, index) =>
+        index === existingIndex ? tool : item
+    );
+}
+
 export function applyAgentStreamEvent(
     message: HomeChatMessage,
     event: AgentStreamEvent,
 ): HomeChatMessage {
     const result = message.agentResult;
+
     switch (event.type) {
         case "status":
-            return { ...message, streamingStatus: event.message, agentResult: result ? { ...result, steps: event.step ?? result.steps } : result };
+            return {
+                ...message,
+                streamingStatus: event.message,
+                agentResult: result
+                    ? {
+                        ...result,
+                        steps: event.step ?? result.steps,
+                    }
+                    : result,
+            };
+
         case "rag":
-            return result ? { ...message, agentResult: { ...result, rag: event.rag } } : message;
+            return result
+                ? {
+                    ...message,
+                    agentResult: {
+                        ...result,
+                        rag: event.rag,
+                    },
+                }
+                : message;
+
         case "context":
-            return result ? { ...message, agentResult: { ...result, context: event.context } } : message;
+            return result
+                ? {
+                    ...message,
+                    agentResult: {
+                        ...result,
+                        context: event.context,
+                    },
+                }
+                : message;
+
         case "answer_delta":
-            return { ...message, content: message.content + event.content, agentResult: result ? { ...result, answer: result.answer + event.content, steps: event.step } : result };
+            return {
+                ...message,
+                content: message.content + event.content,
+                agentResult: result
+                    ? {
+                        ...result,
+                        steps: event.step,
+                    }
+                    : result,
+            };
+
         case "answer_reset":
-            return { ...message, content: "", agentResult: result ? { ...result, answer: "", steps: event.step } : result };
-        case "tool_start":
-            return result ? {
+            return {
+                ...message,
+                content: "",
+                agentResult: result
+                    ? {
+                        ...result,
+                        steps: event.step,
+                    }
+                    : result,
+            };
+
+        case "tool_start": {
+            if (!result) return message;
+
+            const runningTool: AgentToolExecution = {
+                id: event.call_id,
+                name: event.name,
+                arguments: event.arguments,
+                status: "running",
+            };
+
+            return {
                 ...message,
                 streamingStatus: `Running ${event.name}`,
-                agentResult: { ...result, steps: event.step, tools_used: [...result.tools_used, { id: event.call_id, name: event.name, arguments: event.arguments, status: "running" }] },
-            } : message;
-        case "tool_result":
-            return result ? {
-                ...message,
-                streamingStatus: event.tool.status === "success" ? `${event.tool.name} completed` : `${event.tool.name} failed`,
                 agentResult: {
                     ...result,
                     steps: event.step,
-                    tools_used: result.tools_used.some((tool) => tool.id === event.call_id)
-                        ? result.tools_used.map((tool) => tool.id === event.call_id ? event.tool : tool)
-                        : [...result.tools_used, event.tool],
+                    tools_used: upsertTool(
+                        result.tools_used,
+                        event.call_id,
+                        runningTool,
+                    ),
                 },
-            } : message;
+            };
+        }
+
+        case "tool_result":
+            return result
+                ? {
+                    ...message,
+                    streamingStatus: event.tool.status === "success"
+                        ? `${event.tool.name} completed`
+                        : `${event.tool.name} failed`,
+                    agentResult: {
+                        ...result,
+                        steps: event.step,
+                        tools_used: upsertTool(
+                            result.tools_used,
+                            event.call_id,
+                            event.tool,
+                        ),
+                    },
+                }
+                : message;
+
         case "metrics":
             return {
                 ...message,
-                metrics: {
-                    ...message.metrics,
-                    totalDurationMs: event.metrics.duration_seconds * 1000,
-                    promptEvalCount: event.metrics.input_tokens,
-                    evalCount: event.metrics.output_tokens,
-                    tokensPerSecond: event.metrics.tokens_per_second ?? undefined,
-                    contextWindow: event.metrics.context_window,
-                    contextUsedTokens: event.metrics.context_used_tokens,
-                    contextRemainingTokens: event.metrics.context_remaining_tokens,
-                    maxOutputTokens: event.metrics.max_tokens,
-                    temperature: event.metrics.temperature,
-                    live: !event.metrics.final,
-                },
+                metrics: mapRuntimeMetric(event.metrics, message.metrics),
             };
+
         case "done":
-            return { ...message, content: event.result.answer, agentResult: event.result, streamingStatus: undefined, streamError: undefined };
+            return {
+                ...message,
+                content: event.result.answer,
+                agentResult: event.result,
+                metrics: event.result.runtime_metric
+                    ? mapRuntimeMetric(
+                        {
+                            ...event.result.runtime_metric,
+                            metric_kind: "measured",
+                            final: true,
+                        },
+                        message.metrics,
+                    )
+                    : message.metrics,
+                streamingStatus: undefined,
+                streamError: undefined,
+            };
+
         case "error":
-            return { ...message, streamingStatus: undefined, streamError: event.message };
-        default:
-            return message;
+            return {
+                ...message,
+                streamingStatus: undefined,
+                streamError: event.message,
+            };
+
+        default: {
+            const exhaustive: never = event;
+            return exhaustive;
+        }
     }
 }

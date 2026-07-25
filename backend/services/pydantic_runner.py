@@ -282,7 +282,12 @@ class PydanticAgentRunner:
             if runtime is not None
             else 0.1
         )
-        
+        reserve_tokens = (
+            int(chat_settings.reserve_tokens)
+            if chat_settings is not None
+            else 512
+        )
+
         async with agent.run_stream_events(
             clean_prompt,
             message_history=message_history,
@@ -315,15 +320,16 @@ class PydanticAgentRunner:
                                     "metrics": {
                                         "final": False,
                                         "duration_seconds": round(elapsed, 3),
-                                        "input_tokens": 0,
+                                        "metric_kind": "estimated",
+                                        "input_tokens": None,
                                         "output_tokens": estimated_output_tokens,
                                         "tokens_per_second": round(
                                             estimated_output_tokens / elapsed,
                                             2,
                                         ),
                                         "context_window": context_window,
-                                        "context_used_tokens": 0,
-                                        "context_remaining_tokens": context_window,
+                                        "context_used_tokens": None,
+                                        "context_remaining_tokens": None,
                                         "max_tokens": max_tokens,
                                         "temperature": temperature,
                                     },
@@ -358,15 +364,16 @@ class PydanticAgentRunner:
                                     "metrics": {
                                         "final": False,
                                         "duration_seconds": round(elapsed, 3),
-                                        "input_tokens": 0,
+                                        "metric_kind": "estimated",
+                                        "input_tokens": None,
                                         "output_tokens": estimated_output_tokens,
                                         "tokens_per_second": round(
                                             estimated_output_tokens / elapsed,
                                             2,
                                         ),
                                         "context_window": context_window,
-                                        "context_used_tokens": 0,
-                                        "context_remaining_tokens": context_window,
+                                        "context_used_tokens": None,
+                                        "context_remaining_tokens": None,
                                         "max_tokens": max_tokens,
                                         "temperature": temperature,
                                     },
@@ -490,7 +497,7 @@ class PydanticAgentRunner:
 
         safe_input_tokens = max(
             128,
-            context_window - max_tokens - 512,
+            context_window - max_tokens - reserve_tokens,
         )
 
         runtime_metric = None
@@ -514,6 +521,7 @@ class PydanticAgentRunner:
                 "type": "metrics",
                 "metrics": {
                     **runtime_metric,
+                    "metric_kind": "measured",
                     "final": True,
                 },
             }
@@ -540,6 +548,7 @@ class PydanticAgentRunner:
                 "rag": rag_trace,
                 "context": project_context_trace,
                 "change_set_id": run_deps.change_set_id,
+                "repair_task_id": run_deps.repair_task_id,
                 "runtime_metric": runtime_metric,
             },
         }

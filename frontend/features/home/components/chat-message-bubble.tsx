@@ -10,6 +10,7 @@ import ReactMarkdown from "react-markdown";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AgentExecutionDetails } from "@/features/home/components/agent-execution-details";
+import { ModelRunMetrics } from "@/features/home/components/model-run-metrics";
 import type { HomeChatMessage } from "@/features/home/types";
 import { cn } from "@/lib/utils";
 
@@ -25,11 +26,13 @@ export function ChatMessageBubble({
     return (
         <div
             className={cn(
-                "flex gap-3 px-4 py-3",
-                isUser ? "bg-transparent" : "bg-zinc-50/80 dark:bg-zinc-900/50",
+                "flex gap-3 px-4 py-4",
+                isUser
+                    ? "bg-transparent"
+                    : "bg-zinc-50/80 dark:bg-zinc-900/50",
             )}
         >
-            <Avatar className="size-8">
+            <Avatar className="size-8 shrink-0">
                 <AvatarFallback
                     className={cn(
                         isUser
@@ -45,7 +48,7 @@ export function ChatMessageBubble({
                 </AvatarFallback>
             </Avatar>
 
-            <div className="min-w-0 flex-1 space-y-2">
+            <div className="min-w-0 flex-1 space-y-3">
                 <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
                     {isUser
                         ? "You"
@@ -67,7 +70,9 @@ export function ChatMessageBubble({
                             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-80">
                                 Thinking
                             </p>
-                            <p className="whitespace-pre-wrap">{message.reasoning}</p>
+                            <p className="whitespace-pre-wrap">
+                                {message.reasoning}
+                            </p>
                         </div>
                     ) : null}
 
@@ -92,66 +97,9 @@ export function ChatMessageBubble({
                 {!isUser && message.agentResult ? (
                     <AgentExecutionDetails result={message.agentResult} />
                 ) : null}
-                {message?.metrics?.contextWindow != null ? (
-                    <span>
-                        Context:{" "}
-                        {message.metrics.contextUsedTokens?.toLocaleString() ?? 0}/
-                        {message.metrics.contextWindow.toLocaleString()}
-                    </span>
-                ) : null}
 
-                {message?.metrics?.contextRemainingTokens != null ? (
-                    <span>
-                        Remaining:{" "}
-                        {message.metrics.contextRemainingTokens.toLocaleString()}
-                    </span>
-                ) : null}
-
-                {message?.metrics?.maxOutputTokens != null ? (
-                    <span>
-                        Max output: {message.metrics.maxOutputTokens.toLocaleString()}
-                    </span>
-                ) : null}
-
-                {message?.metrics?.temperature != null ? (
-                    <span>
-                        Temperature: {message.metrics.temperature}
-                    </span>
-                ) : null}
-
-                {message?.metrics?.live ? (
-                    <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                        Live estimate
-                    </span>
-                ) : null}
                 {!isUser && message.metrics ? (
-                    <div className="rounded-md border border-zinc-200 bg-zinc-100/80 p-2 text-[11px] text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/70 dark:text-zinc-300">
-                        <div className="flex flex-wrap gap-3">
-                            {message.metrics.tokensPerSecond != null ? (
-                                <span>
-                                    Throughput: {message.metrics.tokensPerSecond} tok/s
-                                </span>
-                            ) : null}
-
-                            {message.metrics.totalDurationMs != null ? (
-                                <span>
-                                    Total: {(message.metrics.totalDurationMs / 1000).toFixed(1)}s
-                                </span>
-                            ) : null}
-
-                            {message.metrics.promptEvalCount != null ? (
-                                <span>Input tokens: {message.metrics.promptEvalCount}</span>
-                            ) : null}
-
-                            {message.metrics.evalCount != null ? (
-                                <span>Output tokens: {message.metrics.evalCount}</span>
-                            ) : null}
-
-                            {message.metrics.doneReason ? (
-                                <span>Done: {message.metrics.doneReason}</span>
-                            ) : null}
-                        </div>
-                    </div>
+                    <ModelRunMetrics metrics={message.metrics} />
                 ) : null}
             </div>
         </div>

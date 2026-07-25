@@ -16,22 +16,24 @@ export interface OllamaModelOption {
 }
 
 export interface OllamaCompletionMetrics {
-  totalDurationMs?: number;
-  loadDurationMs?: number;
-  promptEvalCount?: number;
-  promptEvalDurationMs?: number;
-  evalCount?: number;
-  evalDurationMs?: number;
-  tokensPerSecond?: number;
-  doneReason?: string;
-
-  contextWindow?: number;
-  contextUsedTokens?: number;
-  contextRemainingTokens?: number;
-  maxOutputTokens?: number;
-  temperature?: number;
-  live?: boolean;
+    totalDurationMs?: number;
+    loadDurationMs?: number;
+    promptEvalCount?: number;
+    promptEvalDurationMs?: number;
+    evalCount?: number;
+    evalDurationMs?: number;
+    tokensPerSecond?: number;
+    doneReason?: string;
+    contextWindow?: number;
+    contextUsedTokens?: number;
+    contextRemainingTokens?: number;
+    maxOutputTokens?: number;
+    safeInputTokens?: number;
+    temperature?: number;
+    live?: boolean;
+    metricKind?: "estimated" | "measured";
 }
+
 export interface OllamaGenerationSettings {
     temperature: number;
     topP: number;
