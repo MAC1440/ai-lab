@@ -70,7 +70,19 @@ _runtime_settings_path = Path(
 if not _runtime_settings_path.is_absolute():
     _runtime_settings_path = _backend_root / _runtime_settings_path
 runtime_settings_service = RuntimeSettingsService(_runtime_settings_path)
-runtime_metrics_service = RuntimeMetricsService(history_size=100)
+
+_runtime_metrics_database_path = Path(
+    os.getenv("RUNTIME_METRICS_DB_PATH", "data/runtime-metrics.sqlite3")
+).expanduser()
+if not _runtime_metrics_database_path.is_absolute():
+    _runtime_metrics_database_path = (
+        _backend_root / _runtime_metrics_database_path
+    )
+runtime_metrics_service = RuntimeMetricsService(
+    database_path=_runtime_metrics_database_path,
+    history_size=int(os.getenv("RUNTIME_METRICS_HISTORY_SIZE", "100")),
+)
+
 hardware_profile_service = HardwareProfileService(
     provider_settings_service.get_provider("ollama")["base_url"]
 )
@@ -227,11 +239,13 @@ system_service = SystemService(
         "project-tasks": _project_tasks_database_path,
         "project-index": _project_index_database_path,
         "reliability-benchmarks": _reliability_database_path,
+        "runtime-metrics": _runtime_metrics_database_path,
     },
     config_paths={
         "provider-settings": _provider_settings_path,
         "mcp-settings": _mcp_settings_path,
         "model-capabilities": _model_capabilities_path,
+        "runtime-settings": _runtime_settings_path,
     },
     data_directory=_backend_root / "data",
 )

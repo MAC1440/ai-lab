@@ -76,6 +76,7 @@ export type RuntimeMetric = {
   output_tokens: number;
   total_tokens: number;
   tokens_per_second: number | null;
+  prompt_tokens_per_second: number | null;
   context_window: number;
   max_tokens: number;
   safe_input_tokens: number;
@@ -85,6 +86,13 @@ export type RuntimeMetric = {
   assignment_source: string | null;
 };
 
+export type RuntimeMetricsFilters = {
+  limit?: number;
+  stage?: string;
+  agentId?: string;
+  model?: string;
+};
+
 export type RuntimeMetricsSnapshot = {
   latest: RuntimeMetric | null;
   history: RuntimeMetric[];
@@ -92,7 +100,16 @@ export type RuntimeMetricsSnapshot = {
     run_count: number;
     average_tokens_per_second: number | null;
     average_duration_seconds: number | null;
+    total_input_tokens: number;
+    total_output_tokens: number;
   };
+  filters: {
+    limit: number;
+    stage: string | null;
+    agent_id: string | null;
+    model: string | null;
+  };
+  persistent: boolean;
 };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -104,10 +121,12 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     },
     cache: "no-store",
   });
+
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
     throw new Error(payload?.detail ?? `Request failed (${response.status})`);
   }
+
   return response.json() as Promise<T>;
 }
 
@@ -126,5 +145,31 @@ export const saveRuntimeSettings = (settings: RuntimeSettings) =>
 export const autoConfigureRuntime = () =>
   api<RuntimeSettings>("/runtime/settings/auto", { method: "POST" });
 
-export const getRuntimeMetrics = () =>
-  api<RuntimeMetricsSnapshot>("/runtime/metrics");
+export const getRuntimeMetrics = (
+  filters: RuntimeMetricsFilters = {},
+) => {
+  const params = new URLSearchParams();
+
+  if (filters.limit != null) {
+    params.set("limit", String(filters.limit));
+  }
+  if (filters.stage) {
+    params.set("stage", filters.stage);
+  }
+  if (filters.agentId) {
+    params.set("agent_id", filters.agentId);
+  }
+  if (filters.model) {
+    params.set("model", filters.model);
+  }
+
+  const query = params.toString();
+  return api<RuntimeMetricsSnapshot>(
+    `/runtime/metrics${query ? `?${query}` : ""}`,
+  );
+};
+
+export const clearRuntimeMetrics = () =>
+  api<{ removed: number; message: string }>("/runtime/metrics", {
+    method: "DELETE",
+  });

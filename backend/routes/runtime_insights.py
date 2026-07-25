@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from dependencies import (
     hardware_profile_service,
@@ -37,5 +37,24 @@ def auto_settings():
 
 
 @router.get("/metrics")
-def metrics():
-    return runtime_metrics_service.snapshot()
+def metrics(
+    limit: int = Query(default=100, ge=1, le=100),
+    stage: str | None = Query(default=None, min_length=1, max_length=40),
+    agent_id: str | None = Query(default=None, min_length=1, max_length=100),
+    model: str | None = Query(default=None, min_length=1, max_length=200),
+):
+    return runtime_metrics_service.snapshot(
+        limit=limit,
+        stage=stage,
+        agent_id=agent_id,
+        model=model,
+    )
+
+
+@router.delete("/metrics")
+def clear_metrics():
+    removed = runtime_metrics_service.clear()
+    return {
+        "removed": removed,
+        "message": "Runtime metric history cleared.",
+    }
