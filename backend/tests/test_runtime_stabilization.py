@@ -11,7 +11,6 @@ from services.model_capability_service import ModelCapabilityService
 from services.pydantic_agent import AgentRunDeps
 from services.pydantic_runner import PydanticAgentRunner
 from services.runtime_settings_service import (
-    RuntimeSettingsDocument,
     RuntimeSettingsService,
     RuntimeStageSettings,
 )
@@ -43,11 +42,13 @@ class RecordingMetricsService:
     @staticmethod
     def timer():
         import time
+
         return time.perf_counter()
 
     def record(self, **kwargs):
         self.calls.append(kwargs)
         usage = kwargs["usage"]
+
         return {
             "recorded_at": "2026-07-25T00:00:00+00:00",
             "agent_id": kwargs["agent_id"],
@@ -78,9 +79,11 @@ class RuntimeStabilizationTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         root = Path(self.temp_dir.name)
+
         self.runtime_settings = RuntimeSettingsService(
             root / "runtime-settings.json"
         )
+
         document = self.runtime_settings.get()
         document.automatic = False
         document.planning = RuntimeStageSettings(
@@ -96,6 +99,7 @@ class RuntimeStabilizationTests(unittest.IsolatedAsyncioTestCase):
             temperature=0.1,
         )
         self.runtime_settings.save(document)
+
         self.capabilities = ModelCapabilityService(
             root / "capabilities.json"
         )
@@ -112,7 +116,10 @@ class RuntimeStabilizationTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(
-            client.prompt_budget(agent_id="coding", stage="planning"),
+            client.prompt_budget(
+                agent_id="coding",
+                stage="planning",
+            ),
             2304,
         )
 
@@ -145,18 +152,33 @@ class RuntimeStabilizationTests(unittest.IsolatedAsyncioTestCase):
             ]
 
         final_metric = next(
-            event for event in events
+            event
+            for event in events
             if event["type"] == "metrics"
             and event["metrics"]["final"]
         )
         done = events[-1]
 
-        self.assertEqual(final_metric["metrics"]["metric_kind"], "measured")
+        self.assertEqual(
+            final_metric["metrics"]["metric_kind"],
+            "measured",
+        )
         self.assertEqual(done["type"], "done")
-        self.assertEqual(done["result"]["repair_task_id"], "repair-123")
-        self.assertIsNotNone(done["result"]["runtime_metric"])
-        self.assertEqual(metrics.calls[0]["stage"], "chat")
-        self.assertEqual(metrics.calls[0]["safe_input_tokens"], 2304)
+        self.assertEqual(
+            done["result"]["repair_task_id"],
+            "repair-123",
+        )
+        self.assertIsNotNone(
+            done["result"]["runtime_metric"]
+        )
+        self.assertEqual(
+            metrics.calls[0]["stage"],
+            "chat",
+        )
+        self.assertEqual(
+            metrics.calls[0]["safe_input_tokens"],
+            2304,
+        )
 
 
 if __name__ == "__main__":

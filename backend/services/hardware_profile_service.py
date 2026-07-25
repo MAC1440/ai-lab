@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import json
 import os
 import platform
 import re
 import shutil
 import subprocess
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -158,6 +156,7 @@ class HardwareProfileService:
             name = item.get("name") or item.get("model") or ""
             parameters = HardwareProfileService._parameter_count(name)
             size = item.get("size")
+
             if parameters is not None:
                 if parameters <= fastest:
                     tier = "fastest"
@@ -171,9 +170,12 @@ class HardwareProfileService:
                 # Approximate fallback for Q4-ish model files.
                 size_gib = size / _GIB
                 tier = (
-                    "fastest" if size_gib <= fastest * 0.75
-                    else "balanced" if size_gib <= balanced * 0.75
-                    else "maximum_practical" if size_gib <= maximum * 0.75
+                    "fastest"
+                    if size_gib <= fastest * 0.75
+                    else "balanced"
+                    if size_gib <= balanced * 0.75
+                    else "maximum_practical"
+                    if size_gib <= maximum * 0.75
                     else "not_recommended"
                 )
             else:
@@ -187,11 +189,15 @@ class HardwareProfileService:
                     "tier": tier,
                 }
             )
+
         return result
 
     @staticmethod
     def _parameter_count(name: str) -> float | None:
-        matches = re.findall(r"(?<!\d)(\d+(?:\.\d+)?)\s*[bB](?![a-zA-Z])", name)
+        matches = re.findall(
+            r"(?<!\d)(\d+(?:\.\d+)?)\s*[bB](?![a-zA-Z])",
+            name,
+        )
         return float(matches[-1]) if matches else None
 
     @staticmethod
@@ -214,13 +220,18 @@ class HardwareProfileService:
 
             status = MemoryStatusEx()
             status.dwLength = ctypes.sizeof(MemoryStatusEx)
-            if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+
+            if not ctypes.windll.kernel32.GlobalMemoryStatusEx(
+                ctypes.byref(status)
+            ):
                 raise OSError("Could not read Windows memory status")
+
             return int(status.ullTotalPhys), int(status.ullAvailPhys)
 
         pages = os.sysconf("SC_PHYS_PAGES")
         available = os.sysconf("SC_AVPHYS_PAGES")
         page_size = os.sysconf("SC_PAGE_SIZE")
+
         return int(pages * page_size), int(available * page_size)
 
     @staticmethod
@@ -228,11 +239,16 @@ class HardwareProfileService:
         executable = shutil.which("nvidia-smi")
         if not executable:
             return None
+
         command = [
             executable,
-            "--query-gpu=name,memory.total,memory.free,utilization.gpu,temperature.gpu",
+            (
+                "--query-gpu=name,memory.total,memory.free,"
+                "utilization.gpu,temperature.gpu"
+            ),
             "--format=csv,noheader,nounits",
         ]
+
         try:
             completed = subprocess.run(
                 command,
@@ -246,10 +262,12 @@ class HardwareProfileService:
                     else 0
                 ),
             )
+
             first = completed.stdout.strip().splitlines()[0]
             name, total, free, utilization, temperature = [
                 part.strip() for part in first.split(",", 4)
             ]
+
             return GpuInfo(
                 name=name,
                 memory_total_bytes=int(float(total) * 1024**2),
@@ -257,5 +275,10 @@ class HardwareProfileService:
                 utilization_percent=float(utilization),
                 temperature_c=float(temperature),
             )
-        except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        except (
+            OSError,
+            ValueError,
+            IndexError,
+            subprocess.SubprocessError,
+        ):
             return None

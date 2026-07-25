@@ -4,10 +4,11 @@ import sqlite3
 import threading
 import time
 from collections import deque
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 
 @dataclass(frozen=True)
@@ -235,7 +236,16 @@ class RuntimeMetricsService:
             )
             connection.commit()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        """
+        Open and reliably close a SQLite connection.
+
+        sqlite3.Connection's own context manager only manages transactions.
+        It does not close the connection when the ``with`` block exits. That
+        leaves the database file locked on Windows and prevents temporary test
+        directories from being removed.
+        """
         if self.database_path is None:
             raise RuntimeError("Persistent runtime metrics are not configured")
 
@@ -245,7 +255,11 @@ class RuntimeMetricsService:
             check_same_thread=False,
         )
         connection.row_factory = sqlite3.Row
-        return connection
+
+        try:
+            yield connection
+        finally:
+            connection.close()
 
     def _insert(self, metric: ModelRunMetric) -> None:
         values = asdict(metric)

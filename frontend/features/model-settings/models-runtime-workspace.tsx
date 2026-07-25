@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BotIcon,
   CheckCircle2Icon,
-  ChipIcon,
   CpuIcon,
   GaugeIcon,
   HardDriveIcon,
@@ -389,7 +388,7 @@ function HardwareOverview({
         detail={`${formatGb(availableGb)} currently available`}
       />
       <OverviewCard
-        icon={ChipIcon}
+        icon={CpuIcon}
         label="GPU"
         value={loading ? "Loading…" : hardware?.gpu?.name || "Not detected"}
         detail={
