@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import {
   MenuIcon,
   PanelLeftCloseIcon,
@@ -8,6 +9,20 @@ import {
   SparklesIcon,
 } from "lucide-react";
 
+const sectionDetails: Record<
+  string,
+  { title: string; description: string }
+> = {
+  "/": {
+    title: "Agent Chat",
+    description: "Inspect, reason, propose changes, and verify work.",
+  },
+  "/performance": {
+    title: "Performance",
+    description: "Review persisted model speed, duration, and token usage.",
+  },
+};
+
 export function AppHeader({
   sidebarCollapsed,
   onOpenMobileNavigation,
@@ -15,6 +30,12 @@ export function AppHeader({
   sidebarCollapsed: boolean;
   onOpenMobileNavigation: () => void;
 }) {
+  const pathname = usePathname();
+  const details = sectionDetails[pathname] ?? {
+    title: "AI Lab",
+    description: "Local agent workspace.",
+  };
+
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-zinc-200 bg-zinc-100/85 px-4 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/85">
       <button
@@ -37,14 +58,14 @@ export function AppHeader({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <h1 className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            Agent Chat
+            {details.title}
           </h1>
           <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 sm:inline dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
             Local workspace
           </span>
         </div>
         <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-          Inspect, reason, propose changes, and verify work.
+          {details.description}
         </p>
       </div>
 

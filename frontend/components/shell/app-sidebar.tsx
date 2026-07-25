@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -8,6 +10,7 @@ import {
 } from "lucide-react";
 
 import {
+  isNavigationItemActive,
   primaryNavigation,
   secondaryNavigation,
   type NavigationItem,
@@ -21,6 +24,8 @@ export function AppSidebar({
   collapsed: boolean;
   onCollapse: () => void;
 }) {
+  const pathname = usePathname();
+
   return (
     <aside
       className={cn(
@@ -54,6 +59,7 @@ export function AppSidebar({
         <NavigationGroup
           items={primaryNavigation}
           collapsed={collapsed}
+          pathname={pathname}
         />
 
         <div className="my-3 border-t border-zinc-200 dark:border-zinc-800" />
@@ -61,6 +67,7 @@ export function AppSidebar({
         <NavigationGroup
           items={secondaryNavigation}
           collapsed={collapsed}
+          pathname={pathname}
         />
       </div>
 
@@ -109,41 +116,24 @@ export function AppSidebar({
 function NavigationGroup({
   items,
   collapsed,
+  pathname,
 }: {
   items: NavigationItem[];
   collapsed: boolean;
+  pathname: string;
 }) {
   return (
     <nav className="space-y-1" aria-label="AI Lab sections">
       {items.map((item) => {
         const Icon = item.icon;
         const disabled = !item.available;
-
-        return (
-          <button
-            key={item.id}
-            type="button"
-            disabled={disabled}
-            title={
-              collapsed
-                ? item.label
-                : disabled
-                  ? `${item.label} — coming in a later drop`
-                  : item.description
-            }
-            className={cn(
-              "group flex w-full items-center rounded-xl px-3 py-2.5 text-left transition",
-              collapsed ? "justify-center" : "gap-3",
-              item.active
-                ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
-                : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100",
-              disabled && "cursor-not-allowed opacity-55",
-            )}
-          >
+        const active = isNavigationItemActive(pathname, item);
+        const content = (
+          <>
             <Icon
               className={cn(
                 "size-4 shrink-0",
-                item.active && "text-emerald-500",
+                active && "text-emerald-500",
               )}
             />
 
@@ -163,7 +153,45 @@ function NavigationGroup({
                 Soon
               </span>
             ) : null}
-          </button>
+          </>
+        );
+
+        const className = cn(
+          "group flex w-full items-center rounded-xl px-3 py-2.5 text-left transition",
+          collapsed ? "justify-center" : "gap-3",
+          active
+            ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
+            : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100",
+          disabled && "cursor-not-allowed opacity-55",
+        );
+
+        if (disabled) {
+          return (
+            <button
+              key={item.id}
+              type="button"
+              disabled
+              title={
+                collapsed
+                  ? item.label
+                  : `${item.label} — coming in a later drop`
+              }
+              className={className}
+            >
+              {content}
+            </button>
+          );
+        }
+
+        return (
+          <Link
+            key={item.id}
+            href={item.href}
+            title={collapsed ? item.label : item.description}
+            className={className}
+          >
+            {content}
+          </Link>
         );
       })}
     </nav>

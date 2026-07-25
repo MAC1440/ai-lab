@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   FlaskConicalIcon,
   XIcon,
 } from "lucide-react";
 
 import {
+  isNavigationItemActive,
   primaryNavigation,
   secondaryNavigation,
   type NavigationItem,
@@ -19,6 +22,8 @@ export function MobileNavigation({
   open: boolean;
   onClose: () => void;
 }) {
+  const pathname = usePathname();
+
   return (
     <div
       className={cn(
@@ -68,6 +73,7 @@ export function MobileNavigation({
         <div className="ai-lab-scrollbar flex-1 overflow-y-auto p-3">
           <MobileNavigationGroup
             items={primaryNavigation}
+            pathname={pathname}
             onSelect={onClose}
           />
 
@@ -75,6 +81,7 @@ export function MobileNavigation({
 
           <MobileNavigationGroup
             items={secondaryNavigation}
+            pathname={pathname}
             onSelect={onClose}
           />
         </div>
@@ -85,9 +92,11 @@ export function MobileNavigation({
 
 function MobileNavigationGroup({
   items,
+  pathname,
   onSelect,
 }: {
   items: NavigationItem[];
+  pathname: string;
   onSelect: () => void;
 }) {
   return (
@@ -95,21 +104,9 @@ function MobileNavigationGroup({
       {items.map((item) => {
         const Icon = item.icon;
         const disabled = !item.available;
-
-        return (
-          <button
-            key={item.id}
-            type="button"
-            disabled={disabled}
-            onClick={onSelect}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left",
-              item.active
-                ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
-                : "text-zinc-600 dark:text-zinc-400",
-              disabled && "cursor-not-allowed opacity-50",
-            )}
-          >
+        const active = isNavigationItemActive(pathname, item);
+        const content = (
+          <>
             <Icon className="size-4 shrink-0" />
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-medium">
@@ -124,7 +121,39 @@ function MobileNavigationGroup({
                 Soon
               </span>
             ) : null}
-          </button>
+          </>
+        );
+
+        const className = cn(
+          "flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left",
+          active
+            ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
+            : "text-zinc-600 dark:text-zinc-400",
+          disabled && "cursor-not-allowed opacity-50",
+        );
+
+        if (disabled) {
+          return (
+            <button
+              key={item.id}
+              type="button"
+              disabled
+              className={className}
+            >
+              {content}
+            </button>
+          );
+        }
+
+        return (
+          <Link
+            key={item.id}
+            href={item.href}
+            onClick={onSelect}
+            className={className}
+          >
+            {content}
+          </Link>
         );
       })}
     </nav>
