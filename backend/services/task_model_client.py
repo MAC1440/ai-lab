@@ -151,7 +151,15 @@ class PydanticTaskModelClient:
             runtime,
             stage,
         )
-        return int(capability["effective_safe_input_tokens"])
+        capability_budget = int(capability["effective_safe_input_tokens"])
+        stage_settings = (
+            self.runtime_settings_service.stage(stage)
+            if self.runtime_settings_service is not None
+            else None
+        )
+        if stage_settings is None:
+            return capability_budget
+        return min(capability_budget, stage_settings.safe_input_tokens)
 
     def estimate_tokens(
         self,

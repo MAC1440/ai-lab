@@ -138,10 +138,10 @@ class PydanticAgentRunner:
             else None
         )
         chat_settings = (
-        self.runtime_settings_service.stage("chat")
-        if self.runtime_settings_service is not None
-        else None
-    )
+            self.runtime_settings_service.stage("chat")
+            if self.runtime_settings_service is not None
+            else None
+        )
 
         if runtime is not None and chat_settings is not None:
             existing_generation = runtime.get("generation", {})
