@@ -28,15 +28,15 @@ import {
 } from "./system-api";
 
 const styles = {
-    pass: "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30",
-    warning: "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30",
-    fail: "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30",
+    pass: "border-success/30 bg-success/10 dark:border-success/30 dark:bg-success/10",
+    warning: "border-pending/30 bg-pending/10 dark:border-pending/30 dark:bg-pending/10",
+    fail: "border-danger/30 bg-danger/10 dark:border-danger/30 dark:bg-danger/10",
 };
 
 function CheckIcon({ status }: { status: SystemCheck["status"] }) {
-    if (status === "pass") return <CheckCircle2Icon className="size-5 shrink-0 text-emerald-600" />;
-    if (status === "warning") return <AlertTriangleIcon className="size-5 shrink-0 text-amber-600" />;
-    return <XCircleIcon className="size-5 shrink-0 text-red-600" />;
+    if (status === "pass") return <CheckCircle2Icon className="size-5 shrink-0 text-success" />;
+    if (status === "warning") return <AlertTriangleIcon className="size-5 shrink-0 text-pending" />;
+    return <XCircleIcon className="size-5 shrink-0 text-danger" />;
 }
 
 export function SystemDialog({ disabled = false }: { disabled?: boolean }) {
@@ -91,21 +91,21 @@ export function SystemDialog({ disabled = false }: { disabled?: boolean }) {
                 </DialogDescription>
 
                 {error && (
-                    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                    <div className="rounded-md border border-danger/30 bg-danger/10 p-3 text-sm text-danger dark:border-danger/30 dark:bg-danger/10 dark:text-danger">
                         {error}
                     </div>
                 )}
 
                 {loading && !data ? (
-                    <div className="flex h-48 items-center justify-center text-sm text-zinc-500">
+                    <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
                         <Loader2Icon className="mr-2 size-4 animate-spin" /> Running checks…
                     </div>
                 ) : data ? (
                     <>
                         <div className="grid grid-cols-3 gap-3 text-center">
-                            <div className="rounded-lg border p-3"><div className="text-2xl font-semibold text-emerald-600">{data.summary.passed}</div><div className="text-xs text-zinc-500">Passed</div></div>
-                            <div className="rounded-lg border p-3"><div className="text-2xl font-semibold text-amber-600">{data.summary.warnings}</div><div className="text-xs text-zinc-500">Warnings</div></div>
-                            <div className="rounded-lg border p-3"><div className="text-2xl font-semibold text-red-600">{data.summary.failed}</div><div className="text-xs text-zinc-500">Failed</div></div>
+                            <div className="rounded-lg border p-3"><div className="text-2xl font-semibold text-success">{data.summary.passed}</div><div className="text-xs text-muted-foreground">Passed</div></div>
+                            <div className="rounded-lg border p-3"><div className="text-2xl font-semibold text-pending">{data.summary.warnings}</div><div className="text-xs text-muted-foreground">Warnings</div></div>
+                            <div className="rounded-lg border p-3"><div className="text-2xl font-semibold text-danger">{data.summary.failed}</div><div className="text-xs text-muted-foreground">Failed</div></div>
                         </div>
                         <ScrollArea className="h-[390px] pr-4">
                             <div className="space-y-2">
@@ -114,7 +114,7 @@ export function SystemDialog({ disabled = false }: { disabled?: boolean }) {
                                         <CheckIcon status={check.status} />
                                         <div className="min-w-0">
                                             <p className="text-sm font-medium">{check.name}</p>
-                                            <p className="break-words text-xs text-zinc-600 dark:text-zinc-300">{check.message}</p>
+                                            <p className="break-words text-xs text-muted-foreground dark:text-muted-foreground">{check.message}</p>
                                             {check.action && <p className="mt-1 text-xs font-medium">Next: {check.action}</p>}
                                         </div>
                                     </div>
@@ -125,7 +125,7 @@ export function SystemDialog({ disabled = false }: { disabled?: boolean }) {
                 ) : null}
 
                 <div className="flex flex-wrap justify-between gap-2 border-t pt-4">
-                    <p className="max-w-md text-xs text-zinc-500">
+                    <p className="max-w-md text-xs text-muted-foreground">
                         Backups contain AI Lab settings and SQLite state only. They never include workspace files, .env, or API keys.
                     </p>
                     <div className="flex gap-2">

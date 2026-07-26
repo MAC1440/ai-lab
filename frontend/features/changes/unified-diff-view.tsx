@@ -140,21 +140,21 @@ function parseUnifiedDiff(diff: string): ParsedUnifiedDiff {
 
 function lineRowClasses(kind: DiffLineKind) {
   return cn(
-    "grid min-w-max grid-cols-[3.25rem_3.25rem_1.5rem_minmax(36rem,1fr)] border-b border-white/5 font-mono text-xs leading-5 last:border-b-0",
-    kind === "addition" && "bg-emerald-950/55 text-emerald-50",
-    kind === "deletion" && "bg-red-950/55 text-red-50",
-    kind === "context" && "bg-zinc-950 text-zinc-300",
-    kind === "meta" && "bg-zinc-900 text-zinc-500",
+    "grid min-w-max grid-cols-[3.25rem_3.25rem_1.5rem_minmax(36rem,1fr)] border-b border-border/5 font-mono text-xs leading-5 last:border-b-0",
+    kind === "addition" && "bg-success/10 text-success",
+    kind === "deletion" && "bg-danger/10 text-danger",
+    kind === "context" && "bg-surface-raised text-muted-foreground",
+    kind === "meta" && "bg-surface-raised text-muted-foreground",
   );
 }
 
 function numberCellClasses(kind: DiffLineKind) {
   return cn(
-    "select-none border-r border-white/5 px-2 text-right tabular-nums",
-    kind === "addition" && "bg-emerald-950/80 text-emerald-400",
-    kind === "deletion" && "bg-red-950/80 text-red-400",
-    kind === "context" && "bg-zinc-900/80 text-zinc-600",
-    kind === "meta" && "bg-zinc-900 text-zinc-700",
+    "select-none border-r border-border/5 px-2 text-right tabular-nums",
+    kind === "addition" && "bg-success/10 text-success",
+    kind === "deletion" && "bg-danger/10 text-danger",
+    kind === "context" && "bg-surface-raised/80 text-muted-foreground",
+    kind === "meta" && "bg-surface-raised text-foreground",
   );
 }
 
@@ -173,7 +173,7 @@ function markerFor(kind: DiffLineKind) {
 export function UnifiedDiffView({ diff }: { diff: string }) {
   if (!diff.trim()) {
     return (
-      <div className="flex min-h-32 items-center justify-center border-t border-zinc-800 bg-zinc-950 px-4 text-sm text-zinc-500">
+      <div className="flex min-h-32 items-center justify-center border-t border-border bg-surface-raised px-4 text-sm text-muted-foreground">
         No textual diff was produced.
       </div>
     );
@@ -183,29 +183,29 @@ export function UnifiedDiffView({ diff }: { diff: string }) {
   const displayedFile = parsed.newFile ?? parsed.oldFile ?? "Changed file";
 
   return (
-    <section className="overflow-hidden border-t border-zinc-800 bg-zinc-950">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-900/90 px-4 py-2.5">
-        <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-300">
-          <FileCode2Icon className="size-4 shrink-0 text-zinc-400" />
+    <section className="overflow-hidden border-t border-border bg-surface-raised">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface-raised/90 px-4 py-2.5">
+        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          <FileCode2Icon className="size-4 shrink-0 text-muted-foreground" />
           <span className="truncate font-mono" title={displayedFile}>
             {displayedFile}
           </span>
         </div>
 
         <div className="flex items-center gap-2 text-xs font-semibold tabular-nums">
-          <span className="rounded-md border border-emerald-800/70 bg-emerald-950/60 px-2 py-0.5 text-emerald-300">
+          <span className="rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-success">
             +{parsed.additions}
           </span>
-          <span className="rounded-md border border-red-800/70 bg-red-950/60 px-2 py-0.5 text-red-300">
+          <span className="rounded-md border border-danger/30 bg-danger/10 px-2 py-0.5 text-danger">
             −{parsed.deletions}
           </span>
         </div>
       </div>
 
-      <div className="max-h-[34rem] overflow-auto bg-zinc-950">
+      <div className="max-h-[34rem] overflow-auto bg-surface-raised">
         {parsed.hunks.map((hunk, hunkIndex) => (
           <div key={`${hunk.header}-${hunkIndex}`}>
-            <div className="sticky top-0 z-10 min-w-max border-y border-sky-900/60 bg-sky-950/95 px-4 py-1.5 font-mono text-xs text-sky-300 backdrop-blur">
+            <div className="sticky top-0 z-10 min-w-max border-y border-pending/30 bg-pending/10 px-4 py-1.5 font-mono text-xs text-pending backdrop-blur">
               {hunk.header}
             </div>
 
@@ -223,8 +223,8 @@ export function UnifiedDiffView({ diff }: { diff: string }) {
                 <span
                   className={cn(
                     "select-none text-center font-bold",
-                    line.kind === "addition" && "text-emerald-400",
-                    line.kind === "deletion" && "text-red-400",
+                    line.kind === "addition" && "text-success",
+                    line.kind === "deletion" && "text-danger",
                   )}
                   aria-hidden="true"
                 >
@@ -239,12 +239,12 @@ export function UnifiedDiffView({ diff }: { diff: string }) {
         ))}
       </div>
 
-      <div className="flex items-center gap-4 border-t border-zinc-800 bg-zinc-900/80 px-4 py-2 text-[11px] text-zinc-500">
+      <div className="flex items-center gap-4 border-t border-border bg-surface-raised/80 px-4 py-2 text-[11px] text-muted-foreground">
         <span>
-          <span className="font-semibold text-zinc-400">Old</span> line
+          <span className="font-semibold text-muted-foreground">Old</span> line
         </span>
         <span>
-          <span className="font-semibold text-zinc-400">New</span> line
+          <span className="font-semibold text-muted-foreground">New</span> line
         </span>
         <span className="ml-auto hidden sm:inline">
           Scroll horizontally for long lines

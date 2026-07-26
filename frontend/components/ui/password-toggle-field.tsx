@@ -27,10 +27,10 @@ export function PasswordToggleFieldInput({
     <PasswordToggleFieldPrimitive.Input
       data-slot="password-toggle-field-input"
       className={cn(
-        "flex h-9 w-full rounded-lg border border-zinc-200 bg-white px-3 py-1 pr-10 text-sm shadow-xs",
-        "placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2",
+        "flex h-9 w-full rounded-lg border border-border bg-surface px-3 py-1 pr-10 text-sm shadow-xs",
+        "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
         "disabled:cursor-not-allowed disabled:opacity-50",
-        "dark:border-zinc-700 dark:bg-zinc-900 dark:placeholder:text-zinc-500",
+        "dark:border-border dark:bg-surface-raised dark:placeholder:text-muted-foreground",
         className,
       )}
       {...props}
@@ -46,7 +46,7 @@ export function PasswordToggleFieldToggle({
     <PasswordToggleFieldPrimitive.Toggle
       data-slot="password-toggle-field-toggle"
       className={cn(
-        "absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100",
+        "absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground hover:text-foreground dark:hover:text-foreground",
         className,
       )}
       {...props}

@@ -42,13 +42,13 @@ export function ChatInput({
     return (
         <form
             onSubmit={handleSubmit}
-            className="border-t border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+            className="border-t border-border bg-surface p-4 dark:border-border dark:bg-surface-raised"
         >
             <div
                 className={cn(
-                    "flex items-end gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 p-2",
-                    "focus-within:border-zinc-400 focus-within:ring-2 focus-within:ring-zinc-200",
-                    "dark:border-zinc-700 dark:bg-zinc-900 dark:focus-within:border-zinc-500 dark:focus-within:ring-zinc-800",
+                    "flex items-end gap-2 rounded-2xl border border-border bg-surface-hover p-2",
+                    "focus-within:border-border focus-within:ring-2 focus-within:ring-accent",
+                    "dark:border-border dark:bg-surface-raised dark:focus-within:border-border dark:focus-within:ring-accent",
                 )}
             >
                 <textarea
@@ -61,8 +61,8 @@ export function ChatInput({
                     rows={1}
                     className={cn(
                         "max-h-40 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none",
-                        "placeholder:text-zinc-400 disabled:opacity-50",
-                        "dark:placeholder:text-zinc-500",
+                        "placeholder:text-muted-foreground disabled:opacity-50",
+                        "dark:placeholder:text-muted-foreground",
                     )}
                 />
                 <Button
@@ -76,7 +76,7 @@ export function ChatInput({
                     {streaming ? <SquareIcon className="size-3.5 fill-current" /> : <ArrowUpIcon className="size-4" />}
                 </Button>
             </div>
-            <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
+            <p className="mt-2 text-center text-xs text-muted-foreground dark:text-muted-foreground">
                 {streaming ? "Stop closes the active Ollama stream" : "Press Enter to send · Shift+Enter for a new line"}
             </p>
         </form>

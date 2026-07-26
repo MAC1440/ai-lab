@@ -30,10 +30,10 @@ export function HoverCardContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 w-64 rounded-lg border border-zinc-200 bg-white p-4 text-zinc-900 shadow-md outline-none",
+          "z-50 w-64 rounded-lg border border-border bg-surface p-4 text-foreground shadow-md outline-none",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-          "dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100",
+          "dark:border-border dark:bg-surface-raised dark:text-foreground",
           className,
         )}
         {...props}

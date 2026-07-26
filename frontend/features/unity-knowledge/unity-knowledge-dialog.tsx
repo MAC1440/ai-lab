@@ -114,10 +114,10 @@ export function UnityKnowledgeDialog({ disabled = false }: { disabled?: boolean 
                     </div>
                     <div className="rounded-lg border p-3 text-sm">
                         <p className="font-medium">Current index</p>
-                        <p className="mt-1 text-zinc-500">
+                        <p className="mt-1 text-muted-foreground">
                             {status ? `${status.chunk_count.toLocaleString()} chunks` : "Loading…"}
                         </p>
-                        <p className="truncate text-xs text-zinc-500" title={status?.embedding_model}>
+                        <p className="truncate text-xs text-muted-foreground" title={status?.embedding_model}>
                             {status?.embedding_model ?? ""}
                         </p>
                     </div>
@@ -146,7 +146,7 @@ export function UnityKnowledgeDialog({ disabled = false }: { disabled?: boolean 
                 </div>
 
                 {error && (
-                    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                    <div className="rounded-md border border-danger/30 bg-danger/10 p-3 text-sm text-danger dark:border-danger/30 dark:bg-danger/10 dark:text-danger">
                         {error}
                     </div>
                 )}
@@ -160,8 +160,8 @@ export function UnityKnowledgeDialog({ disabled = false }: { disabled?: boolean 
                                     <span className="capitalize">{progress.stage}</span>
                                     <span>{progress.completed}/{progress.total} {percentage}%</span>
                                 </div>
-                                <div className="mt-2 h-2 overflow-hidden rounded bg-zinc-200 dark:bg-zinc-800">
-                                    <div className="h-full bg-violet-600 transition-all" style={{ width: `${percentage}%` }} />
+                                <div className="mt-2 h-2 overflow-hidden rounded bg-surface-hover dark:bg-surface-hover">
+                                    <div className="h-full bg-pending transition-all" style={{ width: `${percentage}%` }} />
                                 </div>
                             </>
                         )}
@@ -173,12 +173,12 @@ export function UnityKnowledgeDialog({ disabled = false }: { disabled?: boolean 
 
                 {preview && (
                     <div className="space-y-2">
-                        <div className="flex flex-wrap gap-3 text-xs text-zinc-500">
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                             <span>{preview.chunk_count} chunks</span>
                             <span>{preview.original_characters.toLocaleString()} original characters</span>
                             <span>{preview.cleaned_characters.toLocaleString()} retained</span>
                         </div>
-                        <ScrollArea className="h-[280px] rounded-lg border bg-zinc-50 p-4 dark:bg-zinc-950">
+                        <ScrollArea className="h-[280px] rounded-lg border bg-surface-hover p-4 dark:bg-surface-raised">
                             <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed">
                                 {preview.chunks.map((chunk, index) => `--- CHUNK ${index + 1} ---\n${chunk.text}`).join("\n\n")}
                             </pre>

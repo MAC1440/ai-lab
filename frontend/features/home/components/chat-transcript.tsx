@@ -33,15 +33,15 @@ export function ChatTranscript({
                     {messages.length === 0 ? (
                         <div className="flex min-h-[55vh] items-center justify-center px-6 py-16 text-center">
                             <div className="max-w-xl space-y-3">
-                                <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-success/10 text-success dark:bg-success/10 dark:text-success">
                                     <SparklesIcon className="size-6" />
                                 </div>
-                                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                                <h2 className="text-lg font-semibold text-foreground dark:text-foreground">
                                     {selectedAgent
                                         ? `Chat with ${selectedAgent.name}`
                                         : "Select an agent"}
                                 </h2>
-                                <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+                                <p className="text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
                                     {selectedAgent?.description ??
                                         "Choose an agent to begin."}
                                 </p>
@@ -58,7 +58,7 @@ export function ChatTranscript({
                             </div>
                         </div>
                     ) : (
-                        <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
+                        <div className="divide-y divide-border dark:divide-border">
                             {messages.map((message, index) => (
                                 <ChatMessageBubble
                                     key={message.id}

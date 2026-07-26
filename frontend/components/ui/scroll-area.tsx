@@ -25,7 +25,7 @@ export function ScrollArea({
         className="flex touch-none select-none p-px transition-colors data-[orientation=horizontal]:h-2.5 data-[orientation=vertical]:w-2.5 data-[orientation=horizontal]:flex-col"
       >
         <ScrollAreaPrimitive.Thumb
-          className="relative flex-1 rounded-full bg-zinc-300 dark:bg-zinc-600"
+          className="relative flex-1 rounded-full bg-border-strong"
         />
       </ScrollAreaPrimitive.Scrollbar>
     </ScrollAreaPrimitive.Root>

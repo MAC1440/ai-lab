@@ -40,10 +40,9 @@ export function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-lg border border-zinc-200 bg-white p-1 text-zinc-900 shadow-md",
+          "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-surface-raised p-1 text-foreground shadow-md",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-          "dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100",
           className,
         )}
         {...props}
@@ -72,8 +71,7 @@ export function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       className={cn(
         "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none",
-        "focus:bg-zinc-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "dark:focus:bg-zinc-800",
+        "focus:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         inset && "pl-8",
         className,
       )}
@@ -93,14 +91,13 @@ export function DropdownMenuCheckboxItem({
       data-slot="dropdown-menu-checkbox-item"
       className={cn(
         "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm outline-none",
-        "focus:bg-zinc-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "dark:focus:bg-zinc-800",
+        "focus:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}
       checked={checked}
       {...props}
     >
-      <span className="absolute left-2 flex size-3.5 items-center justify-center">
+      <span className="absolute left-2 flex size-3.5 items-center justify-center text-accent">
         <DropdownMenuPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />
         </DropdownMenuPrimitive.ItemIndicator>
@@ -131,13 +128,12 @@ export function DropdownMenuRadioItem({
       data-slot="dropdown-menu-radio-item"
       className={cn(
         "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm outline-none",
-        "focus:bg-zinc-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "dark:focus:bg-zinc-800",
+        "focus:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}
       {...props}
     >
-      <span className="absolute left-2 flex size-3.5 items-center justify-center">
+      <span className="absolute left-2 flex size-3.5 items-center justify-center text-accent">
         <DropdownMenuPrimitive.ItemIndicator>
           <CircleIcon className="size-2 fill-current" />
         </DropdownMenuPrimitive.ItemIndicator>
@@ -158,7 +154,7 @@ export function DropdownMenuLabel({
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
       className={cn(
-        "px-2 py-1.5 text-sm font-semibold",
+        "px-2 py-1.5 text-sm font-semibold text-foreground",
         inset && "pl-8",
         className,
       )}
@@ -174,7 +170,7 @@ export function DropdownMenuSeparator({
   return (
     <DropdownMenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-zinc-200 dark:bg-zinc-800", className)}
+      className={cn("-mx-1 my-1 h-px bg-border", className)}
       {...props}
     />
   );
@@ -187,7 +183,7 @@ export function DropdownMenuShortcut({
   return (
     <span
       data-slot="dropdown-menu-shortcut"
-      className={cn("ml-auto text-xs tracking-widest text-zinc-500", className)}
+      className={cn("ml-auto text-xs tracking-widest text-muted-foreground", className)}
       {...props}
     />
   );
@@ -212,7 +208,7 @@ export function DropdownMenuSubTrigger({
       data-slot="dropdown-menu-sub-trigger"
       className={cn(
         "flex cursor-default select-none items-center rounded-md px-2 py-1.5 text-sm outline-none",
-        "focus:bg-zinc-100 data-[state=open]:bg-zinc-100 dark:focus:bg-zinc-800 dark:data-[state=open]:bg-zinc-800",
+        "focus:bg-surface-hover data-[state=open]:bg-surface-hover",
         inset && "pl-8",
         className,
       )}
@@ -232,10 +228,9 @@ export function DropdownMenuSubContent({
     <DropdownMenuPrimitive.SubContent
       data-slot="dropdown-menu-sub-content"
       className={cn(
-        "z-50 min-w-[8rem] overflow-hidden rounded-lg border border-zinc-200 bg-white p-1 text-zinc-900 shadow-lg",
+        "z-50 min-w-[8rem] overflow-hidden rounded-lg border border-border bg-surface-raised p-1 text-foreground shadow-lg",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        "dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100",
         className,
       )}
       {...props}

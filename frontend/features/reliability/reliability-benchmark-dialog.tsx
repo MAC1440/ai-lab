@@ -176,7 +176,7 @@ export function ReliabilityBenchmarkDialog({
           </TabsList>
 
           <TabsContent value="run" className="space-y-4">
-            <section className="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4 md:grid-cols-4">
+            <section className="grid gap-3 rounded-xl border border-border bg-surface-raised p-4 md:grid-cols-4">
               <Field label="Suite">
                 <Select
                   value={suite}
@@ -245,7 +245,7 @@ export function ReliabilityBenchmarkDialog({
                   {running ? "Running…" : "Run benchmark"}
                 </Button>
               </div>
-              <p className="text-xs text-zinc-500 md:col-span-4">
+              <p className="text-xs text-muted-foreground md:col-span-4">
                 {selectedScenarios.length * Number(repetitions)} scenario
                 executions · approximately {estimatedModelCalls} model calls ·
                 safety scenarios use no model calls
@@ -253,7 +253,7 @@ export function ReliabilityBenchmarkDialog({
             </section>
 
             {running || state.run ? (
-              <section className="space-y-3 rounded-xl border border-zinc-800 p-4">
+              <section className="space-y-3 rounded-xl border border-border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h3 className="text-sm font-semibold">
@@ -261,7 +261,7 @@ export function ReliabilityBenchmarkDialog({
                         ? state.currentScenario?.name ?? "Preparing fixtures"
                         : resultTitle(state.run)}
                     </h3>
-                    <p className="mt-1 text-xs text-zinc-500">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {state.runId ?? state.run?.run_id}
                     </p>
                   </div>
@@ -284,13 +284,13 @@ export function ReliabilityBenchmarkDialog({
               {selectedScenarios.map((scenario) => (
                 <article
                   key={scenario.scenario_id}
-                  className="rounded-lg border border-zinc-800 p-3"
+                  className="rounded-lg border border-border p-3"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium">{scenario.name}</p>
                     <Badge variant="outline">{scenario.category}</Badge>
                   </div>
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {scenario.description}
                   </p>
                 </article>
@@ -304,7 +304,7 @@ export function ReliabilityBenchmarkDialog({
               history.map((run) => (
                 <article
                   key={run.run_id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 p-4"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-4"
                 >
                   <div>
                     <div className="flex items-center gap-2">
@@ -313,7 +313,7 @@ export function ReliabilityBenchmarkDialog({
                         {run.suite} · {run.repetitions}×
                       </span>
                     </div>
-                    <p className="mt-2 text-xs text-zinc-500">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       {new Date(run.started_at).toLocaleString()} ·{" "}
                       {run.passed_count}/{run.scenario_count} passed
                     </p>
@@ -335,7 +335,7 @@ export function ReliabilityBenchmarkDialog({
                 </article>
               ))
             ) : (
-              <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+              <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
                 No reliability runs have been recorded.
               </p>
             )}
@@ -381,8 +381,8 @@ function ResultGrid({
             className={cn(
               "rounded-lg border p-3",
               passed
-                ? "border-emerald-900 bg-emerald-950/20"
-                : "border-red-900 bg-red-950/20",
+                ? "border-success/30 bg-success/10"
+                : "border-danger/30 bg-danger/10",
             )}
           >
             <div className="flex items-center justify-between gap-2">
@@ -391,23 +391,23 @@ function ResultGrid({
                 {result.repetition > 1 ? ` #${result.repetition}` : ""}
               </p>
               {passed ? (
-                <CheckCircle2Icon className="size-4 text-emerald-400" />
+                <CheckCircle2Icon className="size-4 text-success" />
               ) : (
-                <XCircleIcon className="size-4 text-red-400" />
+                <XCircleIcon className="size-4 text-danger" />
               )}
             </div>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               {Math.round(result.score * 100)}% ·{" "}
               {(result.duration_ms / 1000).toFixed(1)}s
             </p>
             {result.error ? (
-              <p className="mt-2 text-xs text-red-300">{result.error}</p>
+              <p className="mt-2 text-xs text-danger">{result.error}</p>
             ) : null}
             <ul className="mt-2 space-y-1 text-xs">
               {result.assertions
                 .filter((assertion) => !assertion.passed)
                 .map((assertion) => (
-                  <li key={assertion.name} className="text-red-300">
+                  <li key={assertion.name} className="text-danger">
                     {assertion.name.replaceAll("_", " ")}: {assertion.detail}
                   </li>
                 ))}
@@ -426,8 +426,8 @@ function RunBadge({ run }: { run: ReliabilityBenchmarkRun }) {
       variant="outline"
       className={cn(
         passed
-          ? "border-emerald-800 text-emerald-300"
-          : "border-red-800 text-red-300",
+          ? "border-success/30 text-success"
+          : "border-danger/30 text-danger",
       )}
     >
       {passed ? (
@@ -442,7 +442,7 @@ function RunBadge({ run }: { run: ReliabilityBenchmarkRun }) {
 
 function ErrorMessage({ message }: { message: string }) {
   return (
-    <p className="rounded-lg border border-red-900 bg-red-950/30 p-3 text-sm text-red-300">
+    <p className="rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
       {message}
     </p>
   );

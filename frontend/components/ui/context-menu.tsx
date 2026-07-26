@@ -64,7 +64,7 @@ export function ContextMenuSubTrigger({
       data-slot="context-menu-sub-trigger"
       className={cn(
         "flex cursor-default select-none items-center rounded-md px-2 py-1.5 text-sm outline-none",
-        "focus:bg-zinc-100 data-[state=open]:bg-zinc-100 dark:focus:bg-zinc-800 dark:data-[state=open]:bg-zinc-800",
+        "focus:bg-surface-hover data-[state=open]:bg-surface-hover dark:focus:bg-surface-hover dark:data-[state=open]:bg-surface-hover",
         inset && "pl-8",
         className,
       )}
@@ -84,10 +84,10 @@ export function ContextMenuSubContent({
     <ContextMenuPrimitive.SubContent
       data-slot="context-menu-sub-content"
       className={cn(
-        "z-50 min-w-[8rem] overflow-hidden rounded-lg border border-zinc-200 bg-white p-1 text-zinc-900 shadow-lg",
+        "z-50 min-w-[8rem] overflow-hidden rounded-lg border border-border bg-surface p-1 text-foreground shadow-lg",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        "dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100",
+        "dark:border-border dark:bg-surface-raised dark:text-foreground",
         className,
       )}
       {...props}
@@ -104,9 +104,9 @@ export function ContextMenuContent({
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
         className={cn(
-          "z-50 max-h-[var(--radix-context-menu-content-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-lg border border-zinc-200 bg-white p-1 text-zinc-900 shadow-md",
+          "z-50 max-h-[var(--radix-context-menu-content-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-surface p-1 text-foreground shadow-md",
           "animate-in fade-in-0 zoom-in-95",
-          "dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100",
+          "dark:border-border dark:bg-surface-raised dark:text-foreground",
           className,
         )}
         {...props}
@@ -127,8 +127,8 @@ export function ContextMenuItem({
       data-slot="context-menu-item"
       className={cn(
         "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none",
-        "focus:bg-zinc-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "dark:focus:bg-zinc-800",
+        "focus:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "dark:focus:bg-surface-hover",
         inset && "pl-8",
         className,
       )}
@@ -148,8 +148,8 @@ export function ContextMenuCheckboxItem({
       data-slot="context-menu-checkbox-item"
       className={cn(
         "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm outline-none",
-        "focus:bg-zinc-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "dark:focus:bg-zinc-800",
+        "focus:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "dark:focus:bg-surface-hover",
         className,
       )}
       checked={checked}
@@ -175,8 +175,8 @@ export function ContextMenuRadioItem({
       data-slot="context-menu-radio-item"
       className={cn(
         "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm outline-none",
-        "focus:bg-zinc-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "dark:focus:bg-zinc-800",
+        "focus:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "dark:focus:bg-surface-hover",
         className,
       )}
       {...props}
@@ -218,7 +218,7 @@ export function ContextMenuSeparator({
   return (
     <ContextMenuPrimitive.Separator
       data-slot="context-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-zinc-200 dark:bg-zinc-800", className)}
+      className={cn("-mx-1 my-1 h-px bg-surface-hover dark:bg-surface-hover", className)}
       {...props}
     />
   );
@@ -231,7 +231,7 @@ export function ContextMenuShortcut({
   return (
     <span
       data-slot="context-menu-shortcut"
-      className={cn("ml-auto text-xs tracking-widest text-zinc-500", className)}
+      className={cn("ml-auto text-xs tracking-widest text-muted-foreground", className)}
       {...props}
     />
   );

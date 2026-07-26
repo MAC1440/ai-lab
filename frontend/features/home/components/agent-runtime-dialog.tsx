@@ -38,7 +38,7 @@ export function AgentRuntimeDialog({
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent><SelectItem value="default">Profile default</SelectItem><SelectItem value="enabled">Force enabled</SelectItem><SelectItem value="disabled">Force disabled</SelectItem></SelectContent>
                     </Select>
-                    <p className="text-xs text-zinc-500">Cannot grant tools outside the profile allow-list.</p>
+                    <p className="text-xs text-muted-foreground">Cannot grant tools outside the profile allow-list.</p>
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="rag-top-k">Retrieved chunks</Label>

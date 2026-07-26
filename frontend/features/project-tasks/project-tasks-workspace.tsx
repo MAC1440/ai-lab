@@ -377,16 +377,16 @@ export function ProjectTasksWorkspace() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
-      <div className="border-b border-zinc-200 bg-white px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950 sm:px-6">
+      <div className="border-b border-border bg-surface px-4 py-4 dark:border-border dark:bg-surface-raised sm:px-6">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success dark:text-success">
               Deterministic coding workflow
             </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground dark:text-foreground">
               Project tasks
             </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
               Plan, freeze project context, generate a reviewable change set,
               apply it deliberately, verify the workspace, and repair bounded
               failures.
@@ -398,7 +398,7 @@ export function ProjectTasksWorkspace() {
               type="button"
               onClick={() => setShowCreate((current) => !current)}
               disabled={Boolean(activeAction) || creating}
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+              className="inline-flex items-center gap-2 rounded-lg bg-surface-raised px-3 py-2 text-xs font-medium text-accent-foreground disabled:opacity-50 dark:bg-surface-hover dark:text-foreground"
             >
               {showCreate ? (
                 <XIcon className="size-3.5" />
@@ -415,7 +415,7 @@ export function ProjectTasksWorkspace() {
                 void refresh();
               }}
               disabled={loading || Boolean(activeAction)}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-foreground shadow-sm disabled:opacity-50 dark:border-border dark:bg-surface-raised dark:text-foreground"
             >
               <RefreshCwIcon
                 className={cn("size-3.5", loading && "animate-spin")}
@@ -426,10 +426,10 @@ export function ProjectTasksWorkspace() {
         </div>
       </div>
 
-      <div className="ai-lab-scrollbar min-h-0 flex-1 overflow-y-auto bg-zinc-50/50 dark:bg-zinc-950">
+      <div className="ai-lab-scrollbar min-h-0 flex-1 overflow-y-auto bg-surface-hover/50 dark:bg-surface-raised">
         <div className="mx-auto w-full max-w-7xl space-y-4 p-4 sm:p-6">
           {error ? (
-            <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+            <div className="flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger dark:border-danger/30 dark:bg-danger/10 dark:text-danger">
               <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
               <div>
                 <p className="font-medium">Task workflow error</p>
@@ -463,16 +463,16 @@ export function ProjectTasksWorkspace() {
             />
           ) : null}
 
-          <div className="grid min-h-[36rem] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm lg:grid-cols-[19rem_minmax(0,1fr)] dark:border-zinc-800 dark:bg-zinc-950">
-            <aside className="flex min-h-0 flex-col border-b border-zinc-200 lg:border-r lg:border-b-0 dark:border-zinc-800">
-              <div className="space-y-3 border-b border-zinc-200 p-3 dark:border-zinc-800">
+          <div className="grid min-h-[36rem] overflow-hidden rounded-2xl border border-border bg-surface shadow-sm lg:grid-cols-[19rem_minmax(0,1fr)] dark:border-border dark:bg-surface-raised">
+            <aside className="flex min-h-0 flex-col border-b border-border lg:border-r lg:border-b-0 dark:border-border">
+              <div className="space-y-3 border-b border-border p-3 dark:border-border">
                 <label className="relative block">
-                  <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-zinc-400" />
+                  <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search tasks"
-                    className="w-full rounded-lg border border-zinc-200 bg-white py-2 pr-3 pl-9 text-xs outline-none ring-emerald-500/20 focus:border-emerald-500 focus:ring-4 dark:border-zinc-800 dark:bg-zinc-900"
+                    className="w-full rounded-lg border border-border bg-surface py-2 pr-3 pl-9 text-xs outline-none ring-emerald-500/20 focus:border-success/30 focus:ring-4 dark:border-border dark:bg-surface-raised"
                   />
                 </label>
 
@@ -483,7 +483,7 @@ export function ProjectTasksWorkspace() {
                       event.target.value as "" | ProjectTaskStatus,
                     )
                   }
-                  className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-900"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs outline-none dark:border-border dark:bg-surface-raised"
                 >
                   {statusOptions.map((option) => (
                     <option key={option.value || "all"} value={option.value}>
@@ -511,9 +511,9 @@ export function ProjectTasksWorkspace() {
                 ))}
 
                 {!loading && filteredTasks.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-zinc-200 p-6 text-center dark:border-zinc-800">
-                    <FolderKanbanIcon className="mx-auto size-5 text-zinc-300 dark:text-zinc-700" />
-                    <p className="mt-3 text-xs text-zinc-400">
+                  <div className="rounded-xl border border-dashed border-border p-6 text-center dark:border-border">
+                    <FolderKanbanIcon className="mx-auto size-5 text-muted-foreground dark:text-foreground" />
+                    <p className="mt-3 text-xs text-muted-foreground">
                       {tasks.length === 0
                         ? "No project tasks yet."
                         : "No tasks match these filters."}
@@ -553,11 +553,11 @@ export function ProjectTasksWorkspace() {
               ) : (
                 <div className="flex min-h-[28rem] items-center justify-center">
                   <div className="max-w-sm text-center">
-                    <FolderKanbanIcon className="mx-auto size-8 text-zinc-300 dark:text-zinc-700" />
-                    <p className="mt-4 text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                    <FolderKanbanIcon className="mx-auto size-8 text-muted-foreground dark:text-foreground" />
+                    <p className="mt-4 text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                       Select or create a project task
                     </p>
-                    <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                       Tasks keep planning, context, file changes, verification,
                       and repair in one reviewable lifecycle.
                     </p>
@@ -594,19 +594,19 @@ function TaskSummary({
       {cards.map((card) => (
         <div
           key={card.label}
-          className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+          className="rounded-xl border border-border bg-surface p-4 shadow-sm dark:border-border dark:bg-surface-raised"
         >
-          <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             {card.label}
           </p>
           <p
             className={cn(
               "mt-2 text-2xl font-semibold",
-              card.tone === "sky" && "text-sky-600 dark:text-sky-400",
-              card.tone === "amber" && "text-amber-600 dark:text-amber-400",
-              card.tone === "red" && "text-red-600 dark:text-red-400",
+              card.tone === "sky" && "text-pending dark:text-pending",
+              card.tone === "amber" && "text-pending dark:text-pending",
+              card.tone === "red" && "text-danger dark:text-danger",
               card.tone === "emerald"
-                && "text-emerald-600 dark:text-emerald-400",
+                && "text-success dark:text-success",
             )}
           >
             {card.value}
@@ -649,12 +649,12 @@ function CreateTaskPanel({
   onSubmit: () => void;
 }) {
   return (
-    <section className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm sm:p-5 dark:border-emerald-900/60 dark:bg-zinc-950">
+    <section className="rounded-2xl border border-success/30 bg-surface p-4 shadow-sm sm:p-5 dark:border-success/30 dark:bg-surface-raised">
       <div>
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+        <h3 className="text-sm font-semibold text-foreground dark:text-foreground">
           Create a bounded project task
         </h3>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
           State the expected behavior, constraints, files or systems involved,
           and acceptance criteria. The task will start immediately.
         </p>
@@ -697,7 +697,7 @@ function CreateTaskPanel({
               <option value="unity">Unity</option>
               <option value="web">Web</option>
             </select>
-            <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">
+            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
               {agentReason}
             </p>
           </Field>
@@ -738,7 +738,7 @@ function CreateTaskPanel({
               || blocked
               || creating
             }
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-xs font-semibold text-emerald-950 disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-success px-4 py-2.5 text-xs font-semibold text-success disabled:opacity-50"
           >
             {creating ? (
               <Loader2Icon className="size-4 animate-spin" />
@@ -771,21 +771,21 @@ function TaskListItem({
       className={cn(
         "w-full rounded-xl border p-3 text-left transition",
         selected
-          ? "border-emerald-300 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/20"
-          : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700",
+          ? "border-success/30 bg-success/10 dark:border-success/30 dark:bg-success/10"
+          : "border-border bg-surface hover:border-border dark:border-border dark:bg-surface-raised dark:hover:border-border",
       )}
     >
       <div className="flex items-start gap-2">
         {task.status === "completed" ? (
-          <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-emerald-500" />
+          <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-success" />
         ) : active ? (
-          <Loader2Icon className="mt-0.5 size-4 shrink-0 animate-spin text-sky-500" />
+          <Loader2Icon className="mt-0.5 size-4 shrink-0 animate-spin text-pending" />
         ) : (
-          <CircleDotIcon className="mt-0.5 size-4 shrink-0 text-zinc-400" />
+          <CircleDotIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         )}
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">
+          <p className="truncate text-sm font-medium text-foreground dark:text-foreground">
             {task.title}
           </p>
 
@@ -793,12 +793,12 @@ function TaskListItem({
             <span className={cn("rounded-full border px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide", statusClass(task.status))}>
               {task.status.replaceAll("_", " ")}
             </span>
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[9px] text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+            <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[9px] text-muted-foreground dark:bg-surface-hover dark:text-muted-foreground">
               {task.agent_id}
             </span>
           </div>
 
-          <p className="mt-2 truncate text-[10px] text-zinc-400">
+          <p className="mt-2 truncate text-[10px] text-muted-foreground">
             {task.phase.replaceAll("_", " ")} · attempt {task.attempt_count}/
             {task.max_attempts}
           </p>
@@ -817,7 +817,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
       <div className="mt-1.5">{children}</div>
@@ -826,24 +826,24 @@ function Field({
 }
 
 const inputClass =
-  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 outline-none ring-emerald-500/20 placeholder:text-zinc-400 focus:border-emerald-500 focus:ring-4 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200";
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none ring-emerald-500/20 placeholder:text-muted-foreground focus:border-success/30 focus:ring-4 dark:border-border dark:bg-surface-raised dark:text-foreground";
 
 function statusClass(status: ProjectTaskStatus): string {
   switch (status) {
     case "completed":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300";
+      return "border-success/30 bg-success/10 text-success dark:border-success/30 dark:bg-success/10 dark:text-success";
     case "running":
     case "verifying":
-      return "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300";
+      return "border-pending/30 bg-pending/10 text-pending dark:border-pending/30 dark:bg-pending/10 dark:text-pending";
     case "awaiting_approval":
     case "ready_to_verify":
-      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300";
+      return "border-pending/30 bg-pending/10 text-pending dark:border-pending/30 dark:bg-pending/10 dark:text-pending";
     case "needs_attention":
-      return "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300";
+      return "border-danger/30 bg-danger/10 text-danger dark:border-danger/30 dark:bg-danger/10 dark:text-danger";
     case "cancelled":
-      return "border-zinc-200 bg-zinc-100 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400";
+      return "border-border bg-surface-hover text-muted-foreground dark:border-border dark:bg-surface-hover dark:text-muted-foreground";
     default:
-      return "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-300";
+      return "border-pending/30 bg-pending/15 text-pending dark:border-pending/30 dark:bg-pending/15 dark:text-pending";
   }
 }
 

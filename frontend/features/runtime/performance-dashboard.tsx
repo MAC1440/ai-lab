@@ -92,13 +92,13 @@ export function PerformanceDashboard() {
       <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">
         <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success dark:text-success">
               Runtime telemetry
             </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground dark:text-foreground">
               Model performance history
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
               Compare local model speed, response duration, context use,
               and token volume across agent stages.
             </p>
@@ -109,7 +109,7 @@ export function PerformanceDashboard() {
               type="button"
               onClick={() => void loadMetrics()}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-surface-hover disabled:opacity-50 dark:border-border dark:bg-surface-raised dark:text-foreground dark:hover:bg-surface-hover"
             >
               <RefreshCwIcon
                 className={cn("size-3.5", loading && "animate-spin")}
@@ -121,7 +121,7 @@ export function PerformanceDashboard() {
               type="button"
               onClick={() => void handleClear()}
               disabled={clearing || history.length === 0}
-              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-50 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50"
+              className="inline-flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs font-medium text-danger transition hover:bg-danger/10 disabled:opacity-50 dark:border-danger/30 dark:bg-danger/10 dark:text-danger dark:hover:bg-danger/10"
             >
               <Trash2Icon className="size-3.5" />
               Clear history
@@ -130,7 +130,7 @@ export function PerformanceDashboard() {
         </header>
 
         {error ? (
-          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="flex items-start gap-3 rounded-xl border border-pending/30 bg-pending/10 p-4 text-sm text-pending dark:border-pending/30 dark:bg-pending/10 dark:text-pending">
             <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
             <div>
               <p className="font-medium">Metrics unavailable</p>
@@ -177,23 +177,23 @@ export function PerformanceDashboard() {
           </div>
 
           <aside className="space-y-4">
-            <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm dark:border-border dark:bg-surface-raised">
+              <h3 className="text-sm font-semibold text-foreground dark:text-foreground">
                 Filter runs
               </h3>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
                 Filters are applied to persisted history.
               </p>
 
               <div className="mt-4 space-y-4">
                 <label className="block">
-                  <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                  <span className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
                     Stage
                   </span>
                   <select
                     value={stage}
                     onChange={(event) => setStage(event.target.value)}
-                    className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-emerald-500/20 focus:border-emerald-500 focus:ring-4 dark:border-zinc-800 dark:bg-zinc-900"
+                    className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none ring-emerald-500/20 focus:border-success/30 focus:ring-4 dark:border-border dark:bg-surface-raised"
                   >
                     {stageOptions.map((option) => (
                       <option key={option || "all"} value={option}>
@@ -204,14 +204,14 @@ export function PerformanceDashboard() {
                 </label>
 
                 <label className="block">
-                  <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                  <span className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
                     Exact model name
                   </span>
                   <input
                     value={model}
                     onChange={(event) => setModel(event.target.value)}
                     placeholder="granite4.1:3b"
-                    className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-emerald-500/20 placeholder:text-zinc-400 focus:border-emerald-500 focus:ring-4 dark:border-zinc-800 dark:bg-zinc-900"
+                    className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none ring-emerald-500/20 placeholder:text-muted-foreground focus:border-success/30 focus:ring-4 dark:border-border dark:bg-surface-raised"
                   />
                 </label>
 
@@ -222,7 +222,7 @@ export function PerformanceDashboard() {
                     setModel("");
                   }}
                   disabled={!stage && !model}
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                  className="w-full rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-surface-hover disabled:opacity-40 dark:border-border dark:text-muted-foreground dark:hover:bg-surface-raised"
                 >
                   Reset filters
                 </button>
@@ -249,19 +249,19 @@ function SummaryCard({
   icon: typeof ActivityIcon;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm dark:border-border dark:bg-surface-raised">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        <p className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
           {label}
         </p>
-        <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-success/10 text-success dark:text-success">
           <Icon className="size-4" />
         </div>
       </div>
-      <p className="mt-4 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+      <p className="mt-4 text-2xl font-semibold tracking-tight text-foreground dark:text-foreground">
         {value}
       </p>
-      <p className="mt-1 text-[11px] text-zinc-400">{detail}</p>
+      <p className="mt-1 text-[11px] text-muted-foreground">{detail}</p>
     </div>
   );
 }
@@ -280,23 +280,23 @@ function PerformanceChart({
   );
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5 dark:border-border dark:bg-surface-raised">
       <div>
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+        <h3 className="text-sm font-semibold text-foreground dark:text-foreground">
           Output speed
         </h3>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
           Most recent 16 filtered runs, oldest to newest.
         </p>
       </div>
 
-      <div className="mt-6 flex h-52 items-end gap-2 overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50/70 px-3 pt-5 dark:border-zinc-900 dark:bg-zinc-900/40">
+      <div className="mt-6 flex h-52 items-end gap-2 overflow-hidden rounded-xl border border-border bg-surface-hover/70 px-3 pt-5 dark:border-border dark:bg-surface-raised/40">
         {loading ? (
-          <div className="m-auto text-xs text-zinc-400">
+          <div className="m-auto text-xs text-muted-foreground">
             Loading performance history…
           </div>
         ) : runs.length === 0 ? (
-          <div className="m-auto text-center text-xs text-zinc-400">
+          <div className="m-auto text-center text-xs text-muted-foreground">
             Complete an agent run to populate this chart.
           </div>
         ) : (
@@ -311,7 +311,7 @@ function PerformanceChart({
                 title={`${item.model}: ${formatRate(speed)}`}
               >
                 <div
-                  className="w-full rounded-t-md bg-emerald-500/75 transition group-hover:bg-emerald-500"
+                  className="w-full rounded-t-md bg-success/75 transition group-hover:bg-success"
                   style={{ height: `${height}%` }}
                 />
               </div>
@@ -331,19 +331,19 @@ function RuntimeHistoryTable({
   loading: boolean;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="border-b border-zinc-200 px-4 py-4 sm:px-5 dark:border-zinc-800">
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+    <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm dark:border-border dark:bg-surface-raised">
+      <div className="border-b border-border px-4 py-4 sm:px-5 dark:border-border">
+        <h3 className="text-sm font-semibold text-foreground dark:text-foreground">
           Run history
         </h3>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
           Newest runs appear first.
         </p>
       </div>
 
       <div className="ai-lab-scrollbar overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-xs">
-          <thead className="bg-zinc-50 text-zinc-500 dark:bg-zinc-900/60 dark:text-zinc-400">
+          <thead className="bg-surface-hover text-muted-foreground dark:bg-surface-raised/60 dark:text-muted-foreground">
             <tr>
               <th className="px-4 py-3 font-medium">Recorded</th>
               <th className="px-4 py-3 font-medium">Model</th>
@@ -354,12 +354,12 @@ function RuntimeHistoryTable({
               <th className="px-4 py-3 text-right font-medium">Context</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
+          <tbody className="divide-y divide-border dark:divide-border">
             {loading ? (
               <tr>
                 <td
                   colSpan={7}
-                  className="px-4 py-10 text-center text-zinc-400"
+                  className="px-4 py-10 text-center text-muted-foreground"
                 >
                   Loading runtime history…
                 </td>
@@ -368,7 +368,7 @@ function RuntimeHistoryTable({
               <tr>
                 <td
                   colSpan={7}
-                  className="px-4 py-10 text-center text-zinc-400"
+                  className="px-4 py-10 text-center text-muted-foreground"
                 >
                   No matching runs were found.
                 </td>
@@ -377,16 +377,16 @@ function RuntimeHistoryTable({
               history.map((metric) => (
                 <tr
                   key={`${metric.recorded_at}-${metric.agent_id}-${metric.stage}`}
-                  className="text-zinc-700 hover:bg-zinc-50/70 dark:text-zinc-300 dark:hover:bg-zinc-900/40"
+                  className="text-foreground hover:bg-surface-hover/70 dark:text-muted-foreground dark:hover:bg-surface-raised/40"
                 >
-                  <td className="whitespace-nowrap px-4 py-3 text-zinc-500">
+                  <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                     {formatTimestamp(metric.recorded_at)}
                   </td>
                   <td className="max-w-48 truncate px-4 py-3 font-medium">
                     {metric.model || "Unknown"}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                    <span className="rounded-full bg-surface-hover px-2 py-1 text-[10px] font-medium text-muted-foreground dark:bg-surface-hover dark:text-muted-foreground">
                       {metric.stage}
                     </span>
                   </td>
@@ -401,7 +401,7 @@ function RuntimeHistoryTable({
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     {formatInteger(metric.context_used_tokens)}
-                    <span className="text-zinc-400">
+                    <span className="text-muted-foreground">
                       {" / "}
                       {formatInteger(metric.context_window)}
                     </span>
@@ -422,8 +422,8 @@ function LatestRunCard({
   metric: RuntimeMetric | null;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-zinc-950 p-4 text-zinc-100 shadow-sm dark:border-zinc-800">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-400">
+    <div className="rounded-2xl border border-border bg-surface-raised p-4 text-foreground shadow-sm dark:border-border">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-success">
         Latest matching run
       </p>
 
@@ -446,7 +446,7 @@ function LatestRunCard({
           />
         </dl>
       ) : (
-        <p className="mt-4 text-xs leading-relaxed text-zinc-400">
+        <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
           No run matches the current filters.
         </p>
       )}
@@ -463,8 +463,8 @@ function MetricRow({
 }) {
   return (
     <div className="flex items-start justify-between gap-3">
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="break-all text-right font-medium text-zinc-200">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="break-all text-right font-medium text-foreground">
         {value}
       </dd>
     </div>

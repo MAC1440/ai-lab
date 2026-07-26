@@ -16,7 +16,7 @@ export function AppShell({
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
 
   return (
-    <div className="min-h-dvh bg-zinc-100/70 dark:bg-zinc-950">
+    <div className="min-h-dvh bg-background">
       <div className="flex min-h-dvh">
         <AppSidebar
           collapsed={sidebarCollapsed}
@@ -42,7 +42,7 @@ export function AppShell({
           />
 
           <main className="flex min-h-0 flex-1 flex-col px-0 pb-16 sm:px-3 sm:pb-3 lg:px-4">
-            <div className="flex min-h-0 flex-1 overflow-hidden border-zinc-200 bg-white shadow-sm sm:rounded-2xl sm:border dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="flex min-h-0 flex-1 overflow-hidden border-border bg-surface shadow-sm sm:rounded-2xl sm:border">
               {children}
             </div>
           </main>

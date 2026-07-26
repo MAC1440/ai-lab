@@ -12,7 +12,7 @@ export function Menubar({
     <MenubarPrimitive.Root
       data-slot="menubar"
       className={cn(
-        "flex h-9 items-center gap-1 rounded-lg border border-zinc-200 bg-white p-1 shadow-xs dark:border-zinc-800 dark:bg-zinc-950",
+        "flex h-9 items-center gap-1 rounded-lg border border-border bg-surface p-1 shadow-xs dark:border-border dark:bg-surface-raised",
         className,
       )}
       {...props}
@@ -47,8 +47,8 @@ export function MenubarTrigger({
       data-slot="menubar-trigger"
       className={cn(
         "flex cursor-default select-none items-center rounded-md px-2 py-1 text-sm font-medium outline-none",
-        "focus:bg-zinc-100 focus:text-zinc-900 data-[state=open]:bg-zinc-100 data-[state=open]:text-zinc-900",
-        "dark:focus:bg-zinc-800 dark:focus:text-zinc-100 dark:data-[state=open]:bg-zinc-800 dark:data-[state=open]:text-zinc-100",
+        "focus:bg-surface-hover focus:text-foreground data-[state=open]:bg-surface-hover data-[state=open]:text-foreground",
+        "dark:focus:bg-surface-hover dark:focus:text-foreground dark:data-[state=open]:bg-surface-hover dark:data-[state=open]:text-foreground",
         className,
       )}
       {...props}
@@ -71,10 +71,10 @@ export function MenubarContent({
         alignOffset={alignOffset}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 min-w-[12rem] overflow-hidden rounded-lg border border-zinc-200 bg-white p-1 text-zinc-900 shadow-md",
+          "z-50 min-w-[12rem] overflow-hidden rounded-lg border border-border bg-surface p-1 text-foreground shadow-md",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-          "dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100",
+          "dark:border-border dark:bg-surface-raised dark:text-foreground",
           className,
         )}
         {...props}
@@ -95,8 +95,8 @@ export function MenubarItem({
       data-slot="menubar-item"
       className={cn(
         "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none",
-        "focus:bg-zinc-100 focus:text-zinc-900 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "dark:focus:bg-zinc-800 dark:focus:text-zinc-100",
+        "focus:bg-surface-hover focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "dark:focus:bg-surface-hover dark:focus:text-foreground",
         inset && "pl-8",
         className,
       )}
@@ -116,8 +116,8 @@ export function MenubarCheckboxItem({
       data-slot="menubar-checkbox-item"
       className={cn(
         "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm outline-none",
-        "focus:bg-zinc-100 focus:text-zinc-900 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "dark:focus:bg-zinc-800 dark:focus:text-zinc-100",
+        "focus:bg-surface-hover focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "dark:focus:bg-surface-hover dark:focus:text-foreground",
         className,
       )}
       checked={checked}
@@ -151,8 +151,8 @@ export function MenubarRadioItem({
       data-slot="menubar-radio-item"
       className={cn(
         "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm outline-none",
-        "focus:bg-zinc-100 focus:text-zinc-900 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "dark:focus:bg-zinc-800 dark:focus:text-zinc-100",
+        "focus:bg-surface-hover focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "dark:focus:bg-surface-hover dark:focus:text-foreground",
         className,
       )}
       {...props}
@@ -194,7 +194,7 @@ export function MenubarSeparator({
   return (
     <MenubarPrimitive.Separator
       data-slot="menubar-separator"
-      className={cn("-mx-1 my-1 h-px bg-zinc-200 dark:bg-zinc-800", className)}
+      className={cn("-mx-1 my-1 h-px bg-surface-hover dark:bg-surface-hover", className)}
       {...props}
     />
   );
@@ -207,7 +207,7 @@ export function MenubarShortcut({
   return (
     <span
       data-slot="menubar-shortcut"
-      className={cn("ml-auto text-xs tracking-widest text-zinc-500", className)}
+      className={cn("ml-auto text-xs tracking-widest text-muted-foreground", className)}
       {...props}
     />
   );
@@ -232,8 +232,8 @@ export function MenubarSubTrigger({
       data-slot="menubar-sub-trigger"
       className={cn(
         "flex cursor-default select-none items-center rounded-md px-2 py-1.5 text-sm outline-none",
-        "focus:bg-zinc-100 focus:text-zinc-900 data-[state=open]:bg-zinc-100 data-[state=open]:text-zinc-900",
-        "dark:focus:bg-zinc-800 dark:focus:text-zinc-100 dark:data-[state=open]:bg-zinc-800 dark:data-[state=open]:text-zinc-100",
+        "focus:bg-surface-hover focus:text-foreground data-[state=open]:bg-surface-hover data-[state=open]:text-foreground",
+        "dark:focus:bg-surface-hover dark:focus:text-foreground dark:data-[state=open]:bg-surface-hover dark:data-[state=open]:text-foreground",
         inset && "pl-8",
         className,
       )}
@@ -253,10 +253,10 @@ export function MenubarSubContent({
     <MenubarPrimitive.SubContent
       data-slot="menubar-sub-content"
       className={cn(
-        "z-50 min-w-[8rem] overflow-hidden rounded-lg border border-zinc-200 bg-white p-1 text-zinc-900 shadow-lg",
+        "z-50 min-w-[8rem] overflow-hidden rounded-lg border border-border bg-surface p-1 text-foreground shadow-lg",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        "dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100",
+        "dark:border-border dark:bg-surface-raised dark:text-foreground",
         className,
       )}
       {...props}

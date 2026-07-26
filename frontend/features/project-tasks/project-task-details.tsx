@@ -50,15 +50,15 @@ function statusClass(task: ProjectTask) {
   return cn(
     "border text-[10px] uppercase tracking-wide",
     task.status === "completed" &&
-      "border-emerald-800 bg-emerald-950 text-emerald-300",
+      "border-success/30 bg-success/10 text-success",
     (task.status === "running" || task.status === "verifying") &&
-      "border-sky-800 bg-sky-950 text-sky-300",
+      "border-pending/30 bg-pending/10 text-pending",
     task.status === "awaiting_approval" &&
-      "border-amber-800 bg-amber-950 text-amber-300",
+      "border-pending/30 bg-pending/10 text-pending",
     task.status === "needs_attention" &&
-      "border-red-800 bg-red-950 text-red-300",
+      "border-danger/30 bg-danger/10 text-danger",
     (task.status === "paused" || task.status === "cancelled") &&
-      "border-zinc-700 bg-zinc-900 text-zinc-300",
+      "border-border bg-surface-raised text-muted-foreground",
   );
 }
 
@@ -132,31 +132,31 @@ export function ProjectTaskDetails({
 
   return (
     <section className="space-y-4">
-      <header className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+      <header className="rounded-xl border border-border bg-surface-raised p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               {task.status === "completed" ? (
-                <CheckCircle2Icon className="size-5 text-emerald-400" />
+                <CheckCircle2Icon className="size-5 text-success" />
               ) : (
-                <CircleDotIcon className="size-5 text-violet-400" />
+                <CircleDotIcon className="size-5 text-pending" />
               )}
-              <h2 className="text-base font-semibold text-zinc-100">
+              <h2 className="text-base font-semibold text-foreground">
                 {task.title}
               </h2>
               <Badge className={statusClass(task)}>
                 {task.status.replaceAll("_", " ")}
               </Badge>
             </div>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-400">
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
               {task.goal}
             </p>
-            <p className="mt-2 text-xs text-zinc-500">
+            <p className="mt-2 text-xs text-muted-foreground">
               Phase: {task.phase.replaceAll("_", " ")} · Attempt{" "}
               {task.attempt_count}/{task.max_attempts} · {task.agent_id} agent
             </p>
             {task.last_error ? (
-              <p className="mt-3 rounded-lg border border-amber-900/70 bg-amber-950/30 p-3 text-xs leading-5 text-amber-200">
+              <p className="mt-3 rounded-lg border border-pending/30 bg-pending/10 p-3 text-xs leading-5 text-pending">
                 {task.last_error}
               </p>
             ) : null}
@@ -223,13 +223,13 @@ export function ProjectTaskDetails({
       </header>
 
       {liveEvents.length ? (
-        <section className="rounded-xl border border-sky-900/70 bg-sky-950/20 p-4">
-          <h3 className="text-sm font-semibold text-sky-200">Live workflow</h3>
+        <section className="rounded-xl border border-pending/30 bg-pending/10 p-4">
+          <h3 className="text-sm font-semibold text-pending">Live workflow</h3>
           <ol className="mt-3 space-y-2">
             {liveEvents.slice(-8).map((event, index) => (
               <li
                 key={`${event.type}-${index}`}
-                className="flex gap-2 text-xs leading-5 text-sky-100/80"
+                className="flex gap-2 text-xs leading-5 text-pending/80"
               >
                 {index === liveEvents.slice(-8).length - 1 && busy ? (
                   <Loader2Icon className="mt-0.5 size-3.5 shrink-0 animate-spin" />
@@ -248,12 +248,12 @@ export function ProjectTaskDetails({
       ) : null}
 
       {projectIndex?.status === "ready" ? (
-        <section className="rounded-xl border border-violet-900/60 bg-violet-950/20 p-4">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-violet-200">
+        <section className="rounded-xl border border-pending/30 bg-pending/15 p-4">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-pending">
             <DatabaseIcon className="size-4" />
             Indexed planning evidence
           </h3>
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-muted-foreground">
             Ranked from {projectIndex.file_count ?? 0} indexed source files
             before the planning model ran.
           </p>
@@ -261,17 +261,17 @@ export function ProjectTaskDetails({
             {projectIndex.relevant_files?.map((file) => (
               <div
                 key={file.path}
-                className="rounded-lg border border-violet-900/40 bg-zinc-950/70 p-2.5"
+                className="rounded-lg border border-pending/30 bg-surface-raised/70 p-2.5"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <code className="min-w-0 truncate text-xs text-zinc-200">
+                  <code className="min-w-0 truncate text-xs text-foreground">
                     {file.path}
                   </code>
-                  <span className="shrink-0 text-[10px] text-violet-400">
+                  <span className="shrink-0 text-[10px] text-pending">
                     {file.score ?? 0}
                   </span>
                 </div>
-                <p className="mt-1.5 text-[11px] leading-4 text-zinc-500">
+                <p className="mt-1.5 text-[11px] leading-4 text-muted-foreground">
                   {file.reasons?.join(" · ") || "Relevant path match"}
                 </p>
               </div>
@@ -281,50 +281,50 @@ export function ProjectTaskDetails({
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+        <section className="rounded-xl border border-border bg-surface-raised p-4">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <FileCode2Icon className="size-4 text-violet-400" />
+            <FileCode2Icon className="size-4 text-pending" />
             Structured plan
           </h3>
           {plan ? (
             <div className="mt-3 space-y-3">
-              <p className="text-xs leading-5 text-zinc-400">{plan.summary}</p>
+              <p className="text-xs leading-5 text-muted-foreground">{plan.summary}</p>
               <ul className="space-y-2">
                 {plan.files.map((file) => (
                   <li
                     key={`${file.operation}:${file.path}`}
-                    className="rounded-lg border border-zinc-800 p-2.5"
+                    className="rounded-lg border border-border p-2.5"
                   >
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{file.operation}</Badge>
-                      <code className="min-w-0 truncate text-xs text-zinc-200">
+                      <code className="min-w-0 truncate text-xs text-foreground">
                         {file.path}
                       </code>
                     </div>
-                    <p className="mt-1.5 text-xs text-zinc-500">{file.reason}</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">{file.reason}</p>
                   </li>
                 ))}
               </ul>
               {plan.risks.length ? (
-                <p className="text-xs text-amber-300">
+                <p className="text-xs text-pending">
                   Risks: {plan.risks.join(" · ")}
                 </p>
               ) : null}
             </div>
           ) : (
-            <p className="mt-3 text-xs text-zinc-500">
+            <p className="mt-3 text-xs text-muted-foreground">
               The planning model has not produced a typed plan yet.
             </p>
           )}
         </section>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+        <section className="rounded-xl border border-border bg-surface-raised p-4">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <ShieldCheckIcon className="size-4 text-emerald-400" />
+            <ShieldCheckIcon className="size-4 text-success" />
             Frozen context and validation
           </h3>
           {context ? (
-            <div className="mt-3 space-y-2 text-xs text-zinc-400">
+            <div className="mt-3 space-y-2 text-xs text-muted-foreground">
               <p>
                 {context.files?.length ?? 0} exact file(s) ·{" "}
                 {readableBytes(context.bytes)} ·{" "}
@@ -337,20 +337,20 @@ export function ProjectTaskDetails({
                     className="flex items-center justify-between gap-3"
                   >
                     <code className="truncate">{file.path}</code>
-                    <span className="shrink-0 text-zinc-600">
+                    <span className="shrink-0 text-muted-foreground">
                       {readableBytes(file.bytes)}
                     </span>
                   </li>
                 ))}
               </ul>
               {context.omitted?.length ? (
-                <p className="text-amber-300">
+                <p className="text-pending">
                   Omitted: {context.omitted.join(", ")}
                 </p>
               ) : null}
             </div>
           ) : (
-            <p className="mt-3 text-xs text-zinc-500">
+            <p className="mt-3 text-xs text-muted-foreground">
               Context will be frozen after planning.
             </p>
           )}
@@ -359,8 +359,8 @@ export function ProjectTaskDetails({
               className={cn(
                 "mt-4 rounded-lg border p-3 text-xs",
                 validation.valid !== false
-                  ? "border-emerald-900 bg-emerald-950/30 text-emerald-200"
-                  : "border-red-900 bg-red-950/30 text-red-200",
+                  ? "border-success/30 bg-success/10 text-success"
+                  : "border-danger/30 bg-danger/10 text-danger",
               )}
             >
               <p className="flex items-center gap-2 font-medium">
@@ -390,7 +390,7 @@ export function ProjectTaskDetails({
                 Atomic change set ({task.proposals.length} file
                 {task.proposals.length === 1 ? "" : "s"})
               </h3>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Review every operation. Application and verification are one
                 controlled workflow.
               </p>
@@ -400,7 +400,7 @@ export function ProjectTaskDetails({
                 <Button
                   variant="outline"
                   disabled={busy}
-                  className="border-red-900 text-red-300"
+                  className="border-danger/30 text-danger"
                   onClick={() => onReject(task)}
                 >
                   <XIcon className="size-4" />
@@ -408,7 +408,7 @@ export function ProjectTaskDetails({
                 </Button>
                 <Button
                   disabled={busy}
-                  className="bg-emerald-600 hover:bg-emerald-500"
+                  className="bg-success/10 hover:bg-success"
                   onClick={() => onApproveAndVerify(task)}
                 >
                   {action === "verify" ? (
@@ -432,11 +432,11 @@ export function ProjectTaskDetails({
       ) : null}
 
       {storedVerification || displayedVerificationOutput ? (
-        <section className="overflow-hidden rounded-xl border border-zinc-800 bg-black">
-          <header className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 px-4 py-2 text-xs text-zinc-300">
+        <section className="overflow-hidden rounded-xl border border-border bg-foreground">
+          <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2 text-xs text-muted-foreground">
             <span className="font-medium">Verification output</span>
             {storedVerification ? (
-              <span className="text-zinc-500">
+              <span className="text-muted-foreground">
                 {storedVerification.status ?? "unknown"}
                 {typeof storedVerification.exit_code === "number"
                   ? ` · exit ${storedVerification.exit_code}`
@@ -449,12 +449,12 @@ export function ProjectTaskDetails({
             ) : null}
           </header>
           {displayedVerificationOutput ? (
-            <pre className="max-h-80 overflow-auto whitespace-pre-wrap p-4 text-xs leading-5 text-zinc-300">
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap p-4 text-xs leading-5 text-muted-foreground">
               {displayedVerificationOutput}
             </pre>
           ) : null}
           {storedVerification?.error ? (
-            <p className="border-t border-red-900/60 bg-red-950/30 px-4 py-3 text-xs text-red-300">
+            <p className="border-t border-danger/30 bg-danger/10 px-4 py-3 text-xs text-danger">
               {storedVerification.error}
             </p>
           ) : null}
@@ -462,11 +462,11 @@ export function ProjectTaskDetails({
       ) : null}
 
       {task.events.length ? (
-        <details className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-xs text-zinc-500">
-          <summary className="cursor-pointer font-medium text-zinc-300">
+        <details className="rounded-xl border border-border bg-surface-raised p-4 text-xs text-muted-foreground">
+          <summary className="cursor-pointer font-medium text-muted-foreground">
             Durable audit trail ({task.events.length})
           </summary>
-          <ol className="mt-3 space-y-2 border-l border-zinc-800 pl-3">
+          <ol className="mt-3 space-y-2 border-l border-border pl-3">
             {task.events.map((event) => (
               <li key={event.event_id}>
                 {event.message} · {new Date(event.created_at).toLocaleString()}

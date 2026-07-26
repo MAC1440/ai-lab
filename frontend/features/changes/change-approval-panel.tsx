@@ -27,11 +27,11 @@ function statusClasses(status: ChangeProposal["status"]) {
   return cn(
     "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]",
     status === "pending" &&
-      "border-amber-700/70 bg-amber-950/50 text-amber-300",
+      "border-pending/30 bg-pending/10 text-pending",
     status === "approved" &&
-      "border-emerald-700/70 bg-emerald-950/50 text-emerald-300",
+      "border-success/30 bg-success/10 text-success",
     status === "rejected" &&
-      "border-red-700/70 bg-red-950/50 text-red-300",
+      "border-danger/30 bg-danger/10 text-danger",
   );
 }
 
@@ -70,11 +70,11 @@ export function ChangeApprovalPanel({
   }
 
   return (
-    <article className="overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl">
-      <header className="flex items-start justify-between gap-4 bg-zinc-900/70 px-4 py-3.5">
+    <article className="overflow-hidden rounded-xl border border-border bg-surface-raised shadow-xl">
+      <header className="flex items-start justify-between gap-4 bg-surface-raised/70 px-4 py-3.5">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-            <FileDiffIcon className="size-4 shrink-0 text-sky-400" />
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <FileDiffIcon className="size-4 shrink-0 text-pending" />
             <span className="truncate" title={proposal.file_path}>
               Proposed {proposal.operation}: {proposal.file_path}
               {proposal.destination_path
@@ -84,7 +84,7 @@ export function ChangeApprovalPanel({
           </div>
 
           {proposal.summary ? (
-            <p className="mt-1.5 text-xs leading-5 text-zinc-400">
+            <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
               {proposal.summary}
             </p>
           ) : null}
@@ -98,14 +98,14 @@ export function ChangeApprovalPanel({
       <UnifiedDiffView diff={proposal.diff} />
 
       {error ? (
-        <p className="border-t border-red-900/60 bg-red-950/40 px-4 py-2.5 text-xs text-red-300">
+        <p className="border-t border-danger/30 bg-danger/10 px-4 py-2.5 text-xs text-danger">
           {error}
         </p>
       ) : null}
 
       {proposal.status === "pending" && !reviewOnly ? (
-        <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-800 bg-zinc-900/70 px-4 py-3">
-          <p className="mr-auto text-xs text-zinc-500">
+        <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface-raised/70 px-4 py-3">
+          <p className="mr-auto text-xs text-muted-foreground">
             Review this operation before changing the workspace.
           </p>
 
@@ -114,7 +114,7 @@ export function ChangeApprovalPanel({
             variant="outline"
             size="sm"
             disabled={action !== null}
-            className="border-red-900/70 text-red-300 hover:bg-red-950/50"
+            className="border-danger/30 text-danger hover:bg-danger/10"
             onClick={() => void resolve("reject")}
           >
             {action === "reject" ? (
@@ -129,7 +129,7 @@ export function ChangeApprovalPanel({
             type="button"
             size="sm"
             disabled={action !== null}
-            className="bg-emerald-600 text-white hover:bg-emerald-500"
+            className="bg-success/10 text-accent-foreground hover:bg-success"
             onClick={() => void resolve("approve")}
           >
             {action === "approve" ? (
@@ -141,7 +141,7 @@ export function ChangeApprovalPanel({
           </Button>
         </footer>
       ) : reviewOnly && proposal.status === "pending" ? (
-        <footer className="border-t border-zinc-800 bg-zinc-900/70 px-4 py-3 text-xs text-zinc-500">
+        <footer className="border-t border-border bg-surface-raised/70 px-4 py-3 text-xs text-muted-foreground">
           This file belongs to one atomic task change set. Approve or reject the
           complete set below.
         </footer>

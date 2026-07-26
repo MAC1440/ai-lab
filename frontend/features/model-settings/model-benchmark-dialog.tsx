@@ -149,7 +149,7 @@ export function ModelBenchmarkDialog({
           assignments automatically.
         </DialogDescription>
 
-        <section className="flex flex-wrap items-end gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+        <section className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface-raised p-4">
           <div className="min-w-48 flex-1 space-y-1.5">
             <Label>Agent assignment to test</Label>
             <Select
@@ -191,7 +191,7 @@ export function ModelBenchmarkDialog({
         </section>
 
         {error ? (
-          <p className="rounded-lg border border-red-900 bg-red-950/30 p-3 text-sm text-red-300">
+          <p className="rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
             {error}
           </p>
         ) : null}
@@ -204,24 +204,24 @@ export function ModelBenchmarkDialog({
               <article
                 key={stage}
                 className={cn(
-                  "rounded-xl border border-zinc-800 bg-zinc-950 p-4",
-                  isCurrent && "border-sky-800",
+                  "rounded-xl border border-border bg-surface-raised p-4",
+                  isCurrent && "border-pending/30",
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold capitalize">{stage}</h3>
                   {isCurrent ? (
-                    <Loader2Icon className="size-4 animate-spin text-sky-400" />
+                    <Loader2Icon className="size-4 animate-spin text-pending" />
                   ) : result?.status === "passed" ? (
-                    <CheckCircle2Icon className="size-4 text-emerald-400" />
+                    <CheckCircle2Icon className="size-4 text-success" />
                   ) : result ? (
-                    <XCircleIcon className="size-4 text-red-400" />
+                    <XCircleIcon className="size-4 text-danger" />
                   ) : (
-                    <ActivityIcon className="size-4 text-zinc-600" />
+                    <ActivityIcon className="size-4 text-muted-foreground" />
                   )}
                 </div>
                 {result ? (
-                  <div className="mt-3 space-y-2 text-xs text-zinc-400">
+                  <div className="mt-3 space-y-2 text-xs text-muted-foreground">
                     <p className="flex items-center gap-2">
                       <Badge variant="outline">
                         {Math.round(result.score * 100)}%
@@ -237,7 +237,7 @@ export function ModelBenchmarkDialog({
                         : "Speed unavailable"}
                     </p>
                     {result.error ? (
-                      <p className="text-red-300">{result.error}</p>
+                      <p className="text-danger">{result.error}</p>
                     ) : null}
                     <ul className="space-y-1">
                       {result.assertions.map((assertion) => (
@@ -245,8 +245,8 @@ export function ModelBenchmarkDialog({
                           key={assertion.name}
                           className={
                             assertion.passed
-                              ? "text-emerald-400"
-                              : "text-red-400"
+                              ? "text-success"
+                              : "text-danger"
                           }
                         >
                           {assertion.passed ? "✓" : "✕"}{" "}
@@ -256,7 +256,7 @@ export function ModelBenchmarkDialog({
                     </ul>
                   </div>
                 ) : (
-                  <p className="mt-3 text-xs text-zinc-600">
+                  <p className="mt-3 text-xs text-muted-foreground">
                     Not measured in this session.
                   </p>
                 )}
@@ -265,11 +265,11 @@ export function ModelBenchmarkDialog({
           })}
         </section>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+        <section className="rounded-xl border border-border bg-surface-raised p-4">
           <h3 className="text-sm font-semibold">
             Measured assignment recommendations
           </h3>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-muted-foreground">
             Based on {recommendations?.benchmarked_model_count ?? 0} benchmarked
             model profile(s). Recommendations remain advisory.
           </p>
@@ -280,20 +280,20 @@ export function ModelBenchmarkDialog({
               return (
                 <div
                   key={stage}
-                  className="rounded-lg border border-zinc-800 p-3"
+                  className="rounded-lg border border-border p-3"
                 >
-                  <p className="text-xs font-medium capitalize text-zinc-300">
+                  <p className="text-xs font-medium capitalize text-muted-foreground">
                     {stage}
                   </p>
                   {recommendation ? (
                     <>
                       <p
-                        className="mt-2 truncate text-sm text-zinc-100"
+                        className="mt-2 truncate text-sm text-foreground"
                         title={recommendation.model}
                       >
                         {recommendation.model}
                       </p>
-                      <p className="mt-1 text-xs text-zinc-500">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {Math.round(recommendation.score * 100)}% ·{" "}
                         {recommendation.measured_tokens_per_second
                           ? `${recommendation.measured_tokens_per_second.toFixed(1)} tok/s`
@@ -301,7 +301,7 @@ export function ModelBenchmarkDialog({
                       </p>
                     </>
                   ) : (
-                    <p className="mt-2 text-xs text-zinc-600">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       Run a benchmark first.
                     </p>
                   )}

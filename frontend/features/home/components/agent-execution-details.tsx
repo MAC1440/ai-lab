@@ -14,7 +14,7 @@ function formatDistance(distance: number | null | undefined) {
 function ToolStatus({ tool }: { tool: AgentToolExecution }) {
     if (tool.status === "running") {
         return (
-            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+            <span className="flex items-center gap-1 text-pending dark:text-pending">
                 <Loader2Icon className="size-3 animate-spin" />
                 running
             </span>
@@ -25,8 +25,8 @@ function ToolStatus({ tool }: { tool: AgentToolExecution }) {
         <span
             className={
                 tool.status === "success"
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-red-600 dark:text-red-400"
+                    ? "text-success dark:text-success"
+                    : "text-danger dark:text-danger"
             }
         >
             {tool.status}
@@ -45,15 +45,15 @@ export function AgentExecutionDetails({
     const hasProjectContext = projectContext?.enabled === true;
 
     return (
-        <details className="group rounded-lg border border-zinc-200 bg-white/70 text-xs dark:border-zinc-800 dark:bg-zinc-950/50">
-            <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2 text-zinc-600 marker:hidden dark:text-zinc-300">
+        <details className="group rounded-lg border border-border bg-surface/70 text-xs dark:border-border dark:bg-surface-raised/50">
+            <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2 text-muted-foreground marker:hidden dark:text-muted-foreground">
                 <span className="font-medium">Execution details</span>
 
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
+                <span className="rounded-full bg-surface-hover px-2 py-0.5 dark:bg-surface-hover">
                     {result.model}
                 </span>
 
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
+                <span className="rounded-full bg-surface-hover px-2 py-0.5 dark:bg-surface-hover">
                     {result.steps} {result.steps === 1 ? "step" : "steps"}
                 </span>
 
@@ -61,46 +61,46 @@ export function AgentExecutionDetails({
                     <span
                         className={
                             result.rag.context_found
-                                ? "rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                                : "rounded-full bg-amber-100 px-2 py-0.5 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+                                ? "rounded-full bg-success/10 px-2 py-0.5 text-success dark:bg-success/10 dark:text-success"
+                                : "rounded-full bg-pending/10 px-2 py-0.5 text-pending dark:bg-pending/10 dark:text-pending"
                         }
                     >
                         {result.rag.context_found ? "RAG context found" : "No RAG context"}
                     </span>
                 ) : (
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
+                    <span className="rounded-full bg-surface-hover px-2 py-0.5 dark:bg-surface-hover">
                         RAG disabled
                     </span>
                 )}
 
                 {hasTools ? (
-                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
+                    <span className="rounded-full bg-pending/15 px-2 py-0.5 text-pending dark:bg-pending/15 dark:text-pending">
                         {result.tools_used.length} tool call
                         {result.tools_used.length === 1 ? "" : "s"}
                     </span>
                 ) : null}
 
                 {hasProjectContext ? (
-                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                    <span className="rounded-full bg-pending/10 px-2 py-0.5 text-pending dark:bg-pending/10 dark:text-pending">
                         {projectContext.file_count} context file
                         {projectContext.file_count === 1 ? "" : "s"}
                     </span>
                 ) : null}
 
-                <span className="ml-auto text-[10px] uppercase tracking-wide text-zinc-400 group-open:hidden">
+                <span className="ml-auto text-[10px] uppercase tracking-wide text-muted-foreground group-open:hidden">
                     Show
                 </span>
-                <span className="ml-auto hidden text-[10px] uppercase tracking-wide text-zinc-400 group-open:inline">
+                <span className="ml-auto hidden text-[10px] uppercase tracking-wide text-muted-foreground group-open:inline">
                     Hide
                 </span>
             </summary>
 
-            <div className="space-y-4 border-t border-zinc-200 px-3 py-3 dark:border-zinc-800">
+            <div className="space-y-4 border-t border-border px-3 py-3 dark:border-border">
                 <section>
-                    <h4 className="font-semibold text-zinc-800 dark:text-zinc-200">
+                    <h4 className="font-semibold text-foreground dark:text-foreground">
                         Agent
                     </h4>
-                    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-zinc-600 dark:text-zinc-400">
+                    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-muted-foreground dark:text-muted-foreground">
                         <dt>Agent ID</dt>
                         <dd className="font-mono">{result.agent_id}</dd>
 
@@ -113,17 +113,17 @@ export function AgentExecutionDetails({
                 </section>
 
                 <section>
-                    <h4 className="font-semibold text-zinc-800 dark:text-zinc-200">
+                    <h4 className="font-semibold text-foreground dark:text-foreground">
                         Project context
                     </h4>
 
                     {!hasProjectContext ? (
-                        <p className="mt-2 text-zinc-500">
+                        <p className="mt-2 text-muted-foreground">
                             Deterministic project context was disabled for this agent.
                         </p>
                     ) : (
                         <div className="mt-2 space-y-2">
-                            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-zinc-600 dark:text-zinc-400">
+                            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-muted-foreground dark:text-muted-foreground">
                                 <dt>Project types</dt>
                                 <dd>{projectContext.project_types.join(", ") || "unknown"}</dd>
 
@@ -146,11 +146,11 @@ export function AgentExecutionDetails({
                             </dl>
 
                             {projectContext.files_included.length > 0 ? (
-                                <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-900">
-                                    <p className="font-medium text-zinc-700 dark:text-zinc-300">
+                                <div className="rounded-md border border-border bg-surface-hover p-2 dark:border-border dark:bg-surface-raised">
+                                    <p className="font-medium text-foreground dark:text-muted-foreground">
                                         Preloaded files
                                     </p>
-                                    <ul className="mt-1 space-y-1 font-mono text-[11px] text-zinc-600 dark:text-zinc-400">
+                                    <ul className="mt-1 space-y-1 font-mono text-[11px] text-muted-foreground dark:text-muted-foreground">
                                         {projectContext.files_included.map((path) => (
                                             <li key={path} className="break-all">
                                                 {path}
@@ -159,7 +159,7 @@ export function AgentExecutionDetails({
                                     </ul>
                                 </div>
                             ) : (
-                                <p className="text-zinc-500">
+                                <p className="text-muted-foreground">
                                     No files were preloaded; the project tree is still available.
                                 </p>
                             )}
@@ -168,17 +168,17 @@ export function AgentExecutionDetails({
                 </section>
 
                 <section>
-                    <h4 className="font-semibold text-zinc-800 dark:text-zinc-200">
+                    <h4 className="font-semibold text-foreground dark:text-foreground">
                         Retrieval
                     </h4>
 
                     {!result.rag.enabled ? (
-                        <p className="mt-2 text-zinc-500">
+                        <p className="mt-2 text-muted-foreground">
                             Retrieval was disabled for this agent.
                         </p>
                     ) : (
                         <div className="mt-2 space-y-2">
-                            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-zinc-600 dark:text-zinc-400">
+                            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-muted-foreground dark:text-muted-foreground">
                                 <dt>Context found</dt>
                                 <dd>{result.rag.context_found ? "Yes" : "No"}</dd>
 
@@ -212,7 +212,7 @@ export function AgentExecutionDetails({
                                             key={`${String(source.source ?? "source")}-${String(
                                                 source.chunk_index ?? index,
                                             )}-${index}`}
-                                            className="rounded-md border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-900"
+                                            className="rounded-md border border-border bg-surface-hover p-2 dark:border-border dark:bg-surface-raised"
                                         >
                                             <div className="flex flex-wrap gap-x-3 gap-y-1">
                                                 <span>
@@ -249,7 +249,7 @@ export function AgentExecutionDetails({
                                                     href={source.source_url}
                                                     target="_blank"
                                                     rel="noreferrer"
-                                                    className="mt-1 inline-block text-violet-600 underline underline-offset-2 dark:text-violet-400"
+                                                    className="mt-1 inline-block text-pending underline underline-offset-2 dark:text-pending"
                                                 >
                                                     Open official Unity documentation
                                                 </a>
@@ -258,7 +258,7 @@ export function AgentExecutionDetails({
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-zinc-500">
+                                <p className="text-muted-foreground">
                                     No document chunks were included in the model context.
                                 </p>
                             )}
@@ -267,12 +267,12 @@ export function AgentExecutionDetails({
                 </section>
 
                 <section>
-                    <h4 className="font-semibold text-zinc-800 dark:text-zinc-200">
+                    <h4 className="font-semibold text-foreground dark:text-foreground">
                         Tools
                     </h4>
 
                     {!hasTools ? (
-                        <p className="mt-2 text-zinc-500">
+                        <p className="mt-2 text-muted-foreground">
                             The model has not called a tool for this response.
                         </p>
                     ) : (
@@ -280,19 +280,19 @@ export function AgentExecutionDetails({
                             {result.tools_used.map((tool, index) => (
                                 <div
                                     key={tool.id ?? `${tool.name}-${index}`}
-                                    className="rounded-md border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-900"
+                                    className="rounded-md border border-border bg-surface-hover p-2 dark:border-border dark:bg-surface-raised"
                                 >
                                     <div className="flex items-center justify-between gap-3">
                                         <code className="font-semibold">{tool.name}</code>
                                         <ToolStatus tool={tool} />
                                     </div>
 
-                                    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words rounded bg-zinc-100 p-2 text-[11px] dark:bg-zinc-950">
+                                    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words rounded bg-surface-hover p-2 text-[11px] dark:bg-surface-raised">
                                         {JSON.stringify(tool.arguments, null, 2)}
                                     </pre>
 
                                     {tool.error ? (
-                                        <p className="mt-2 text-red-600 dark:text-red-400">
+                                        <p className="mt-2 text-danger dark:text-danger">
                                             {tool.error}
                                         </p>
                                     ) : null}

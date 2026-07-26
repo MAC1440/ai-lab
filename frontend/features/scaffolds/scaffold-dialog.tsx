@@ -121,7 +121,7 @@ export function ScaffoldDialog({ disabled = false }: { disabled?: boolean }) {
         </DialogDescription>
 
         {loading ? (
-          <div className="flex items-center gap-2 py-8 text-sm text-zinc-500">
+          <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
             <Loader2Icon className="size-4 animate-spin" /> Loading scaffolds…
           </div>
         ) : (
@@ -139,11 +139,11 @@ export function ScaffoldDialog({ disabled = false }: { disabled?: boolean }) {
                 </SelectContent>
               </Select>
               {selected ? (
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400">
-                  <p className="text-zinc-200">{selected.description}</p>
+                <div className="rounded-lg border border-border bg-surface-raised p-3 text-xs text-muted-foreground">
+                  <p className="text-foreground">{selected.description}</p>
                   <p className="mt-1">Source: {selected.source}</p>
-                  {selected.requires_network ? <p className="mt-1 text-amber-400">Requires internet during staging.</p> : null}
-                  {selected.unavailable_reason ? <p className="mt-1 text-red-400">{selected.unavailable_reason}</p> : null}
+                  {selected.requires_network ? <p className="mt-1 text-pending">Requires internet during staging.</p> : null}
+                  {selected.unavailable_reason ? <p className="mt-1 text-danger">{selected.unavailable_reason}</p> : null}
                 </div>
               ) : null}
             </div>
@@ -159,11 +159,11 @@ export function ScaffoldDialog({ disabled = false }: { disabled?: boolean }) {
               </div>
             </div>
 
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-muted-foreground">
               The target must be missing or empty. Generated dependencies are not installed automatically.
             </p>
-            {error ? <p className="rounded-lg border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">{error}</p> : null}
-            {success ? <p className="rounded-lg border border-emerald-900 bg-emerald-950/40 p-3 text-sm text-emerald-300">{success}</p> : null}
+            {error ? <p className="rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">{error}</p> : null}
+            {success ? <p className="rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success">{success}</p> : null}
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Close</Button>

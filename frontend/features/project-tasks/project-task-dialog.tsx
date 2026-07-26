@@ -59,13 +59,13 @@ function taskBadgeClass(task: ProjectTask) {
   return cn(
     "border text-[9px] uppercase tracking-wide",
     task.status === "completed" &&
-      "border-emerald-900 bg-emerald-950 text-emerald-300",
+      "border-success/30 bg-success/10 text-success",
     (task.status === "running" || task.status === "verifying") &&
-      "border-sky-900 bg-sky-950 text-sky-300",
+      "border-pending/30 bg-pending/10 text-pending",
     task.status === "awaiting_approval" &&
-      "border-amber-900 bg-amber-950 text-amber-300",
+      "border-pending/30 bg-pending/10 text-pending",
     task.status === "needs_attention" &&
-      "border-red-900 bg-red-950 text-red-300",
+      "border-danger/30 bg-danger/10 text-danger",
   );
 }
 
@@ -345,7 +345,7 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
       </DialogTrigger>
       <DialogContent className="h-[92vh] max-h-[92vh] max-w-[96vw] overflow-hidden p-0 xl:max-w-7xl">
         <div className="flex h-full min-h-0 flex-col">
-          <header className="flex items-start justify-between gap-4 border-b border-zinc-800 px-5 py-4 pr-12">
+          <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4 pr-12">
             <div>
               <DialogTitle>Production project tasks</DialogTitle>
               <DialogDescription>
@@ -383,13 +383,13 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
           </header>
 
           {error ? (
-            <p className="mx-5 mt-4 rounded-lg border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">
+            <p className="mx-5 mt-4 rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
               {error}
             </p>
           ) : null}
 
           {showCreate ? (
-            <section className="mx-5 mt-4 grid gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4 md:grid-cols-[minmax(0,1fr)_200px]">
+            <section className="mx-5 mt-4 grid gap-3 rounded-xl border border-border bg-surface-raised p-4 md:grid-cols-[minmax(0,1fr)_200px]">
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="task-title">Task title</Label>
@@ -433,7 +433,7 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
                       <SelectItem value="web">Web</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs leading-5 text-zinc-500">
+                  <p className="text-xs leading-5 text-muted-foreground">
                     {agentReason}
                   </p>
                 </div>
@@ -460,7 +460,7 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
           ) : null}
 
           <div className="grid min-h-0 flex-1 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <aside className="min-h-0 overflow-y-auto border-r border-zinc-800 p-3">
+            <aside className="min-h-0 overflow-y-auto border-r border-border p-3">
               <div className="space-y-2">
                 {tasks.map((task) => (
                   <button
@@ -469,8 +469,8 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
                     className={cn(
                       "w-full rounded-lg border p-3 text-left transition",
                       selectedTaskId === task.task_id
-                        ? "border-violet-700 bg-violet-950/30"
-                        : "border-zinc-800 bg-zinc-950 hover:border-zinc-700",
+                        ? "border-pending/30 bg-pending/15"
+                        : "border-border bg-surface-raised hover:border-border",
                     )}
                     onClick={() => {
                       setSelectedTaskId(task.task_id);
@@ -480,18 +480,18 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
                   >
                     <div className="flex items-start gap-2">
                       {task.status === "completed" ? (
-                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-success" />
                       ) : (
-                        <CircleDotIcon className="mt-0.5 size-4 shrink-0 text-violet-400" />
+                        <CircleDotIcon className="mt-0.5 size-4 shrink-0 text-pending" />
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-zinc-200">
+                        <p className="truncate text-sm font-medium text-foreground">
                           {task.title}
                         </p>
                         <Badge className={cn("mt-2", taskBadgeClass(task))}>
                           {task.status.replaceAll("_", " ")}
                         </Badge>
-                        <p className="mt-2 truncate text-[11px] text-zinc-600">
+                        <p className="mt-2 truncate text-[11px] text-muted-foreground">
                           {task.phase.replaceAll("_", " ")}
                         </p>
                       </div>
@@ -499,7 +499,7 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
                   </button>
                 ))}
                 {!loading && tasks.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-zinc-800 p-6 text-center text-xs text-zinc-500">
+                  <p className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
                     No project tasks yet.
                   </p>
                 ) : null}
@@ -534,7 +534,7 @@ export function ProjectTaskDialog({ disabled = false }: { disabled?: boolean }) 
                   onCancel={(task) => void cancelTask(task)}
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-zinc-500">
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                   Create or select a project task.
                 </div>
               )}
