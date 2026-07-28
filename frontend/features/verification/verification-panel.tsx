@@ -444,7 +444,7 @@ export function VerificationPanel({
 
           <pre
             ref={outputRef}
-            className="h-72 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-xs leading-5 text-muted-foreground"
+            className="h-72 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-xs leading-5 text-muted-foreground bg-surface"
           >
             {liveOutput ||
               (selectedRun
