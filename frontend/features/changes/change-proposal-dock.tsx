@@ -111,15 +111,15 @@ export function ChangeProposalDock() {
 
   return (
     <aside className="fixed inset-x-3 bottom-3 z-50 mx-auto w-auto max-w-[90rem] sm:inset-x-5 sm:bottom-5">
-      <div className="overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/95 shadow-2xl shadow-black/50 backdrop-blur">
+      <div className="overflow-hidden rounded-xl border border-border bg-surface-raised/95 shadow-2xl shadow-black/50 backdrop-blur">
         <header className="flex items-center justify-between gap-3 px-4 py-3">
-          <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-zinc-100">
+          <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
             {loading ? (
               <Loader2Icon className="size-4 shrink-0 animate-spin" />
             ) : lastApproved && proposals.length === 0 ? (
-              <CheckCircle2Icon className="size-4 shrink-0 text-emerald-400" />
+              <CheckCircle2Icon className="size-4 shrink-0 text-success" />
             ) : (
-              <FileDiffIcon className="size-4 shrink-0 text-sky-400" />
+              <FileDiffIcon className="size-4 shrink-0 text-pending" />
             )}
             <span className="truncate">
               {proposals.length > 0
@@ -139,22 +139,22 @@ export function ChangeProposalDock() {
         </header>
 
         {!collapsed ? (
-          <div className="max-h-[82vh] space-y-3 overflow-y-auto border-t border-zinc-800 p-3 sm:p-4">
+          <div className="max-h-[82vh] space-y-3 overflow-y-auto border-t border-border p-3 sm:p-4">
             {error ? (
-              <div className="rounded-lg border border-red-900/70 bg-red-950/40 px-3 py-2 text-xs text-red-300">
+              <div className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
                 Could not load the change approval queue: {error}
               </div>
             ) : null}
 
             {lastApproved ? (
-              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-900/70 bg-emerald-950/35 px-3 py-3">
-                <CheckCircle2Icon className="size-5 shrink-0 text-emerald-400" />
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-success/30 bg-success/10 px-3 py-3">
+                <CheckCircle2Icon className="size-5 shrink-0 text-success" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-emerald-200">
+                  <p className="text-sm font-medium text-success">
                     Change written successfully
                   </p>
                   <p
-                    className="truncate text-xs text-emerald-300/70"
+                    className="truncate text-xs text-success/70"
                     title={lastApproved.file_path}
                   >
                     {lastApproved.file_path}
@@ -181,8 +181,8 @@ export function ChangeProposalDock() {
             {groupedProposals.map((group) => (
               <section key={group.id} className="space-y-3">
                 {group.proposals.length > 1 ? (
-                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-violet-900/60 bg-violet-950/25 px-3 py-2">
-                    <p className="mr-auto text-xs text-violet-200">
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-pending/30 bg-pending/15 px-3 py-2">
+                    <p className="mr-auto text-xs text-pending">
                       One agent turn proposed {group.proposals.length} related files.
                     </p>
                     <Button type="button" size="sm" variant="outline" disabled={setAction !== null} onClick={() => void resolveSet(group, "reject")}>

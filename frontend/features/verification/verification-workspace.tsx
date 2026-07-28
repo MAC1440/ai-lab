@@ -122,7 +122,7 @@ export function VerificationWorkspace() {
         />
 
         {error ? (
-          <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+          <div className="flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger dark:border-danger/30 dark:bg-danger/10 dark:text-danger">
             <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
             <div>
               <p className="font-medium">Verification workspace error</p>
@@ -133,11 +133,11 @@ export function VerificationWorkspace() {
 
         <Summary counts={counts} />
 
-        <div className="grid min-h-[38rem] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm lg:grid-cols-[20rem_minmax(0,1fr)] dark:border-zinc-800 dark:bg-zinc-950">
-          <aside className="flex min-h-0 flex-col border-b border-zinc-200 lg:border-r lg:border-b-0 dark:border-zinc-800">
-            <div className="space-y-3 border-b border-zinc-200 p-3 dark:border-zinc-800">
+        <div className="grid min-h-[38rem] overflow-hidden rounded-2xl border border-border bg-surface shadow-sm lg:grid-cols-[20rem_minmax(0,1fr)] dark:border-border dark:bg-surface-raised">
+          <aside className="flex min-h-0 flex-col border-b border-border lg:border-r lg:border-b-0 dark:border-border">
+            <div className="space-y-3 border-b border-border p-3 dark:border-border">
               <label className="relative block">
-                <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-zinc-400" />
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
@@ -174,9 +174,9 @@ export function VerificationWorkspace() {
               ))}
 
               {!loading && filteredTasks.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-zinc-200 p-6 text-center dark:border-zinc-800">
-                  <ShieldCheckIcon className="mx-auto size-6 text-zinc-300 dark:text-zinc-700" />
-                  <p className="mt-3 text-xs text-zinc-400">
+                <div className="rounded-xl border border-dashed border-border p-6 text-center dark:border-border">
+                  <ShieldCheckIcon className="mx-auto size-6 text-muted-foreground dark:text-foreground" />
+                  <p className="mt-3 text-xs text-muted-foreground">
                     No verification runs match these filters.
                   </p>
                 </div>
@@ -207,13 +207,13 @@ function WorkspaceHeader({
   return (
     <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success dark:text-success">
           Workspace confidence
         </p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground dark:text-foreground">
           Verification
         </h2>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
           Track task-linked checks, inspect persisted events and artifacts, and
           identify work that is ready for repair.
         </p>
@@ -223,7 +223,7 @@ function WorkspaceHeader({
         type="button"
         onClick={onRefresh}
         disabled={loading}
-        className="inline-flex w-fit items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200"
+        className="inline-flex w-fit items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-foreground shadow-sm disabled:opacity-50 dark:border-border dark:bg-surface-raised dark:text-foreground"
       >
         <RefreshCwIcon
           className={cn("size-3.5", loading && "animate-spin")}
@@ -256,18 +256,18 @@ function Summary({
       {items.map(([label, value, tone]) => (
         <div
           key={label}
-          className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+          className="rounded-xl border border-border bg-surface p-4 shadow-sm dark:border-border dark:bg-surface-raised"
         >
-          <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
           <p
             className={cn(
               "mt-2 text-2xl font-semibold",
-              tone === "sky" && "text-sky-600 dark:text-sky-400",
-              tone === "emerald" && "text-emerald-600 dark:text-emerald-400",
-              tone === "red" && "text-red-600 dark:text-red-400",
-              tone === "amber" && "text-amber-600 dark:text-amber-400",
+              tone === "sky" && "text-pending dark:text-pending",
+              tone === "emerald" && "text-success dark:text-success",
+              tone === "red" && "text-danger dark:text-danger",
+              tone === "amber" && "text-pending dark:text-pending",
             )}
           >
             {value}
@@ -304,34 +304,34 @@ function VerificationListItem({
       className={cn(
         "w-full rounded-xl border p-3 text-left transition",
         selected
-          ? "border-emerald-300 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/20"
-          : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700",
+          ? "border-success/30 bg-success/10 dark:border-success/30 dark:bg-success/10"
+          : "border-border bg-surface hover:border-border dark:border-border dark:bg-surface-raised dark:hover:border-border",
       )}
     >
       <div className="flex items-start gap-2">
         <Icon
           className={cn(
             "mt-0.5 size-4 shrink-0",
-            state === "running" && "animate-spin text-sky-500",
-            state === "passed" && "text-emerald-500",
-            state === "failed" && "text-red-500",
-            state === "not_started" && "text-amber-500",
+            state === "running" && "animate-spin text-pending",
+            state === "passed" && "text-success",
+            state === "failed" && "text-danger",
+            state === "not_started" && "text-pending",
           )}
         />
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">
+          <p className="truncate text-sm font-medium text-foreground dark:text-foreground">
             {task.title}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <span className={cn("rounded-full border px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide", verificationStateClass(state))}>
               {formatVerificationState(state)}
             </span>
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[9px] text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+            <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[9px] text-muted-foreground dark:bg-surface-hover dark:text-muted-foreground">
               attempt {task.attempt_count}/{task.max_attempts}
             </span>
           </div>
-          <p className="mt-2 truncate font-mono text-[10px] text-zinc-400">
+          <p className="mt-2 truncate font-mono text-[10px] text-muted-foreground">
             {task.latest_verification_run_id ?? "No run ID"}
           </p>
         </div>
@@ -347,24 +347,24 @@ function VerificationDetails({ task }: { task: ProjectTask }) {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-col gap-4 border-b border-zinc-200 pb-5 sm:flex-row sm:items-start sm:justify-between dark:border-zinc-800">
+      <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between dark:border-border">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+            <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
               {task.title}
             </h3>
             <span className={cn("rounded-full border px-2 py-1 text-[9px] font-medium uppercase tracking-wide", verificationStateClass(state))}>
               {formatVerificationState(state)}
             </span>
           </div>
-          <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
             {task.goal}
           </p>
         </div>
 
         <Link
           href="/tasks"
-          className="w-fit rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          className="w-fit rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-surface-hover dark:border-border dark:text-muted-foreground dark:hover:bg-surface-raised"
         >
           Open task workflow
         </Link>
@@ -390,7 +390,7 @@ function VerificationDetails({ task }: { task: ProjectTask }) {
       </div>
 
       {task.last_error ? (
-        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+        <div className="flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger dark:border-danger/30 dark:bg-danger/10 dark:text-danger">
           <FileWarningIcon className="mt-0.5 size-4 shrink-0" />
           <div>
             <p className="font-medium">Latest failure</p>
@@ -437,7 +437,7 @@ function VerificationDetails({ task }: { task: ProjectTask }) {
       </Section>
 
       {state === "failed" ? (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+        <div className="flex items-start gap-3 rounded-xl border border-pending/30 bg-pending/10 p-4 text-xs leading-relaxed text-pending dark:border-pending/30 dark:bg-pending/10 dark:text-pending">
           <WrenchIcon className="mt-0.5 size-4 shrink-0" />
           <p>
             This task needs attention. Open the task workflow to run the bounded
@@ -464,14 +464,14 @@ function Section({
   return (
     <section>
       <div className="flex items-start gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-300">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-hover text-muted-foreground dark:bg-surface-raised dark:text-muted-foreground">
           <Icon className="size-4" />
         </div>
         <div>
-          <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          <h4 className="text-sm font-semibold text-foreground dark:text-foreground">
             {title}
           </h4>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
             {description}
           </p>
         </div>
@@ -483,26 +483,26 @@ function Section({
 
 function EventCard({ event }: { event: ProjectTaskEvent }) {
   return (
-    <article className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+    <article className="rounded-xl border border-border p-3 dark:border-border">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+          <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground dark:bg-surface-hover dark:text-muted-foreground">
             {event.event_type.replaceAll("_", " ")}
           </span>
-          <span className="text-[10px] text-zinc-400">
+          <span className="text-[10px] text-muted-foreground">
             {formatTimestamp(event.created_at)}
           </span>
         </div>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground dark:text-muted-foreground">
         {event.message}
       </p>
       {Object.keys(event.payload).length > 0 ? (
         <details className="mt-3">
-          <summary className="cursor-pointer text-[10px] font-medium text-zinc-400">
+          <summary className="cursor-pointer text-[10px] font-medium text-muted-foreground">
             Event payload
           </summary>
-          <pre className="ai-lab-scrollbar mt-2 max-h-72 overflow-auto rounded-lg bg-zinc-950 p-3 text-[11px] text-zinc-300">
+          <pre className="ai-lab-scrollbar mt-2 max-h-72 overflow-auto rounded-lg bg-surface-raised p-3 text-[11px] text-muted-foreground">
             {JSON.stringify(event.payload, null, 2)}
           </pre>
         </details>
@@ -517,16 +517,16 @@ function ArtifactCard({
   artifact: ProjectTaskArtifact;
 }) {
   return (
-    <article className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
-        <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+    <article className="overflow-hidden rounded-xl border border-border dark:border-border">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-hover px-4 py-3 dark:bg-surface-raised/50">
+        <span className="text-xs font-semibold text-foreground dark:text-foreground">
           {artifact.artifact_type.replaceAll("_", " ")}
         </span>
-        <span className="text-[10px] text-zinc-400">
+        <span className="text-[10px] text-muted-foreground">
           {formatTimestamp(artifact.created_at)}
         </span>
       </div>
-      <pre className="ai-lab-scrollbar max-h-[30rem] overflow-auto whitespace-pre-wrap break-words bg-zinc-950 p-4 text-[11px] leading-relaxed text-zinc-300">
+      <pre className="ai-lab-scrollbar max-h-[30rem] overflow-auto whitespace-pre-wrap break-words bg-surface-raised p-4 text-[11px] leading-relaxed text-muted-foreground">
         {JSON.stringify(artifact.payload, null, 2)}
       </pre>
     </article>
@@ -541,11 +541,11 @@ function MetricCard({
   value: string;
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3 dark:border-zinc-800 dark:bg-zinc-900/40">
-      <p className="text-[9px] font-medium uppercase tracking-wide text-zinc-400">
+    <div className="min-w-0 rounded-xl border border-border bg-surface-hover/60 p-3 dark:border-border dark:bg-surface-raised/40">
+      <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-2 break-all font-mono text-[11px] font-medium text-zinc-700 dark:text-zinc-200">
+      <p className="mt-2 break-all font-mono text-[11px] font-medium text-foreground dark:text-foreground">
         {value}
       </p>
     </div>
@@ -554,7 +554,7 @@ function MetricCard({
 
 function EmptyPanel({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-zinc-200 p-6 text-center text-xs text-zinc-400 dark:border-zinc-800">
+    <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground dark:border-border">
       {message}
     </div>
   );
@@ -564,11 +564,11 @@ function EmptySelection() {
   return (
     <div className="flex min-h-[30rem] items-center justify-center">
       <div className="max-w-sm text-center">
-        <ShieldCheckIcon className="mx-auto size-8 text-zinc-300 dark:text-zinc-700" />
-        <p className="mt-4 text-sm font-medium text-zinc-600 dark:text-zinc-300">
+        <ShieldCheckIcon className="mx-auto size-8 text-muted-foreground dark:text-foreground" />
+        <p className="mt-4 text-sm font-medium text-muted-foreground dark:text-muted-foreground">
           Select a verification record
         </p>
-        <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
           Check status, task errors, persisted events, and structured artifacts
           will appear here.
         </p>
@@ -591,13 +591,13 @@ function verificationStateClass(
 ): string {
   switch (state) {
     case "running":
-      return "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300";
+      return "border-pending/30 bg-pending/10 text-pending dark:border-pending/30 dark:bg-pending/10 dark:text-pending";
     case "passed":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300";
+      return "border-success/30 bg-success/10 text-success dark:border-success/30 dark:bg-success/10 dark:text-success";
     case "failed":
-      return "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300";
+      return "border-danger/30 bg-danger/10 text-danger dark:border-danger/30 dark:bg-danger/10 dark:text-danger";
     default:
-      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300";
+      return "border-pending/30 bg-pending/10 text-pending dark:border-pending/30 dark:bg-pending/10 dark:text-pending";
   }
 }
 
@@ -649,7 +649,7 @@ function toMessage(error: unknown, fallback: string): string {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-zinc-200 bg-white py-2 pr-3 pl-9 text-xs outline-none ring-emerald-500/20 focus:border-emerald-500 focus:ring-4 dark:border-zinc-800 dark:bg-zinc-900";
+  "w-full rounded-lg border border-border bg-surface py-2 pr-3 pl-9 text-xs outline-none ring-emerald-500/20 focus:border-success/30 focus:ring-4 dark:border-border dark:bg-surface-raised";
 
 const selectClass =
-  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-900";
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs outline-none dark:border-border dark:bg-surface-raised";

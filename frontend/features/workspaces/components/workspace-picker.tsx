@@ -139,17 +139,17 @@ export function WorkspacePicker({
 
     return (
         <div className="space-y-4">
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
-                <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            <div className="rounded-lg border border-border bg-surface-hover p-3 dark:border-border dark:bg-surface-raised">
+                <p className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
                     Current folder
                 </p>
-                <p className="mt-1 break-all font-mono text-sm text-zinc-900 dark:text-zinc-100">
+                <p className="mt-1 break-all font-mono text-sm text-foreground dark:text-foreground">
                     {currentPath ?? "Choose a drive"}
                 </p>
             </div>
 
             {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+                <div className="rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger dark:border-danger/30 dark:bg-danger/10 dark:text-danger">
                     {error}
                 </div>
             )}
@@ -203,10 +203,10 @@ export function WorkspacePicker({
                         </Button>
                     </div>
 
-                    <ScrollArea className="h-72 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                    <ScrollArea className="h-72 rounded-lg border border-border dark:border-border">
                         <div className="space-y-1 p-2">
                             {isLoading ? (
-                                <div className="flex h-40 items-center justify-center text-sm text-zinc-500">
+                                <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
                                     <Loader2Icon className="mr-2 size-4 animate-spin" />
                                     Loading folders…
                                 </div>
@@ -216,14 +216,14 @@ export function WorkspacePicker({
                                         key={folder.path}
                                         type="button"
                                         onClick={() => void openFolder(folder.path)}
-                                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-surface-hover dark:hover:bg-surface-raised"
                                     >
-                                        <FolderIcon className="size-4 shrink-0 text-amber-500" />
+                                        <FolderIcon className="size-4 shrink-0 text-pending" />
                                         <span className="truncate">{folder.name}</span>
                                     </button>
                                 ))
                             ) : (
-                                <div className="flex h-40 items-center justify-center text-sm text-zinc-500">
+                                <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
                                     No subfolders found. You may select this folder.
                                 </div>
                             )}

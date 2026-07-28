@@ -331,13 +331,13 @@ function WorkspaceHeader({
   return (
     <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success dark:text-success">
           Local inference control
         </p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground dark:text-foreground">
           Models and runtime
         </h2>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
           Inspect installed models, verify provider connectivity, manage agent
           assignments, and keep context limits appropriate for this machine.
         </p>
@@ -347,7 +347,7 @@ function WorkspaceHeader({
         type="button"
         onClick={onRefresh}
         disabled={loading || busy}
-        className="inline-flex w-fit items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        className="inline-flex w-fit items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-foreground shadow-sm transition hover:bg-surface-hover disabled:opacity-50 dark:border-border dark:bg-surface-raised dark:text-foreground dark:hover:bg-surface-hover"
       >
         <RefreshCwIcon
           className={cn("size-3.5", loading && "animate-spin")}
@@ -425,19 +425,19 @@ function OverviewCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm dark:border-border dark:bg-surface-raised">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        <p className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
           {label}
         </p>
-        <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-success/10 text-success dark:text-success">
           <Icon className="size-4" />
         </div>
       </div>
-      <p className="mt-4 truncate text-base font-semibold text-zinc-950 dark:text-zinc-50">
+      <p className="mt-4 truncate text-base font-semibold text-foreground dark:text-foreground">
         {value}
       </p>
-      <p className="mt-1 truncate text-[11px] text-zinc-400">{detail}</p>
+      <p className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</p>
     </div>
   );
 }
@@ -462,24 +462,24 @@ function ProviderSection({
   onTest: (provider: ModelProvider) => Promise<void>;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="border-b border-zinc-200 p-4 sm:p-5 dark:border-zinc-800">
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+    <div className="rounded-2xl border border-border bg-surface shadow-sm dark:border-border dark:bg-surface-raised">
+      <div className="border-b border-border p-4 sm:p-5 dark:border-border">
+        <h3 className="text-sm font-semibold text-foreground dark:text-foreground">
           Providers and installed models
         </h3>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
           Test the configured endpoint, discover models, and compare them with
           saved capability profiles.
         </p>
       </div>
 
-      <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
+      <div className="divide-y divide-border dark:divide-border">
         {loading ? (
-          <div className="p-8 text-center text-xs text-zinc-400">
+          <div className="p-8 text-center text-xs text-muted-foreground">
             Loading providers…
           </div>
         ) : providers.length === 0 ? (
-          <div className="p-8 text-center text-xs text-zinc-400">
+          <div className="p-8 text-center text-xs text-muted-foreground">
             No model providers are configured.
           </div>
         ) : (
@@ -537,24 +537,24 @@ function ProviderCard({
     <div className="p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-hover text-muted-foreground dark:bg-surface-raised dark:text-muted-foreground">
             <ServerIcon className="size-4" />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h4 className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              <h4 className="truncate text-sm font-semibold text-foreground dark:text-foreground">
                 {provider.name}
               </h4>
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-zinc-500 dark:bg-zinc-800 dark:text-zinc-300">
+              <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground dark:bg-surface-hover dark:text-muted-foreground">
                 {provider.kind.replace("_", " ")}
               </span>
               {provider.built_in ? (
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                <span className="rounded-full bg-success/10 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-success dark:text-success">
                   Built in
                 </span>
               ) : null}
             </div>
-            <p className="mt-1 break-all font-mono text-[11px] text-zinc-400">
+            <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground">
               {provider.base_url}
             </p>
           </div>
@@ -565,7 +565,7 @@ function ProviderCard({
             type="button"
             onClick={() => void onTest()}
             disabled={testing || discovering}
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-surface-hover disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-surface-raised"
           >
             {testing ? "Testing…" : "Test"}
           </button>
@@ -573,7 +573,7 @@ function ProviderCard({
             type="button"
             onClick={() => void onDiscover()}
             disabled={discovering || testing}
-            className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+            className="rounded-lg bg-surface-raised px-3 py-2 text-xs font-medium text-accent-foreground disabled:opacity-50 dark:bg-surface-hover dark:text-foreground"
           >
             {discovering ? "Discovering…" : "Discover models"}
           </button>
@@ -582,7 +582,7 @@ function ProviderCard({
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {models.length === 0 ? (
-          <div className="col-span-full rounded-xl border border-dashed border-zinc-200 p-5 text-center text-xs text-zinc-400 dark:border-zinc-800">
+          <div className="col-span-full rounded-xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground dark:border-border">
             Run discovery to list models from this provider.
           </div>
         ) : (
@@ -631,13 +631,13 @@ function ModelCard({
   ];
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
+    <div className="rounded-xl border border-border bg-surface-hover/60 p-4 dark:border-border dark:bg-surface-raised/40">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          <p className="truncate text-sm font-semibold text-foreground dark:text-foreground">
             {model.name}
           </p>
-          <p className="mt-1 text-[11px] text-zinc-400">
+          <p className="mt-1 text-[11px] text-muted-foreground">
             {model.size ? formatBytes(model.size) : "Size unavailable"}
           </p>
         </div>
@@ -677,7 +677,7 @@ function ModelCard({
           {warnings.map((warning) => (
             <p
               key={warning}
-              className="flex items-start gap-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300"
+              className="flex items-start gap-2 text-[11px] leading-relaxed text-pending dark:text-pending"
             >
               <ShieldAlertIcon className="mt-0.5 size-3 shrink-0" />
               {warning}
@@ -717,7 +717,7 @@ function AssignmentSection({
 }) {
   if (loading) {
     return (
-      <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center text-xs text-zinc-400 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="rounded-2xl border border-border bg-surface p-8 text-center text-xs text-muted-foreground shadow-sm dark:border-border dark:bg-surface-raised">
         Loading model assignments…
       </div>
     );
@@ -728,18 +728,18 @@ function AssignmentSection({
   const agents = Object.keys(snapshot.agents) as AgentId[];
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="border-b border-zinc-200 p-4 sm:p-5 dark:border-zinc-800">
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+    <div className="rounded-2xl border border-border bg-surface shadow-sm dark:border-border dark:bg-surface-raised">
+      <div className="border-b border-border p-4 sm:p-5 dark:border-border">
+        <h3 className="text-sm font-semibold text-foreground dark:text-foreground">
           Agent and task-stage assignments
         </h3>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
           The base agent model handles chat. Optional stage overrides handle
           planning, file generation, and repair.
         </p>
       </div>
 
-      <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
+      <div className="divide-y divide-border dark:divide-border">
         {agents.map((agentId) => (
           <AgentAssignments
             key={agentId}
@@ -790,14 +790,14 @@ function AgentAssignments({
   return (
     <div className="p-4 sm:p-5">
       <div className="flex items-center gap-3">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+        <div className="flex size-9 items-center justify-center rounded-xl bg-success/10 text-success dark:text-success">
           <BotIcon className="size-4" />
         </div>
         <div>
-          <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          <h4 className="text-sm font-semibold text-foreground dark:text-foreground">
             {agentLabels[agentId]} agent
           </h4>
-          <p className="text-[11px] text-zinc-400">
+          <p className="text-[11px] text-muted-foreground">
             Base chat model and optional task-stage overrides
           </p>
         </div>
@@ -876,13 +876,13 @@ function AssignmentEditor({
   );
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
+    <div className="rounded-xl border border-border bg-surface-hover/60 p-4 dark:border-border dark:bg-surface-raised/40">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h5 className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+          <h5 className="text-xs font-semibold text-foreground dark:text-foreground">
             {title}
           </h5>
-          <p className="mt-1 text-[10px] text-zinc-400">
+          <p className="mt-1 text-[10px] text-muted-foreground">
             {draft.assignment_source
               ? `Resolved from ${draft.assignment_source}`
               : "Explicit assignment"}
@@ -899,7 +899,7 @@ function AssignmentEditor({
                 model: recommendation.model,
               }))
             }
-            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-1 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+            className="inline-flex items-center gap-1 rounded-lg bg-success/10 px-2 py-1 text-[10px] font-medium text-success dark:text-success"
             title={`Benchmark score ${recommendation.score.toFixed(2)}`}
           >
             <WandSparklesIcon className="size-3" />
@@ -1002,7 +1002,7 @@ function AssignmentEditor({
       </div>
 
       {profile ? (
-        <p className="mt-3 text-[10px] text-zinc-400">
+        <p className="mt-3 text-[10px] text-muted-foreground">
           Saved capability: {formatInteger(profile.context_window)} context,
           {" "}
           {formatInteger(profile.max_output_tokens)} max output,
@@ -1012,7 +1012,7 @@ function AssignmentEditor({
             : `${profile.measured_tokens_per_second.toFixed(2)} tok/s`}.
         </p>
       ) : (
-        <p className="mt-3 flex items-start gap-1.5 text-[10px] text-amber-600 dark:text-amber-300">
+        <p className="mt-3 flex items-start gap-1.5 text-[10px] text-pending dark:text-pending">
           <ShieldAlertIcon className="mt-0.5 size-3 shrink-0" />
           No saved capability profile exists. Conservative inferred limits will
           be used.
@@ -1023,7 +1023,7 @@ function AssignmentEditor({
         type="button"
         onClick={() => void onSave(draft)}
         disabled={saving || !draft.model.trim() || !provider}
-        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-surface-raised px-3 py-2 text-xs font-medium text-accent-foreground disabled:opacity-50 dark:bg-surface-hover dark:text-foreground"
       >
         <SaveIcon className="size-3.5" />
         {saving ? "Saving…" : "Save assignment"}
@@ -1050,21 +1050,21 @@ function RuntimeSection({
   onSave: () => Promise<void>;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm dark:border-border dark:bg-surface-raised">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          <h3 className="text-sm font-semibold text-foreground dark:text-foreground">
             Runtime limits
           </h3>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
             Global stage defaults are clamped by each model capability profile.
           </p>
         </div>
-        <HardDriveIcon className="size-4 text-emerald-500" />
+        <HardDriveIcon className="size-4 text-success" />
       </div>
 
       {loading || !runtime ? (
-        <div className="py-8 text-center text-xs text-zinc-400">
+        <div className="py-8 text-center text-xs text-muted-foreground">
           Loading runtime settings…
         </div>
       ) : (
@@ -1088,7 +1088,7 @@ function RuntimeSection({
             )}
           </div>
 
-          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-[11px] leading-relaxed text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
+          <div className="mt-4 rounded-xl border border-success/30 bg-success/10 p-3 text-[11px] leading-relaxed text-success dark:border-success/30 dark:bg-success/10 dark:text-success">
             Hardware recommendation:{" "}
             {formatInteger(
               hardware?.recommendation.recommended_context_window,
@@ -1103,7 +1103,7 @@ function RuntimeSection({
               type="button"
               onClick={() => void onAutoConfigure()}
               disabled={busyKey !== null}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-xs font-medium text-success hover:bg-success/10 disabled:opacity-50 dark:border-success/30 dark:bg-success/10 dark:text-success"
             >
               <SparklesIcon className="size-3.5" />
               {busyKey === "runtime:auto"
@@ -1115,7 +1115,7 @@ function RuntimeSection({
               type="button"
               onClick={() => void onSave()}
               disabled={busyKey !== null}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-surface-raised px-3 py-2 text-xs font-medium text-accent-foreground disabled:opacity-50 dark:bg-surface-hover dark:text-foreground"
             >
               <SaveIcon className="size-3.5" />
               {busyKey === "runtime:save" ? "Saving…" : "Save runtime settings"}
@@ -1137,10 +1137,10 @@ function RuntimeStageEditor({
   onChange: (value: RuntimeStageSettings) => void;
 }) {
   return (
-    <details className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3 open:bg-white dark:border-zinc-800 dark:bg-zinc-900/40 dark:open:bg-zinc-950">
-      <summary className="cursor-pointer select-none text-xs font-semibold text-zinc-700 dark:text-zinc-200">
+    <details className="rounded-xl border border-border bg-surface-hover/60 p-3 open:bg-surface dark:border-border dark:bg-surface-raised/40 dark:open:bg-surface-raised">
+      <summary className="cursor-pointer select-none text-xs font-semibold text-foreground dark:text-foreground">
         {stageLabels[stage]}
-        <span className="ml-2 font-normal text-zinc-400">
+        <span className="ml-2 font-normal text-muted-foreground">
           {formatInteger(value.num_ctx)} ctx ·{" "}
           {formatInteger(value.max_tokens)} output
         </span>
@@ -1187,12 +1187,12 @@ function RecommendationsCard({
   recommendations: ModelRecommendations | null;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-zinc-950 p-4 text-zinc-100 shadow-sm dark:border-zinc-800">
+    <div className="rounded-2xl border border-border bg-surface-raised p-4 text-foreground shadow-sm dark:border-border">
       <div className="flex items-center gap-2">
-        <WandSparklesIcon className="size-4 text-emerald-400" />
+        <WandSparklesIcon className="size-4 text-success" />
         <h3 className="text-sm font-semibold">Benchmark recommendations</h3>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
         Recommendations rank benchmarked structured-output models. They are
         never applied automatically.
       </p>
@@ -1205,17 +1205,17 @@ function RecommendationsCard({
             return (
               <div
                 key={stage}
-                className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3"
+                className="rounded-xl border border-border bg-surface-raised/70 p-3"
               >
-                <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                   {stageLabels[stage]}
                 </p>
                 {item ? (
                   <>
-                    <p className="mt-1 break-all text-xs font-semibold text-zinc-100">
+                    <p className="mt-1 break-all text-xs font-semibold text-foreground">
                       {item.model}
                     </p>
-                    <p className="mt-1 text-[10px] text-zinc-400">
+                    <p className="mt-1 text-[10px] text-muted-foreground">
                       {item.provider_id} · score {item.score.toFixed(2)}
                       {item.measured_tokens_per_second == null
                         ? ""
@@ -1223,7 +1223,7 @@ function RecommendationsCard({
                     </p>
                   </>
                 ) : (
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     No benchmarked model yet.
                   </p>
                 )}
@@ -1233,7 +1233,7 @@ function RecommendationsCard({
         )}
       </div>
 
-      <p className="mt-4 text-[10px] text-zinc-500">
+      <p className="mt-4 text-[10px] text-muted-foreground">
         {recommendations?.benchmarked_model_count ?? 0} benchmarked model
         profile(s).
       </p>
@@ -1257,8 +1257,8 @@ function MessageBanner({
       className={cn(
         "flex items-start gap-3 rounded-xl border p-4 text-sm",
         tone === "error"
-          ? "border-red-200 bg-red-50 text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
-          : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200",
+          ? "border-danger/30 bg-danger/10 text-danger dark:border-danger/30 dark:bg-danger/10 dark:text-danger"
+          : "border-success/30 bg-success/10 text-success dark:border-success/30 dark:bg-success/10 dark:text-success",
       )}
     >
       <Icon className="mt-0.5 size-4 shrink-0" />
@@ -1279,7 +1279,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
       <div className="mt-1.5">{children}</div>
@@ -1329,10 +1329,10 @@ function Metric({
 }) {
   return (
     <div>
-      <dt className="text-[10px] uppercase tracking-wide text-zinc-400">
+      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 truncate font-medium text-zinc-700 dark:text-zinc-200">
+      <dd className="mt-1 truncate font-medium text-foreground dark:text-foreground">
         {value}
       </dd>
     </div>
@@ -1340,7 +1340,7 @@ function Metric({
 }
 
 const inputClass =
-  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 outline-none ring-emerald-500/20 focus:border-emerald-500 focus:ring-4 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200";
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-foreground outline-none ring-emerald-500/20 focus:border-success/30 focus:ring-4 dark:border-border dark:bg-surface-raised dark:text-foreground";
 
 function toMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -1380,14 +1380,14 @@ function tierClass(
 ): string {
   switch (tier) {
     case "fastest":
-      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+      return "bg-success/10 text-success dark:text-success";
     case "balanced":
-      return "bg-sky-500/10 text-sky-700 dark:text-sky-300";
+      return "bg-pending/10 text-pending dark:text-pending";
     case "maximum_practical":
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-300";
+      return "bg-pending/10 text-pending dark:text-pending";
     case "not_recommended":
-      return "bg-red-500/10 text-red-700 dark:text-red-300";
+      return "bg-danger/10 text-danger dark:text-danger";
     default:
-      return "bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-300";
+      return "bg-surface-hover text-muted-foreground dark:bg-surface-hover dark:text-muted-foreground";
   }
 }

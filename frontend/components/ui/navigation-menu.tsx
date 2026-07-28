@@ -67,9 +67,9 @@ export function NavigationMenuTrigger({
       data-slot="navigation-menu-trigger"
       className={cn(
         "group inline-flex h-9 w-max items-center justify-center rounded-md bg-transparent px-4 py-2 text-sm font-medium transition-colors",
-        "hover:bg-zinc-100 hover:text-zinc-900 focus:bg-zinc-100 focus:text-zinc-900 focus:outline-none",
-        "disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-zinc-100/50",
-        "dark:hover:bg-zinc-800 dark:hover:text-zinc-100 dark:focus:bg-zinc-800 dark:data-[state=open]:bg-zinc-800/50",
+        "hover:bg-surface-hover hover:text-foreground focus:bg-surface-hover focus:text-foreground focus:outline-none",
+        "disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-surface-hover/50",
+        "dark:hover:bg-surface-hover dark:hover:text-foreground dark:focus:bg-surface-hover dark:data-[state=open]:bg-surface-hover/50",
         className,
       )}
       {...props}
@@ -108,9 +108,9 @@ export function NavigationMenuViewport({
       <NavigationMenuPrimitive.Viewport
         data-slot="navigation-menu-viewport"
         className={cn(
-          "origin-top-center relative mt-1.5 h-[var(--radix-navigation-menu-viewport-height)] w-full overflow-hidden rounded-lg border border-zinc-200 bg-white text-zinc-900 shadow md:w-[var(--radix-navigation-menu-viewport-width)]",
+          "origin-top-center relative mt-1.5 h-[var(--radix-navigation-menu-viewport-height)] w-full overflow-hidden rounded-lg border border-border bg-surface text-foreground shadow md:w-[var(--radix-navigation-menu-viewport-width)]",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-90",
-          "dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100",
+          "dark:border-border dark:bg-surface-raised dark:text-foreground",
           className,
         )}
         {...props}
@@ -128,8 +128,8 @@ export function NavigationMenuLink({
       data-slot="navigation-menu-link"
       className={cn(
         "inline-flex h-9 w-max items-center justify-center rounded-md bg-transparent px-4 py-2 text-sm font-medium transition-colors",
-        "hover:bg-zinc-100 hover:text-zinc-900 focus:bg-zinc-100 focus:text-zinc-900 focus:outline-none",
-        "dark:hover:bg-zinc-800 dark:hover:text-zinc-100 dark:focus:bg-zinc-800",
+        "hover:bg-surface-hover hover:text-foreground focus:bg-surface-hover focus:text-foreground focus:outline-none",
+        "dark:hover:bg-surface-hover dark:hover:text-foreground dark:focus:bg-surface-hover",
         className,
       )}
       {...props}
@@ -150,7 +150,7 @@ export function NavigationMenuIndicator({
       )}
       {...props}
     >
-      <div className="relative top-[60%] size-2 rotate-45 rounded-tl-sm bg-zinc-200 shadow-md dark:bg-zinc-800" />
+      <div className="relative top-[60%] size-2 rotate-45 rounded-tl-sm bg-surface-hover shadow-md dark:bg-surface-hover" />
     </NavigationMenuPrimitive.Indicator>
   );
 }

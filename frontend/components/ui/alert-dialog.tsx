@@ -34,7 +34,7 @@ export function AlertDialogOverlay({
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "fixed inset-0 z-50 bg-foreground/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className,
       )}
       {...props}
@@ -52,10 +52,10 @@ export function AlertDialogContent({
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-zinc-200 bg-white p-6 shadow-lg duration-200",
+          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-border bg-surface p-6 shadow-lg duration-200",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-          "dark:border-zinc-800 dark:bg-zinc-950 sm:rounded-lg",
+          "dark:border-border dark:bg-surface-raised sm:rounded-lg",
           className,
         )}
         {...props}
@@ -113,7 +113,7 @@ export function AlertDialogDescription({
   return (
     <AlertDialogPrimitive.Description
       data-slot="alert-dialog-description"
-      className={cn("text-sm text-zinc-500 dark:text-zinc-400", className)}
+      className={cn("text-sm text-muted-foreground dark:text-muted-foreground", className)}
       {...props}
     />
   );

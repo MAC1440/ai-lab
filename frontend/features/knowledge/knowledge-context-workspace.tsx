@@ -301,13 +301,13 @@ function WorkspaceHeader({
   return (
     <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success dark:text-success">
           Retrieval visibility
         </p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground dark:text-foreground">
           Knowledge and project context
         </h2>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
           Inspect local knowledge sources, rebuild the project index, and test
           exactly which project files retrieval would return for an agent query.
         </p>
@@ -317,7 +317,7 @@ function WorkspaceHeader({
         type="button"
         onClick={onRefresh}
         disabled={loading || busy}
-        className="inline-flex w-fit items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200"
+        className="inline-flex w-fit items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-foreground shadow-sm disabled:opacity-50 dark:border-border dark:bg-surface-raised dark:text-foreground"
       >
         <RefreshCwIcon
           className={cn("size-3.5", loading && "animate-spin")}
@@ -352,17 +352,17 @@ function RetrievalDiagnostics({
   onSubmit: () => void;
 }) {
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="border-b border-zinc-200 p-4 sm:p-5 dark:border-zinc-800">
+    <section className="rounded-2xl border border-border bg-surface shadow-sm dark:border-border dark:bg-surface-raised">
+      <div className="border-b border-border p-4 sm:p-5 dark:border-border">
         <div className="flex items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success dark:text-success">
             <SearchIcon className="size-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <h3 className="text-sm font-semibold text-foreground dark:text-foreground">
               Project retrieval diagnostics
             </h3>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
               Query the same persistent project index used to supply relevant
               workspace files to agents.
             </p>
@@ -380,13 +380,13 @@ function RetrievalDiagnostics({
           />
 
           <label className="block">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Result limit
             </span>
             <select
               value={limit}
               onChange={(event) => onLimitChange(Number(event.target.value))}
-              className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-900"
+              className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs outline-none dark:border-border dark:bg-surface-raised"
             >
               {[4, 8, 12, 20, 30, 50].map((value) => (
                 <option key={value} value={value}>
@@ -397,7 +397,7 @@ function RetrievalDiagnostics({
           </label>
 
           <div className="flex flex-col justify-end gap-2">
-            <label className="flex items-center gap-2 text-[11px] text-zinc-500">
+            <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
               <input
                 type="checkbox"
                 checked={refreshBeforeQuery}
@@ -411,7 +411,7 @@ function RetrievalDiagnostics({
               type="button"
               onClick={onSubmit}
               disabled={!query.trim() || running}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-surface-raised px-4 py-2 text-xs font-medium text-accent-foreground disabled:opacity-50 dark:bg-surface-hover dark:text-foreground"
             >
               <SearchIcon className="size-3.5" />
               {running ? "Retrieving…" : "Test retrieval"}
@@ -424,10 +424,10 @@ function RetrievalDiagnostics({
         {response ? (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
+              <p className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
                 {results.length} result{results.length === 1 ? "" : "s"}
               </p>
-              <p className="text-[10px] text-zinc-400">
+              <p className="text-[10px] text-muted-foreground">
                 {responseSummary(response)}
               </p>
             </div>
@@ -447,10 +447,10 @@ function RetrievalDiagnostics({
             </div>
 
             <details className="mt-4">
-              <summary className="cursor-pointer text-[10px] font-medium text-zinc-400">
+              <summary className="cursor-pointer text-[10px] font-medium text-muted-foreground">
                 Raw retrieval response
               </summary>
-              <pre className="ai-lab-scrollbar mt-2 max-h-96 overflow-auto rounded-lg bg-zinc-950 p-3 text-[11px] text-zinc-300">
+              <pre className="ai-lab-scrollbar mt-2 max-h-96 overflow-auto rounded-lg bg-surface-raised p-3 text-[11px] text-muted-foreground">
                 {JSON.stringify(response, null, 2)}
               </pre>
             </details>
@@ -471,25 +471,25 @@ function RetrievalResultCard({
   index: number;
 }) {
   return (
-    <article className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
+    <article className="overflow-hidden rounded-xl border border-border dark:border-border">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-hover px-4 py-3 dark:bg-surface-raised/50">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-white text-[10px] font-semibold text-zinc-500 shadow-sm dark:bg-zinc-950">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-surface text-[10px] font-semibold text-muted-foreground shadow-sm dark:bg-surface-raised">
             {index + 1}
           </span>
-          <p className="break-all font-mono text-xs font-medium text-zinc-800 dark:text-zinc-200">
+          <p className="break-all font-mono text-xs font-medium text-foreground dark:text-foreground">
             {result.path}
           </p>
         </div>
 
         {result.score != null ? (
-          <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[9px] font-medium text-emerald-700 dark:text-emerald-300">
+          <span className="rounded-full bg-success/10 px-2 py-1 text-[9px] font-medium text-success dark:text-success">
             score {result.score.toFixed(4)}
           </span>
         ) : null}
       </div>
 
-      <pre className="ai-lab-scrollbar max-h-72 overflow-auto whitespace-pre-wrap break-words bg-white p-4 font-mono text-[11px] leading-relaxed text-zinc-600 dark:bg-zinc-950 dark:text-zinc-300">
+      <pre className="ai-lab-scrollbar max-h-72 overflow-auto whitespace-pre-wrap break-words bg-surface p-4 font-mono text-[11px] leading-relaxed text-muted-foreground dark:bg-surface-raised dark:text-muted-foreground">
         {result.content || "No text preview was included."}
       </pre>
     </article>
@@ -510,26 +510,26 @@ function KnowledgeSources({
   onRemove: (source: NormalizedSource) => void;
 }) {
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="border-b border-zinc-200 p-4 sm:p-5 dark:border-zinc-800">
+    <section className="rounded-2xl border border-border bg-surface shadow-sm dark:border-border dark:bg-surface-raised">
+      <div className="border-b border-border p-4 sm:p-5 dark:border-border">
         <div className="flex items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-hover text-muted-foreground dark:bg-surface-raised dark:text-muted-foreground">
             <LibraryIcon className="size-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <h3 className="text-sm font-semibold text-foreground dark:text-foreground">
               Indexed knowledge sources
             </h3>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
               General local sources indexed outside the active project index.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
+      <div className="divide-y divide-border dark:divide-border">
         {loading ? (
-          <div className="p-8 text-center text-xs text-zinc-400">
+          <div className="p-8 text-center text-xs text-muted-foreground">
             Loading knowledge sources…
           </div>
         ) : sources.length > 0 ? (
@@ -540,21 +540,21 @@ function KnowledgeSources({
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                  <p className="text-sm font-semibold text-foreground dark:text-foreground">
                     {source.name}
                   </p>
-                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[9px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-300">
+                  <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[9px] font-medium text-muted-foreground dark:bg-surface-hover dark:text-muted-foreground">
                     {formatInteger(source.documentCount)} docs
                   </span>
-                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[9px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-300">
+                  <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[9px] font-medium text-muted-foreground dark:bg-surface-hover dark:text-muted-foreground">
                     {formatInteger(source.chunkCount)} chunks
                   </span>
                 </div>
-                <p className="mt-2 break-all font-mono text-[10px] text-zinc-400">
+                <p className="mt-2 break-all font-mono text-[10px] text-muted-foreground">
                   {source.path || source.id}
                 </p>
                 {source.updatedAt ? (
-                  <p className="mt-1 text-[10px] text-zinc-400">
+                  <p className="mt-1 text-[10px] text-muted-foreground">
                     Updated {formatTimestamp(source.updatedAt)}
                   </p>
                 ) : null}
@@ -564,7 +564,7 @@ function KnowledgeSources({
                 type="button"
                 onClick={() => onRemove(source)}
                 disabled={busyKey === `source:${source.id}`}
-                className="inline-flex w-fit shrink-0 items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 disabled:opacity-50 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+                className="inline-flex w-fit shrink-0 items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs font-medium text-danger disabled:opacity-50 dark:border-danger/30 dark:bg-danger/10 dark:text-danger"
               >
                 <Trash2Icon className="size-3.5" />
                 {busyKey === `source:${source.id}` ? "Removing…" : "Remove"}
@@ -576,10 +576,10 @@ function KnowledgeSources({
             <EmptyPanel message="No normalized knowledge sources were found." />
             {rawStatus ? (
               <details className="mt-4">
-                <summary className="cursor-pointer text-[10px] font-medium text-zinc-400">
+                <summary className="cursor-pointer text-[10px] font-medium text-muted-foreground">
                   Raw source status
                 </summary>
-                <pre className="ai-lab-scrollbar mt-2 max-h-96 overflow-auto rounded-lg bg-zinc-950 p-3 text-[11px] text-zinc-300">
+                <pre className="ai-lab-scrollbar mt-2 max-h-96 overflow-auto rounded-lg bg-surface-raised p-3 text-[11px] text-muted-foreground">
                   {JSON.stringify(rawStatus, null, 2)}
                 </pre>
               </details>
@@ -622,17 +622,17 @@ function ProjectIndexCard({
   );
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+    <section className="rounded-2xl border border-border bg-surface p-4 shadow-sm dark:border-border dark:bg-surface-raised">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          <h3 className="text-sm font-semibold text-foreground dark:text-foreground">
             Project index
           </h3>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
             Persistent searchable project-file context.
           </p>
         </div>
-        <DatabaseIcon className="size-4 text-emerald-500" />
+        <DatabaseIcon className="size-4 text-success" />
       </div>
 
       <dl className="mt-4 space-y-3 text-xs">
@@ -650,7 +650,7 @@ function ProjectIndexCard({
           type="button"
           onClick={() => onRefresh(false)}
           disabled={busyKey !== null}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-300"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground disabled:opacity-50 dark:border-border dark:text-muted-foreground"
         >
           <RefreshCwIcon
             className={cn(
@@ -673,7 +673,7 @@ function ProjectIndexCard({
             }
           }}
           disabled={busyKey !== null}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-surface-raised px-3 py-2 text-xs font-medium text-accent-foreground disabled:opacity-50 dark:bg-surface-hover dark:text-foreground"
         >
           <BoxesIcon className="size-3.5" />
           {busyKey === "index:rebuild" ? "Rebuilding…" : "Rebuild complete index"}
@@ -682,10 +682,10 @@ function ProjectIndexCard({
 
       {status ? (
         <details className="mt-4">
-          <summary className="cursor-pointer text-[10px] font-medium text-zinc-400">
+          <summary className="cursor-pointer text-[10px] font-medium text-muted-foreground">
             Raw index status
           </summary>
-          <pre className="ai-lab-scrollbar mt-2 max-h-80 overflow-auto rounded-lg bg-zinc-950 p-3 text-[11px] text-zinc-300">
+          <pre className="ai-lab-scrollbar mt-2 max-h-80 overflow-auto rounded-lg bg-surface-raised p-3 text-[11px] text-muted-foreground">
             {JSON.stringify(status, null, 2)}
           </pre>
         </details>
@@ -704,13 +704,13 @@ function ContextDiagnostics({
   sourceStatus: JsonRecord | null;
 }) {
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-zinc-950 p-4 text-zinc-100 shadow-sm dark:border-zinc-800">
+    <section className="rounded-2xl border border-border bg-surface-raised p-4 text-foreground shadow-sm dark:border-border">
       <div className="flex items-center gap-2">
-        <HardDriveIcon className="size-4 text-emerald-400" />
+        <HardDriveIcon className="size-4 text-success" />
         <h3 className="text-sm font-semibold">Context diagnostics</h3>
       </div>
 
-      <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
         These snapshots expose what the backend currently knows. Expand them
         when retrieval behavior looks surprising.
       </p>
@@ -741,11 +741,11 @@ function RawSnapshot({
   value: JsonRecord | null;
 }) {
   return (
-    <details className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
-      <summary className="cursor-pointer text-xs font-medium text-zinc-300">
+    <details className="rounded-xl border border-border bg-surface-raised/70 p-3">
+      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
         {title}
       </summary>
-      <pre className="ai-lab-scrollbar mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-relaxed text-zinc-400">
+      <pre className="ai-lab-scrollbar mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-relaxed text-muted-foreground">
         {value ? JSON.stringify(value, null, 2) : "Unavailable"}
       </pre>
     </details>
@@ -764,19 +764,19 @@ function OverviewCard({
   detail: string;
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="min-w-0 rounded-2xl border border-border bg-surface p-4 shadow-sm dark:border-border dark:bg-surface-raised">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        <p className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
           {label}
         </p>
-        <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-success/10 text-success dark:text-success">
           <Icon className="size-4" />
         </div>
       </div>
-      <p className="mt-4 truncate text-base font-semibold text-zinc-950 dark:text-zinc-50">
+      <p className="mt-4 truncate text-base font-semibold text-foreground dark:text-foreground">
         {value}
       </p>
-      <p className="mt-1 truncate text-[11px] text-zinc-400">{detail}</p>
+      <p className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</p>
     </div>
   );
 }
@@ -790,8 +790,8 @@ function MetricRow({
 }) {
   return (
     <div className="flex items-start justify-between gap-3">
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="break-all text-right font-medium text-zinc-700 dark:text-zinc-200">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="break-all text-right font-medium text-foreground dark:text-foreground">
         {value}
       </dd>
     </div>
@@ -814,8 +814,8 @@ function Banner({
       className={cn(
         "flex items-start gap-3 rounded-xl border p-4 text-sm",
         tone === "error"
-          ? "border-red-200 bg-red-50 text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
-          : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200",
+          ? "border-danger/30 bg-danger/10 text-danger dark:border-danger/30 dark:bg-danger/10 dark:text-danger"
+          : "border-success/30 bg-success/10 text-success dark:border-success/30 dark:bg-success/10 dark:text-success",
       )}
     >
       <Icon className="mt-0.5 size-4 shrink-0" />
@@ -829,7 +829,7 @@ function Banner({
 
 function EmptyPanel({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-zinc-200 p-6 text-center text-xs text-zinc-400 dark:border-zinc-800">
+    <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground dark:border-border">
       {message}
     </div>
   );
@@ -1083,4 +1083,4 @@ function toMessage(error: unknown, fallback: string): string {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 outline-none ring-emerald-500/20 placeholder:text-zinc-400 focus:border-emerald-500 focus:ring-4 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200";
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none ring-emerald-500/20 placeholder:text-muted-foreground focus:border-success/30 focus:ring-4 dark:border-border dark:bg-surface-raised dark:text-foreground";

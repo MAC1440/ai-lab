@@ -19,13 +19,13 @@ export function AgentRunStatus({
 }) {
     if (error) {
         return (
-            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+            <div className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
                 <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
                 <div className="min-w-0">
                     <p className="font-medium">
                         Agent run failed
                     </p>
-                    <p className="mt-0.5 break-words text-red-600/90 dark:text-red-300/90">
+                    <p className="mt-0.5 break-words text-danger/90">
                         {error}
                     </p>
                 </div>
@@ -35,8 +35,8 @@ export function AgentRunStatus({
 
     if (isStreaming) {
         return (
-            <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white/70 px-3 py-2 text-xs text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-300">
-                <Loader2Icon className="size-3.5 animate-spin text-emerald-500" />
+            <div className="flex items-center gap-2 rounded-lg border border-pending/30 bg-pending/10 px-3 py-2 text-xs text-pending">
+                <Loader2Icon className="size-3.5 animate-spin" />
                 <span className="truncate">
                     {status || "Working…"}
                 </span>
@@ -52,7 +52,7 @@ export function AgentRunStatus({
         <div
             className={cn(
                 "flex items-center gap-2 text-xs",
-                "text-emerald-700 dark:text-emerald-300",
+                "text-success",
             )}
         >
             <CheckCircle2Icon className="size-3.5" />

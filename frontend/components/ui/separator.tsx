@@ -13,7 +13,7 @@ export function Separator({
       data-slot="separator"
       orientation={orientation}
       className={cn(
-        "shrink-0 bg-zinc-200 dark:bg-zinc-800",
+        "shrink-0 bg-surface-hover dark:bg-surface-hover",
         orientation === "horizontal" ? "h-px w-full" : "h-full w-px",
         className,
       )}

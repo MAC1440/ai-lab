@@ -398,7 +398,7 @@ export function ChatPanel() {
 
     return (
         <TooltipProvider>
-            <div className="flex h-screen min-h-0 bg-white dark:bg-zinc-950">
+            <div className="flex h-screen min-h-0 bg-surface dark:bg-surface-raised">
                 <SessionSidebar
                     sessions={sessions}
                     selectedId={sessionId}

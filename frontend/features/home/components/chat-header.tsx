@@ -64,15 +64,15 @@ export function ChatHeader({
   onAgentsRefresh: () => Promise<void>;
 }) {
   return (
-    <header className="border-b border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+    <header className="border-b border-border bg-surface px-4 py-3">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
             <SparklesIcon className="size-5" />
           </div>
           <div className="hidden min-w-0 sm:block">
-            <h1 className="text-sm font-semibold">AI Lab</h1>
-            <p className="truncate text-xs text-zinc-500">
+            <h1 className="text-sm font-semibold text-foreground">AI Lab</h1>
+            <p className="truncate text-xs text-muted-foreground">
               Local agent workspace
             </p>
           </div>
@@ -111,7 +111,7 @@ export function ChatHeader({
             </DialogContent>
           </Dialog>
           {agentsLoading ? (
-            <Loader2Icon className="size-4 animate-spin text-zinc-500" />
+            <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
           ) : agents.length ? (
             <Select value={selectedAgentId} onValueChange={onAgentChange}>
               <SelectTrigger className="w-[150px] sm:w-[180px]">
@@ -151,8 +151,8 @@ export function ChatHeader({
         </div>
       </div>
       {selectedAgent ? (
-        <div className="mx-auto mt-2 flex max-w-5xl items-center gap-2 overflow-hidden text-xs text-zinc-500">
-          <span className="shrink-0 font-medium text-zinc-700 dark:text-zinc-200">
+        <div className="mx-auto mt-2 flex max-w-5xl items-center gap-2 overflow-hidden text-xs text-muted-foreground">
+          <span className="shrink-0 font-medium text-foreground">
             {selectedAgent.name}
           </span>
           <span>•</span>
@@ -172,7 +172,7 @@ export function ChatHeader({
           {recommendationReason ? (
             <>
               <span>•</span>
-              <span className="truncate text-emerald-600">
+              <span className="truncate text-success">
                 {recommendationReason}
               </span>
             </>

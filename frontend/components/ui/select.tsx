@@ -35,10 +35,9 @@ export function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm",
-        "focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 focus:ring-offset-background",
+        "flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground",
+        "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background",
         "disabled:cursor-not-allowed disabled:opacity-50",
-        "dark:border-zinc-700 dark:bg-zinc-900",
         className,
       )}
       {...props}
@@ -64,9 +63,8 @@ export function SelectContent({
         data-slot="select-content"
         position={position}
         className={cn(
-          "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-lg border border-zinc-200 bg-white text-zinc-900 shadow-md",
+          "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-lg border border-border bg-surface-raised text-foreground shadow-md",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-          "dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className,
@@ -96,7 +94,7 @@ export function SelectLabel({
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
-      className={cn("px-2 py-1.5 text-xs font-medium text-zinc-500", className)}
+      className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)}
       {...props}
     />
   );
@@ -112,13 +110,12 @@ export function SelectItem({
       data-slot="select-item"
       className={cn(
         "relative flex w-full cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm outline-none",
-        "focus:bg-zinc-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "dark:focus:bg-zinc-800",
+        "focus:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}
       {...props}
     >
-      <span className="absolute left-2 flex size-3.5 items-center justify-center">
+      <span className="absolute left-2 flex size-3.5 items-center justify-center text-accent">
         <SelectPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />
         </SelectPrimitive.ItemIndicator>

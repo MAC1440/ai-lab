@@ -24,15 +24,15 @@ export function ChatMessageBubble({
     <div
       className={cn(
         "flex gap-3 px-4 py-3",
-        isUser ? "bg-transparent" : "bg-zinc-50/80 dark:bg-zinc-900/50",
+        isUser ? "bg-transparent" : "bg-surface-hover/80 dark:bg-surface-raised/50",
       )}
     >
       <Avatar className="size-8">
         <AvatarFallback
           className={cn(
             isUser
-              ? "bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300"
-              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
+              ? "bg-pending/15 text-pending dark:bg-pending/15 dark:text-pending"
+              : "bg-success/10 text-success dark:bg-success/10 dark:text-success",
           )}
         >
           {isUser ? (
@@ -43,13 +43,13 @@ export function ChatMessageBubble({
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1 space-y-1">
-        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        <p className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
           {isUser ? "You" : "Assistant"}
         </p>
-        <div className="text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+        <div className="text-sm leading-relaxed text-foreground dark:text-foreground">
           {message.content || (isStreaming ? "…" : "")}
           {isStreaming && message.content && (
-            <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-emerald-500" />
+            <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-success" />
           )}
         </div>
       </div>

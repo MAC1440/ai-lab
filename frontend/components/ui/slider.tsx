@@ -28,18 +28,18 @@ export function Slider({
     >
       <SliderPrimitive.Track
         data-slot="slider-track"
-        className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800"
+        className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-surface-hover dark:bg-surface-hover"
       >
         <SliderPrimitive.Range
           data-slot="slider-range"
-          className="absolute h-full bg-zinc-900 dark:bg-zinc-100"
+          className="absolute h-full bg-surface-raised dark:bg-surface-hover"
         />
       </SliderPrimitive.Track>
       {values.map((_, index) => (
         <SliderPrimitive.Thumb
           key={index}
           data-slot="slider-thumb"
-          className="block size-4 rounded-full border border-zinc-300 bg-white shadow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-950"
+          className="block size-4 rounded-full border border-border bg-surface shadow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-border dark:bg-surface-raised"
         />
       ))}
     </SliderPrimitive.Root>

@@ -124,12 +124,12 @@ export function ProjectIndexDialog({
         </DialogDescription>
 
         {error ? (
-          <p className="rounded-lg border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">
+          <p className="rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
             {error}
           </p>
         ) : null}
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+        <section className="rounded-xl border border-border bg-surface-raised p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
@@ -137,15 +137,15 @@ export function ProjectIndexDialog({
                   {status?.status.replaceAll("_", " ") ?? "loading"}
                 </Badge>
                 {status?.scan_truncated ? (
-                  <Badge className="border-amber-800 bg-amber-950 text-amber-300">
+                  <Badge className="border-pending/30 bg-pending/10 text-pending">
                     scan limit reached
                   </Badge>
                 ) : null}
               </div>
-              <p className="mt-2 max-w-xl truncate text-xs text-zinc-500">
+              <p className="mt-2 max-w-xl truncate text-xs text-muted-foreground">
                 {status?.workspace ?? "Reading selected workspace…"}
               </p>
-              <p className="mt-1 text-xs text-zinc-600">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Last indexed: {formatDate(status?.indexed_at ?? null)}
               </p>
             </div>
@@ -189,10 +189,10 @@ export function ProjectIndexDialog({
             ].map(([label, value]) => (
               <div
                 key={label}
-                className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3"
+                className="rounded-lg border border-border bg-surface-raised/40 p-3"
               >
-                <p className="text-lg font-semibold text-zinc-100">{value}</p>
-                <p className="text-[11px] uppercase tracking-wide text-zinc-500">
+                <p className="text-lg font-semibold text-foreground">{value}</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   {label}
                 </p>
               </div>
@@ -200,20 +200,20 @@ export function ProjectIndexDialog({
           </div>
 
           {status?.refresh ? (
-            <p className="mt-3 text-xs text-zinc-500">
+            <p className="mt-3 text-xs text-muted-foreground">
               Last refresh: {status.refresh.changed_files} changed,{" "}
               {status.refresh.unchanged_files} unchanged,{" "}
               {status.refresh.removed_files} removed.
             </p>
           ) : null}
           {status?.last_error ? (
-            <p className="mt-3 text-xs text-amber-300">{status.last_error}</p>
+            <p className="mt-3 text-xs text-pending">{status.last_error}</p>
           ) : null}
         </section>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+        <section className="rounded-xl border border-border bg-surface-raised p-4">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <FileSearchIcon className="size-4 text-violet-400" />
+            <FileSearchIcon className="size-4 text-pending" />
             Test relevant-file selection
           </h3>
           <form className="mt-3 flex gap-2" onSubmit={handleQuery}>
@@ -235,27 +235,27 @@ export function ProjectIndexDialog({
 
           {queryResult ? (
             <div className="mt-4 space-y-2">
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-muted-foreground">
                 Tokens: {queryResult.tokens.join(", ") || "none"}
               </p>
               {queryResult.results.map((result) => (
                 <article
                   key={result.path}
-                  className="rounded-lg border border-zinc-800 p-3"
+                  className="rounded-lg border border-border p-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <code className="min-w-0 truncate text-xs text-zinc-200">
+                    <code className="min-w-0 truncate text-xs text-foreground">
                       {result.path}
                     </code>
                     <Badge variant="outline">score {result.score}</Badge>
                   </div>
-                  <p className="mt-2 text-xs text-zinc-500">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     {result.reasons.join(" · ") || result.language}
                   </p>
                 </article>
               ))}
               {!queryResult.results.length ? (
-                <p className="rounded-lg border border-dashed border-zinc-800 p-4 text-center text-xs text-zinc-500">
+                <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                   No indexed files matched this task description.
                 </p>
               ) : null}

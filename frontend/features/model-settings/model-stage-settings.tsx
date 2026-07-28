@@ -98,11 +98,11 @@ function StageCard({
   }
 
   return (
-    <article className="rounded-lg border border-zinc-800 p-3">
+    <article className="rounded-lg border border-border p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-sm font-medium">{stage.name}</p>
-          <p className="mt-1 text-xs text-zinc-500">{stage.description}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{stage.description}</p>
         </div>
         <Badge variant="outline">{override ? "override" : "agent default"}</Badge>
       </div>
@@ -163,7 +163,7 @@ function StageCard({
           </Select>
         </div>
       </div>
-      {error ? <p className="mt-2 text-xs text-red-300">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button
           size="sm"
@@ -217,10 +217,10 @@ export function ModelStageSettings({
   onChanged: () => Promise<void>;
 }) {
   return (
-    <section className="space-y-3 border-t border-zinc-800 pt-4">
+    <section className="space-y-3 border-t border-border pt-4">
       <div>
         <h3 className="text-sm font-semibold">Task-stage model routing</h3>
-        <p className="mt-1 text-xs leading-5 text-zinc-500">
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
           Assign different installed models to planning, code generation, and
           repair. Unset stages inherit the agent model above.
         </p>

@@ -24,10 +24,10 @@ export function ChatComposer({
     onStop: () => void;
 }) {
     return (
-        <footer className="border-t border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+        <footer className="border-t border-border bg-surface p-4 dark:border-border dark:bg-surface-raised">
             <div className="mx-auto max-w-5xl">
                 {error ? (
-                    <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                    <div className="mb-3 flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger dark:border-danger/30 dark:bg-danger/10 dark:text-danger">
                         <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
                         <span>{error}</span>
                     </div>
@@ -41,7 +41,7 @@ export function ChatComposer({
                     onStop={onStop}
                     placeholder={placeholder}
                 />
-                <p className="mt-2 text-center text-[11px] text-zinc-400">
+                <p className="mt-2 text-center text-[11px] text-muted-foreground">
                     RAG progress, tool execution, and answer tokens are streamed
                     from the backend as newline-delimited JSON events.
                 </p>

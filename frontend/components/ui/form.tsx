@@ -47,7 +47,7 @@ export function FormMessage({
   return (
     <FormPrimitive.Message
       data-slot="form-message"
-      className={cn("text-sm text-red-600 dark:text-red-400", className)}
+      className={cn("text-sm text-danger dark:text-danger", className)}
       {...props}
     />
   );

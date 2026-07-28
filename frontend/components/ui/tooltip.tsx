@@ -39,8 +39,7 @@ export function TooltipContent({
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 rounded-md bg-zinc-900 px-3 py-1.5 text-xs text-zinc-50 animate-in fade-in-0 zoom-in-95",
-          "dark:bg-zinc-100 dark:text-zinc-900",
+          "z-50 rounded-md bg-foreground px-3 py-1.5 text-xs text-background animate-in fade-in-0 zoom-in-95",
           className,
         )}
         {...props}

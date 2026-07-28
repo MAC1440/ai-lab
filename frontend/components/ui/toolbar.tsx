@@ -11,7 +11,7 @@ export function Toolbar({
     <ToolbarPrimitive.Root
       data-slot="toolbar"
       className={cn(
-        "flex items-center gap-1 rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950",
+        "flex items-center gap-1 rounded-lg border border-border bg-surface p-1 dark:border-border dark:bg-surface-raised",
         className,
       )}
       {...props}
@@ -41,10 +41,10 @@ export function ToolbarToggleItem({
       data-slot="toolbar-toggle-item"
       className={cn(
         "inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
         "disabled:pointer-events-none disabled:opacity-50",
-        "data-[state=on]:bg-zinc-100 data-[state=on]:text-zinc-900 dark:data-[state=on]:bg-zinc-800 dark:data-[state=on]:text-zinc-100",
-        "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+        "data-[state=on]:bg-surface-hover data-[state=on]:text-foreground dark:data-[state=on]:bg-surface-hover dark:data-[state=on]:text-foreground",
+        "hover:bg-surface-hover dark:hover:bg-surface-hover",
         className,
       )}
       {...props}
@@ -59,7 +59,7 @@ export function ToolbarSeparator({
   return (
     <ToolbarPrimitive.Separator
       data-slot="toolbar-separator"
-      className={cn("mx-1 h-6 w-px bg-zinc-200 dark:bg-zinc-800", className)}
+      className={cn("mx-1 h-6 w-px bg-surface-hover dark:bg-surface-hover", className)}
       {...props}
     />
   );
@@ -73,7 +73,7 @@ export function ToolbarLink({
     <ToolbarPrimitive.Link
       data-slot="toolbar-link"
       className={cn(
-        "inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800",
+        "inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors hover:bg-surface-hover dark:hover:bg-surface-hover",
         className,
       )}
       {...props}
@@ -90,9 +90,9 @@ export function ToolbarButton({
       data-slot="toolbar-button"
       className={cn(
         "inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
         "disabled:pointer-events-none disabled:opacity-50",
-        "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+        "hover:bg-surface-hover dark:hover:bg-surface-hover",
         className,
       )}
       {...props}

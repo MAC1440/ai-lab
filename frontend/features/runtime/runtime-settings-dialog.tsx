@@ -267,7 +267,7 @@ export function RuntimeSettingsDialog() {
         ) : null}
 
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
             {error}
           </div>
         ) : null}

@@ -12,14 +12,14 @@ export function Progress({
     <ProgressPrimitive.Root
       data-slot="progress"
       className={cn(
-        "relative h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800",
+        "relative h-2 w-full overflow-hidden rounded-full bg-surface-hover",
         className,
       )}
       {...props}
     >
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
-        className="h-full w-full flex-1 bg-zinc-900 transition-all dark:bg-zinc-100"
+        className="h-full w-full flex-1 bg-accent transition-all"
         style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
       />
     </ProgressPrimitive.Root>

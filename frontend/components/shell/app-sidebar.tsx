@@ -29,26 +29,26 @@ export function AppSidebar({
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-30 hidden border-r border-zinc-200 bg-white/95 backdrop-blur transition-[width] duration-200 lg:flex lg:flex-col dark:border-zinc-800 dark:bg-zinc-950/95",
+        "fixed inset-y-0 left-0 z-30 hidden border-r border-border bg-surface/95 backdrop-blur transition-[width] duration-200 lg:flex lg:flex-col",
         collapsed ? "w-20" : "w-64",
       )}
     >
       <div
         className={cn(
-          "flex h-16 items-center border-b border-zinc-200 px-4 dark:border-zinc-800",
+          "flex h-16 items-center border-b border-border px-4",
           collapsed ? "justify-center" : "gap-3",
         )}
       >
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-emerald-950 shadow-sm">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground shadow-sm">
           <FlaskConicalIcon className="size-5" />
         </div>
 
         {!collapsed ? (
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <p className="truncate text-sm font-semibold text-foreground">
               AI Lab
             </p>
-            <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
+            <p className="truncate text-[11px] text-muted-foreground">
               Local agent workspace
             </p>
           </div>
@@ -62,7 +62,7 @@ export function AppSidebar({
           pathname={pathname}
         />
 
-        <div className="my-3 border-t border-zinc-200 dark:border-zinc-800" />
+        <div className="my-3 border-t border-border" />
 
         <NavigationGroup
           items={secondaryNavigation}
@@ -71,21 +71,21 @@ export function AppSidebar({
         />
       </div>
 
-      <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
+      <div className="border-t border-border p-3">
         <div
           className={cn(
-            "rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/70",
+            "rounded-xl border border-border bg-surface-hover p-3",
             collapsed && "flex justify-center p-2",
           )}
         >
-          <CpuIcon className="size-4 shrink-0 text-emerald-500" />
+          <CpuIcon className="size-4 shrink-0 text-accent" />
 
           {!collapsed ? (
             <div className="mt-2">
-              <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200">
+              <p className="text-xs font-medium text-foreground">
                 Local-first runtime
               </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                 Models, files, and project context remain on this machine.
               </p>
             </div>
@@ -96,7 +96,7 @@ export function AppSidebar({
           type="button"
           onClick={onCollapse}
           className={cn(
-            "mt-3 flex w-full items-center rounded-lg px-3 py-2 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100",
+            "mt-3 flex w-full items-center rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-surface-hover hover:text-foreground",
             collapsed ? "justify-center" : "justify-between",
           )}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -133,7 +133,7 @@ function NavigationGroup({
             <Icon
               className={cn(
                 "size-4 shrink-0",
-                active && "text-emerald-500",
+                active && "text-accent",
               )}
             />
 
@@ -142,14 +142,14 @@ function NavigationGroup({
                 <span className="block truncate text-sm font-medium">
                   {item.label}
                 </span>
-                <span className="block truncate text-[10px] text-zinc-400 dark:text-zinc-500">
+                <span className="block truncate text-[10px] text-muted-foreground">
                   {item.description}
                 </span>
               </span>
             ) : null}
 
             {!collapsed && disabled ? (
-              <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-zinc-400 dark:bg-zinc-800">
+              <span className="rounded-full bg-surface-hover px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
                 Soon
               </span>
             ) : null}
@@ -160,8 +160,8 @@ function NavigationGroup({
           "group flex w-full items-center rounded-xl px-3 py-2.5 text-left transition",
           collapsed ? "justify-center" : "gap-3",
           active
-            ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
-            : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100",
+            ? "bg-accent/12 text-accent"
+            : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
           disabled && "cursor-not-allowed opacity-55",
         );
 

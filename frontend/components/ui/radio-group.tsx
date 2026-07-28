@@ -25,10 +25,10 @@ export function RadioGroupItem({
     <RadioGroupPrimitive.Item
       data-slot="radio-group-item"
       className={cn(
-        "aspect-square size-4 rounded-full border border-zinc-300 text-zinc-900 shadow-xs",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2",
+        "aspect-square size-4 rounded-full border border-border text-foreground shadow-xs",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
         "disabled:cursor-not-allowed disabled:opacity-50",
-        "dark:border-zinc-600 dark:text-zinc-100",
+        "dark:border-border dark:text-foreground",
         className,
       )}
       {...props}

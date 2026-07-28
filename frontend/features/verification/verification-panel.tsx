@@ -49,17 +49,17 @@ function statusClasses(status: VerificationStatus) {
   return cn(
     "border",
     status === "passed" &&
-      "border-emerald-800 bg-emerald-950/50 text-emerald-300",
+      "border-success/30 bg-success/10 text-success",
     status === "running" &&
-      "border-sky-800 bg-sky-950/50 text-sky-300",
+      "border-pending/30 bg-pending/10 text-pending",
     status === "failed" &&
-      "border-red-800 bg-red-950/50 text-red-300",
+      "border-danger/30 bg-danger/10 text-danger",
     status === "error" &&
-      "border-red-800 bg-red-950/50 text-red-300",
+      "border-danger/30 bg-danger/10 text-danger",
     status === "timed_out" &&
-      "border-amber-800 bg-amber-950/50 text-amber-300",
+      "border-pending/30 bg-pending/10 text-pending",
     status === "cancelled" &&
-      "border-zinc-700 bg-zinc-900 text-zinc-300",
+      "border-border bg-surface-raised text-muted-foreground",
   );
 }
 
@@ -288,7 +288,7 @@ export function VerificationPanel({
 
   if (loading && !overview) {
     return (
-      <div className="flex min-h-72 items-center justify-center text-sm text-zinc-400">
+      <div className="flex min-h-72 items-center justify-center text-sm text-muted-foreground">
         <Loader2Icon className="mr-2 size-4 animate-spin" />
         Detecting workspace projects…
       </div>
@@ -298,15 +298,15 @@ export function VerificationPanel({
   return (
     <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
       <section className="min-w-0 space-y-4">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+        <div className="rounded-xl border border-border bg-surface-raised p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-                <FolderSearchIcon className="size-4 text-violet-400" />
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <FolderSearchIcon className="size-4 text-pending" />
                 Detected workspace
               </div>
               <p
-                className="mt-1 max-w-2xl truncate font-mono text-xs text-zinc-500"
+                className="mt-1 max-w-2xl truncate font-mono text-xs text-muted-foreground"
                 title={overview?.workspace}
               >
                 {overview?.workspace ?? "No workspace selected"}
@@ -333,15 +333,15 @@ export function VerificationPanel({
                 <Badge
                   key={`${project.type}:${project.root}`}
                   variant="outline"
-                  className="border-zinc-700 bg-zinc-900 text-zinc-300"
+                  className="border-border bg-surface-raised text-muted-foreground"
                 >
                   {project.name}
                   {project.version ? ` ${project.version}` : ""}
-                  <span className="ml-1 text-zinc-500">· {project.root}</span>
+                  <span className="ml-1 text-muted-foreground">· {project.root}</span>
                 </Badge>
               ))
             ) : (
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-muted-foreground">
                 No supported project markers were detected.
               </p>
             )}
@@ -349,14 +349,14 @@ export function VerificationPanel({
         </div>
 
         {error ? (
-          <div className="flex items-start gap-2 rounded-lg border border-red-900/70 bg-red-950/40 p-3 text-sm text-red-300">
+          <div className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
             <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
             <span>{error}</span>
           </div>
         ) : null}
 
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Available checks
           </h3>
 
@@ -364,24 +364,24 @@ export function VerificationPanel({
             overview.profiles.map((profile) => (
               <article
                 key={profile.profile_id}
-                className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+                className="rounded-xl border border-border bg-surface-raised p-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <TerminalIcon className="size-4 shrink-0 text-sky-400" />
-                      <h4 className="text-sm font-semibold text-zinc-100">
+                      <TerminalIcon className="size-4 shrink-0 text-pending" />
+                      <h4 className="text-sm font-semibold text-foreground">
                         {profile.name}
                       </h4>
                     </div>
-                    <p className="mt-1 text-xs leading-5 text-zinc-400">
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       {profile.description}
                     </p>
-                    <code className="mt-2 block overflow-x-auto rounded bg-zinc-900 px-2.5 py-2 text-xs text-zinc-300">
+                    <code className="mt-2 block overflow-x-auto rounded bg-surface-raised px-2.5 py-2 text-xs text-muted-foreground">
                       {profile.command}
                     </code>
                     {!profile.available ? (
-                      <p className="mt-2 text-xs text-amber-300">
+                      <p className="mt-2 text-xs text-pending">
                         {profile.unavailable_reason}
                       </p>
                     ) : null}
@@ -405,7 +405,7 @@ export function VerificationPanel({
               </article>
             ))
           ) : (
-            <div className="rounded-xl border border-dashed border-zinc-800 p-6 text-center text-sm text-zinc-500">
+            <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               No verification commands are available for this workspace yet.
             </div>
           )}
@@ -413,17 +413,17 @@ export function VerificationPanel({
       </section>
 
       <section className="min-w-0 space-y-4">
-        <div className="overflow-hidden rounded-xl border border-zinc-800 bg-black">
-          <header className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-950 px-3 py-2.5">
-            <div className="flex min-w-0 items-center gap-2 text-xs text-zinc-300">
+        <div className="overflow-hidden rounded-xl border border-border bg-foreground">
+          <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-raised px-3 py-2.5">
+            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
               {running ? (
-                <Loader2Icon className="size-4 shrink-0 animate-spin text-sky-400" />
+                <Loader2Icon className="size-4 shrink-0 animate-spin text-pending" />
               ) : selectedRun?.status === "passed" ? (
-                <CheckCircle2Icon className="size-4 shrink-0 text-emerald-400" />
+                <CheckCircle2Icon className="size-4 shrink-0 text-success" />
               ) : selectedRun ? (
-                <CircleXIcon className="size-4 shrink-0 text-red-400" />
+                <CircleXIcon className="size-4 shrink-0 text-danger" />
               ) : (
-                <TerminalIcon className="size-4 shrink-0 text-zinc-500" />
+                <TerminalIcon className="size-4 shrink-0 text-muted-foreground" />
               )}
               <span className="truncate">{liveStatus}</span>
             </div>
@@ -444,7 +444,7 @@ export function VerificationPanel({
 
           <pre
             ref={outputRef}
-            className="h-72 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-xs leading-5 text-zinc-300"
+            className="h-72 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-xs leading-5 text-muted-foreground"
           >
             {liveOutput ||
               (selectedRun
@@ -453,7 +453,7 @@ export function VerificationPanel({
           </pre>
 
           {selectedRun ? (
-            <footer className="flex flex-wrap items-center gap-2 border-t border-zinc-800 bg-zinc-950 px-3 py-2.5 text-xs text-zinc-400">
+            <footer className="flex flex-wrap items-center gap-2 border-t border-border bg-surface-raised px-3 py-2.5 text-xs text-muted-foreground">
               <Badge className={statusClasses(selectedRun.status)}>
                 {selectedRun.status.replace("_", " ")}
               </Badge>
@@ -486,8 +486,8 @@ export function VerificationPanel({
 
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <HistoryIcon className="size-4 text-zinc-500" />
-            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+            <HistoryIcon className="size-4 text-muted-foreground" />
+            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Recent runs
             </h3>
           </div>
@@ -498,7 +498,7 @@ export function VerificationPanel({
                 <button
                   key={run.run_id}
                   type="button"
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-left transition hover:border-zinc-700"
+                  className="w-full rounded-lg border border-border bg-surface-raised p-3 text-left transition hover:border-border"
                   onClick={() => {
                     setSelectedRun(run);
                     setLiveOutput(run.output_excerpt);
@@ -506,14 +506,14 @@ export function VerificationPanel({
                   }}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="truncate text-xs font-medium text-zinc-200">
+                    <span className="truncate text-xs font-medium text-foreground">
                       {run.profile_name}
                     </span>
                     <Badge className={statusClasses(run.status)}>
                       {run.status.replace("_", " ")}
                     </Badge>
                   </div>
-                  <div className="mt-1.5 flex items-center gap-2 text-[11px] text-zinc-500">
+                  <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                     <Clock3Icon className="size-3" />
                     <span>{new Date(run.started_at).toLocaleString()}</span>
                     <span>·</span>
@@ -522,7 +522,7 @@ export function VerificationPanel({
                 </button>
               ))
             ) : (
-              <p className="rounded-lg border border-dashed border-zinc-800 p-4 text-center text-xs text-zinc-500">
+              <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                 No verification runs have been recorded for this workspace.
               </p>
             )}

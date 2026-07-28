@@ -28,15 +28,15 @@ export function ChatMessageBubble({
                 "flex gap-3 px-4 py-4",
                 isUser
                     ? "bg-transparent"
-                    : "bg-zinc-50/80 dark:bg-zinc-900/50",
+                    : "bg-surface-hover/60",
             )}
         >
             <Avatar className="size-8 shrink-0">
                 <AvatarFallback
                     className={cn(
                         isUser
-                            ? "bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300"
-                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
+                            ? "bg-pending/15 text-pending"
+                            : "bg-accent/15 text-accent",
                     )}
                 >
                     {isUser ? (
@@ -49,7 +49,7 @@ export function ChatMessageBubble({
 
             <div className="min-w-0 flex-1 space-y-3">
                 <header className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                    <p className="text-xs font-medium text-muted-foreground">
                         {isUser
                             ? "You"
                             : message.agentResult
@@ -66,9 +66,9 @@ export function ChatMessageBubble({
                     />
                 ) : null}
 
-                <div className="space-y-2 text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+                <div className="space-y-2 text-sm leading-relaxed text-foreground">
                     {message.reasoning ? (
-                        <details className="rounded-lg border border-amber-200 bg-amber-50/80 p-2 text-xs text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+                        <details className="rounded-lg border border-accent/30 bg-accent/5 p-2 text-xs text-accent">
                             <summary className="cursor-pointer select-none font-semibold">
                                 Reasoning
                             </summary>
@@ -84,7 +84,7 @@ export function ChatMessageBubble({
                         </ReactMarkdown>
 
                         {isStreaming && message.content ? (
-                            <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-emerald-500" />
+                            <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent" />
                         ) : null}
                     </div>
                 </div>
