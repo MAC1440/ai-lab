@@ -6,6 +6,16 @@ from main import create_app
 
 
 class ProductionRouteRegistrationTests(unittest.TestCase):
+    def test_health_identifies_the_ai_lab_backend(self):
+        response = TestClient(create_app()).get("/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ok")
+        self.assertEqual(response.json()["service"], "ai-lab-backend")
+        self.assertEqual(response.json()["version"], "1.0.0")
+        self.assertIn("checkout_id", response.json())
+        self.assertIn("source_fingerprint", response.json())
+
     def test_benchmark_routes_are_registered_on_production_app(self):
         paths = set(create_app().openapi()["paths"])
 

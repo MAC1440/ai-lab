@@ -6,6 +6,9 @@ backend/.pytest_cache/
 backend/.env
 backend/chroma_db/
 backend/data/
+backend/scripts/data/
+chroma_db/
+launcher/__pycache__/
 
 # Node / Next.js
 frontend/node_modules/
@@ -13,7 +16,11 @@ frontend/.next/
 frontend/.turbo/
 frontend/.env
 frontend/.env.local
-frontend/package-lock.json
+frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
+
+# Local release output
+dist/
 
 # OS
 .DS_Store

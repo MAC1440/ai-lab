@@ -115,7 +115,10 @@ export function RuntimeSettingsDialog() {
   }
 
   useEffect(() => {
-    if (open) void load();
+    if (!open) return;
+
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [open]);
 
   async function applyAutomatic() {

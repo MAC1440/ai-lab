@@ -41,6 +41,16 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }
 
+async function loadKnowledgeOverview(path?: string) {
+  const [status, browser, roots] = await Promise.all([
+    getKnowledgeStatus(),
+    browseKnowledgeFiles(path),
+    getKnowledgeBrowseRoots(),
+  ]);
+
+  return { status, browser, roots: roots.roots };
+}
+
 export function KnowledgeSourcesDialog({
   disabled = false,
 }: {
@@ -58,45 +68,64 @@ export function KnowledgeSourcesDialog({
   const [error, setError] = useState<string | null>(null);
   const [roots, setRoots] = useState<KnowledgeBrowseRoot[]>([]);
 
-  async function refresh() {
-    const [statusResult, browserResult, rootsResult] = await Promise.all([
-      getKnowledgeStatus(),
-      browseKnowledgeFiles(browser?.path),
-      getKnowledgeBrowseRoots(),
-    ]);
-
-    setStatus(statusResult);
-    setBrowser(browserResult);
-    setRoots(rootsResult.roots);
-  }
-
   useEffect(() => {
     if (!open) return;
-    setWorking(true);
-    refresh()
-      .catch((reason) =>
-        setError(
-          reason instanceof Error
-            ? reason.message
-            : "Could not load knowledge sources.",
-        ),
-      )
-      .finally(() => setWorking(false));
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setWorking(true);
+      loadKnowledgeOverview()
+        .then((result) => {
+          if (cancelled) return;
+          setStatus(result.status);
+          setBrowser(result.browser);
+          setRoots(result.roots);
+        })
+        .catch((reason) => {
+          if (!cancelled) {
+            setError(
+              reason instanceof Error
+                ? reason.message
+                : "Could not load knowledge sources.",
+            );
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setWorking(false);
+        });
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [open]);
 
   useEffect(() => {
-    if (!selected.length) {
-      setPreview(null);
-      return;
-    }
+    let cancelled = false;
     const timer = window.setTimeout(() => {
+      if (!selected.length) {
+        setPreview(null);
+        return;
+      }
+
       previewKnowledgeSelection(selected)
-        .then(setPreview)
-        .catch((reason) =>
-          setError(reason instanceof Error ? reason.message : "Preview failed."),
-        );
-    }, 250);
-    return () => window.clearTimeout(timer);
+        .then((result) => {
+          if (!cancelled) setPreview(result);
+        })
+        .catch((reason) => {
+          if (!cancelled) {
+            setError(
+              reason instanceof Error ? reason.message : "Preview failed.",
+            );
+          }
+        });
+    }, selected.length ? 250 : 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [selected]);
 
   async function navigate(path: string) {

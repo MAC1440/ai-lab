@@ -22,9 +22,13 @@ export function RuntimeMetricsCard() {
   }
 
   useEffect(() => {
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 3000);
-    return () => window.clearInterval(timer);
+    const initialTimer = window.setTimeout(() => void refresh(), 0);
+    const refreshTimer = window.setInterval(() => void refresh(), 3000);
+
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(refreshTimer);
+    };
   }, []);
 
   const latest = snapshot?.latest;

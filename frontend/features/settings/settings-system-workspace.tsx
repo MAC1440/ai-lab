@@ -54,7 +54,10 @@ export function SettingsSystemWorkspace() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   const models = snapshots.models as ModelSettingsSnapshot | undefined;
   const runtime = snapshots.runtime as RuntimeSettings | undefined;

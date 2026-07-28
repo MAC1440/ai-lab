@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   BotIcon,
   CheckCircle2Icon,
@@ -109,7 +109,8 @@ export function ModelsRuntimeWorkspace() {
   }, []);
 
   useEffect(() => {
-    void loadWorkspace();
+    const timer = window.setTimeout(() => void loadWorkspace(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadWorkspace]);
 
   const discoverProvider = async (provider: ModelProvider) => {
@@ -805,6 +806,7 @@ function AgentAssignments({
 
       <div className="mt-4 grid gap-3 xl:grid-cols-2">
         <AssignmentEditor
+          key={`base:${base.provider_id}:${base.model}:${base.assignment_source ?? ""}`}
           title="Base chat assignment"
           assignment={base}
           providers={snapshot.providers}
@@ -815,11 +817,14 @@ function AgentAssignments({
         />
 
         {(["planning", "generation", "repair"] as TaskStage[]).map(
-          (stage) => (
-            <AssignmentEditor
-              key={stage}
+          (stage) => {
+            const assignment = stages[stage] ?? base;
+
+            return (
+              <AssignmentEditor
+              key={`${stage}:${assignment.provider_id}:${assignment.model}:${assignment.assignment_source ?? ""}`}
               title={`${stageLabels[stage]} override`}
-              assignment={stages[stage] ?? base}
+              assignment={assignment}
               providers={snapshot.providers}
               discovered={discovered}
               profiles={profiles}
@@ -827,7 +832,8 @@ function AgentAssignments({
               saving={busyKey === `stage:${agentId}:${stage}`}
               onSave={(value) => onSaveStage(agentId, stage, value)}
             />
-          ),
+            );
+          },
         )}
       </div>
     </div>
@@ -854,10 +860,6 @@ function AssignmentEditor({
   onSave: (assignment: AgentModelSettings) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<AgentModelSettings>(assignment);
-
-  useEffect(() => {
-    setDraft(assignment);
-  }, [assignment]);
 
   const provider = providers.find((item) => item.id === draft.provider_id)
     ?? assignment.provider;

@@ -1,21 +1,7 @@
-# Python
-backend/.venv/
-backend/__pycache__/
-backend/**/*.py[cod]
-backend/.pytest_cache/
-backend/.env
-backend/chroma_db/
-backend/data/
-
-# Node / Next.js
-frontend/node_modules/
-frontend/.next/
-frontend/.turbo/
-frontend/.env
-frontend/.env.local
-frontend/package-lock.json
-
-# OS
-.DS_Store
-Thumbs.db
-backend/data/provider-settings.json
+/node_modules/
+/.next/
+/.turbo/
+/.env
+/.env.local
+/next-env.d.ts
+*.tsbuildinfo

@@ -1,0 +1,7 @@
+.github export-ignore
+.vscode export-ignore
+agent-test.txt export-ignore
+backend/scripts/data export-ignore
+chroma_db export-ignore
+frontend/next-env.d.ts export-ignore
+frontend/tsconfig.tsbuildinfo export-ignore

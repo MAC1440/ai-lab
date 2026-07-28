@@ -11,7 +11,6 @@ import {
   LibraryIcon,
   RefreshCwIcon,
   SearchIcon,
-  ShieldAlertIcon,
   Trash2Icon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -92,7 +91,8 @@ export function KnowledgeContextWorkspace() {
   }, []);
 
   useEffect(() => {
-    void loadWorkspace();
+    const timer = window.setTimeout(() => void loadWorkspace(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadWorkspace]);
 
   const sources = useMemo(

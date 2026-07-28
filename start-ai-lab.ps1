@@ -3,7 +3,9 @@ param(
     [ValidateSet("development", "production")]
     [string]$Mode = "development",
     [switch]$NoBrowser,
-    [switch]$Check
+    [switch]$Check,
+    [switch]$Status,
+    [switch]$Diagnostics
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,6 +23,8 @@ $Arguments = @(
 )
 if ($NoBrowser) { $Arguments += "--no-browser" }
 if ($Check) { $Arguments += "--check" }
+if ($Status) { $Arguments += "--status" }
+if ($Diagnostics) { $Arguments += "--diagnostics" }
 
 & $Python @Arguments
 exit $LASTEXITCODE

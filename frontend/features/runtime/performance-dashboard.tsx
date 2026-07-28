@@ -59,7 +59,8 @@ export function PerformanceDashboard() {
   }, [model, stage]);
 
   useEffect(() => {
-    void loadMetrics();
+    const timer = window.setTimeout(() => void loadMetrics(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadMetrics]);
 
   const handleClear = async () => {

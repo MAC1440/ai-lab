@@ -167,24 +167,28 @@ export function ProjectTasksWorkspace() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    const timer = window.setTimeout(() => {
+      void refresh();
 
-    void getAgentRecommendation()
-      .then((recommendation) => {
-        if (agentSelectionTouchedRef.current) return;
-        setAgentId(
-          resolveProjectTaskAgentId(
-            recommendation.agent_id,
-          ) as AgentId,
-        );
-        setAgentReason(recommendation.reason);
-      })
-      .catch(() => {
-        setAgentId("coding");
-        setAgentReason(
-          "Workspace recommendation was unavailable; Coding is selected as the safe fallback.",
-        );
-      });
+      void getAgentRecommendation()
+        .then((recommendation) => {
+          if (agentSelectionTouchedRef.current) return;
+          setAgentId(
+            resolveProjectTaskAgentId(
+              recommendation.agent_id,
+            ) as AgentId,
+          );
+          setAgentReason(recommendation.reason);
+        })
+        .catch(() => {
+          setAgentId("coding");
+          setAgentReason(
+            "Workspace recommendation was unavailable; Coding is selected as the safe fallback.",
+          );
+        });
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [refresh]);
 
   useEffect(() => {

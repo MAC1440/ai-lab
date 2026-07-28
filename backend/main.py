@@ -13,6 +13,7 @@ from routes.changes import router as changes_router  # noqa: E402
 from routes.conversations import router as conversations_router  # noqa: E402
 from routes.knowledge_sources import router as knowledge_sources_router  # noqa: E402
 from routes.mcp_settings import router as mcp_settings_router  # noqa: E402
+from routes.model_benchmarks import router as model_benchmarks_router  # noqa: E402
 from routes.project_index import router as project_index_router  # noqa: E402
 from routes.project_tasks import router as project_tasks_router  # noqa: E402
 from routes.provider_settings import router as provider_settings_router  # noqa: E402
@@ -26,7 +27,6 @@ from routes.system import router as system_router  # noqa: E402
 from routes.unity_docs import router as unity_docs_router  # noqa: E402
 from routes.verifications import router as verifications_router  # noqa: E402
 from routes.workspaces import router as workspaces_router  # noqa: E402
-from routes.model_benchmarks import router as model_benchmarks_router # noqa: E402
 
 
 def create_app() -> FastAPI:
@@ -49,7 +49,15 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     def health_check():
-        return {"status": "ok"}
+        return {
+            "status": "ok",
+            "service": "ai-lab-backend",
+            "version": app.version,
+            "checkout_id": os.getenv("AI_LAB_CHECKOUT_ID"),
+            "source_fingerprint": os.getenv(
+                "AI_LAB_SOURCE_FINGERPRINT"
+            ),
+        }
 
     app.include_router(agents_router)
     app.include_router(workspaces_router)
