@@ -35,6 +35,17 @@ import {
     useExternalAgentRequest,
 } from "@/features/home/hooks/use-external-agent-request";
 
+const WORKSPACE_TOOL_NAMES = new Set([
+    "list_files",
+    "search_files",
+    "read_file",
+    "read_file_range",
+    "search_text",
+    "propose_file_change",
+    "propose_file_change_set",
+    "propose_path_operation",
+]);
+
 export function ChatPanel() {
     const [messages, setMessages] = useState<HomeChatMessage[]>([]);
     const [input, setInput] = useState("");
@@ -82,8 +93,9 @@ export function ChatPanel() {
         [agents, selectedAgentId],
     );
 
-    const selectedAgentUsesTools = Boolean(
-        selectedAgent?.tools.length && settings.toolsMode !== "disabled",
+    const selectedAgentUsesWorkspaceTools = Boolean(
+        settings.toolsMode !== "disabled" &&
+        selectedAgent?.tools.some((tool) => WORKSPACE_TOOL_NAMES.has(tool)),
     );
 
     const refreshSessions = useCallback(async () => {
@@ -260,7 +272,7 @@ export function ChatPanel() {
             return;
         }
 
-        if (selectedAgentUsesTools && !activeWorkspace) {
+        if (selectedAgentUsesWorkspaceTools && !activeWorkspace) {
             setError(
                 `The ${selectedAgent.name} agent can use workspace tools. Select a workspace before sending this request.`,
             );
@@ -394,7 +406,7 @@ export function ChatPanel() {
         isSending ||
         agentsLoading ||
         !selectedAgent ||
-        (selectedAgentUsesTools && !activeWorkspace);
+        (selectedAgentUsesWorkspaceTools && !activeWorkspace);
 
     return (
         <TooltipProvider>
@@ -455,7 +467,9 @@ export function ChatPanel() {
                     messages={messages}
                     isSending={isSending}
                     selectedAgent={selectedAgent}
-                    selectedAgentUsesTools={selectedAgentUsesTools}
+                    selectedAgentUsesWorkspaceTools={
+                        selectedAgentUsesWorkspaceTools
+                    }
                     activeWorkspace={activeWorkspace}
                     onSelectWorkspace={() => setWorkspaceDialogOpen(true)}
                     bottomRef={bottomRef}
@@ -469,7 +483,7 @@ export function ChatPanel() {
                     streaming={isSending}
                     onStop={handleStop}
                     placeholder={
-                        selectedAgentUsesTools && !activeWorkspace
+                        selectedAgentUsesWorkspaceTools && !activeWorkspace
                             ? "Select a workspace before using this agent…"
                             : selectedAgent
                                 ? `Message ${selectedAgent.name}…`

@@ -30,6 +30,13 @@ class PydanticAgentTests(unittest.TestCase):
             "granite4.1:3b",
         )
 
+    def test_every_pydantic_agent_exposes_web_search(self):
+        for agent_id in ("general", "web", "unity", "coding"):
+            agent = get_pydantic_agent(agent_id)
+            tool_names = set(agent.toolsets[0].tools)
+
+            self.assertIn("web_search", tool_names)
+
     def test_caches_agent(self):
         first_agent = get_pydantic_agent("coding")
         second_agent = get_pydantic_agent("coding")

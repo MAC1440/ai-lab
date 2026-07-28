@@ -126,6 +126,34 @@ TOOL_SCHEMAS: Dict[str, ToolSchema] = {
             },
         },
     },
+    "web_search": {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": (
+                "Search the public web for current facts, source links, or "
+                "documentation. Use a concise public query and never include "
+                "secrets or private workspace content."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Concise public search query.",
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 8,
+                        "default": 5,
+                    },
+                },
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+        },
+    },
     "propose_file_change": {
         "type": "function",
         "function": {

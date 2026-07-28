@@ -13,7 +13,7 @@ export function ChatTranscript({
     messages,
     isSending,
     selectedAgent,
-    selectedAgentUsesTools,
+    selectedAgentUsesWorkspaceTools,
     activeWorkspace,
     onSelectWorkspace,
     bottomRef,
@@ -21,7 +21,7 @@ export function ChatTranscript({
     messages: HomeChatMessage[];
     isSending: boolean;
     selectedAgent: AgentProfile | null;
-    selectedAgentUsesTools: boolean;
+    selectedAgentUsesWorkspaceTools: boolean;
     activeWorkspace: string | null;
     onSelectWorkspace: () => void;
     bottomRef: RefObject<HTMLDivElement | null>;
@@ -45,7 +45,8 @@ export function ChatTranscript({
                                     {selectedAgent?.description ??
                                         "Choose an agent to begin."}
                                 </p>
-                                {selectedAgentUsesTools && !activeWorkspace ? (
+                                {selectedAgentUsesWorkspaceTools &&
+                                !activeWorkspace ? (
                                     <Button
                                         type="button"
                                         variant="outline"

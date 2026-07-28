@@ -21,6 +21,16 @@ class AgentServiceTests(unittest.TestCase):
             self.assertIn("propose_path_operation", tools)
             self.assertNotIn("write_file", tools)
 
+    def test_every_agent_can_search_the_web(self):
+        for agent in self.service.list_agents():
+            self.assertIn("web_search", agent["tools"])
+
+    def test_general_agent_has_web_search_without_workspace_access(self):
+        tools = self.service.get_allowed_tool_names("general")
+
+        self.assertEqual(tools, ["web_search"])
+        self.assertNotIn("read_file", tools)
+
     def test_recommendations_prioritize_unity_then_web(self):
         self.assertEqual(
             self.service.recommend_agent(["node", "unity"])["agent_id"],

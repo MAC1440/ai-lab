@@ -11,6 +11,7 @@ from tools.file_tools import (
     search_files,
     search_text,
 )
+from tools.web_tools import web_search
 
 ToolFunction = Callable[..., Any]
 
@@ -27,6 +28,7 @@ class ToolExecutor:
             "read_file": read_file,
             "read_file_range": read_file_range,
             "search_text": search_text,
+            "web_search": web_search,
             "propose_file_change": propose_file_change,
             "propose_file_change_set": propose_file_change_set,
             "propose_path_operation": propose_path_operation,
@@ -128,6 +130,18 @@ class ToolExecutor:
                     default=50,
                     minimum=1,
                     maximum=200,
+                ),
+            }
+
+        if tool_name == "web_search":
+            return {
+                "query": self._string(arguments, "query"),
+                "max_results": self._integer(
+                    arguments,
+                    "max_results",
+                    default=5,
+                    minimum=1,
+                    maximum=8,
                 ),
             }
 

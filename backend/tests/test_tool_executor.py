@@ -70,3 +70,46 @@ def test_allowed_but_unavailable_tool_is_rejected():
         agent_id="coding",
         tool_name="write_file",
     )
+
+
+def test_general_agent_can_execute_web_search():
+    executor = ToolExecutor(agent_service=AgentService())
+
+    with MockWebSearch(executor) as search:
+        result = executor.execute(
+            agent_id="general",
+            tool_name="web_search",
+            arguments={"query": "Pydantic AI documentation"},
+        )
+
+    search.assert_called_once_with(
+        query="Pydantic AI documentation",
+        max_results=5,
+    )
+    assert result["result_count"] == 1
+
+
+class MockWebSearch:
+    def __init__(self, executor):
+        self.executor = executor
+        self.original = executor._tools["web_search"]
+        self.mock = Mock(
+            return_value={
+                "query": "Pydantic AI documentation",
+                "result_count": 1,
+                "results": [
+                    {
+                        "title": "Pydantic AI",
+                        "url": "https://ai.pydantic.dev",
+                        "snippet": "Agent framework",
+                    }
+                ],
+            }
+        )
+
+    def __enter__(self):
+        self.executor._tools["web_search"] = self.mock
+        return self.mock
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.executor._tools["web_search"] = self.original
