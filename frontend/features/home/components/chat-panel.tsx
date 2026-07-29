@@ -18,6 +18,7 @@ import {
     updateConversation,
 } from "@/features/sessions";
 import { ChatHeader } from "@/features/home/components/chat-header";
+import type { ChatModelSelectionStatus } from "@/features/home/components/chat-model-selector";
 import { ChatComposer } from "@/features/home/components/chat-composer";
 import { ChatTranscript } from "@/features/home/components/chat-transcript";
 import {
@@ -69,6 +70,14 @@ export function ChatPanel() {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [settings, setSettings] =
         useState<AgentChatSettings>(defaultAgentSettings);
+    const [modelStatus, setModelStatus] =
+        useState<ChatModelSelectionStatus>({
+            loading: true,
+            configured: false,
+            providerId: null,
+            providerName: null,
+            model: null,
+        });
 
     const bottomRef = useRef<HTMLDivElement>(null);
     const recommendedWorkspaceRef = useRef<string | null>(null);
@@ -83,6 +92,7 @@ export function ChatPanel() {
         }
         if (agents.some((agent) => agent.id === request.recommendedAgentId)) {
             setSelectedAgentId(request.recommendedAgentId);
+            setModelStatus(unconfiguredModelStatus(true));
             setRecommendationReason(request.recommendationReason);
         }
     }, [agents]);
@@ -126,6 +136,7 @@ export function ChatPanel() {
             const conversation = await getConversation(session.session_id);
             setSessionId(conversation.session_id);
             setSelectedAgentId(conversation.agent_id);
+            setModelStatus(unconfiguredModelStatus(true));
             setSettings({
                 ...defaultAgentSettings,
                 ragTopK: conversation.rag_top_k,
@@ -250,6 +261,7 @@ export function ChatPanel() {
             .then((recommendation) => {
                 if (agents.some((agent) => agent.id === recommendation.agent_id)) {
                     setSelectedAgentId(recommendation.agent_id);
+                    setModelStatus(unconfiguredModelStatus(true));
                     setSessionId(null);
                     setMessages([]);
                     setRecommendationReason(recommendation.reason);
@@ -269,6 +281,13 @@ export function ChatPanel() {
         const content = input.trim();
 
         if (!content || isSending || !selectedAgent) {
+            return;
+        }
+
+        if (modelStatus.loading || !modelStatus.configured) {
+            setError(
+                `Select a model for ${selectedAgent.name} before sending this request.`,
+            );
             return;
         }
 
@@ -402,9 +421,24 @@ export function ChatPanel() {
         externalRequest.reset();
     }
 
+    async function handleModelAssignmentChanged() {
+        handleClear();
+        try {
+            setAgents(await getAgents());
+        } catch (requestError) {
+            setError(
+                requestError instanceof Error
+                    ? requestError.message
+                    : "The model was saved, but agents could not be refreshed.",
+            );
+        }
+    }
+
     const inputDisabled =
         isSending ||
         agentsLoading ||
+        modelStatus.loading ||
+        !modelStatus.configured ||
         !selectedAgent ||
         (selectedAgentUsesWorkspaceTools && !activeWorkspace);
 
@@ -437,10 +471,13 @@ export function ChatPanel() {
                     settingsOpen={settingsOpen}
                     settings={settings}
                     recommendationReason={recommendationReason}
+                    modelStatus={modelStatus}
                     isSending={isSending}
                     canClear={messages.length > 0}
+                    hasConversation={messages.length > 0}
                     onAgentChange={(agentId) => {
                         setSelectedAgentId(agentId);
+                        setModelStatus(unconfiguredModelStatus(true));
                         setSessionId(null);
                         setRecommendationReason(null);
                         setMessages([]);
@@ -459,8 +496,10 @@ export function ChatPanel() {
                     }}
                     onSettingsOpenChange={setSettingsOpen}
                     onSettingsChange={setSettings}
+                    onModelStatusChange={setModelStatus}
+                    onModelAssignmentChanged={handleModelAssignmentChanged}
+                    onModelError={setError}
                     onClear={handleClear}
-                    onAgentsRefresh={async () => setAgents(await getAgents())}
                 />
 
                 <ChatTranscript
@@ -483,15 +522,31 @@ export function ChatPanel() {
                     streaming={isSending}
                     onStop={handleStop}
                     placeholder={
-                        selectedAgentUsesWorkspaceTools && !activeWorkspace
-                            ? "Select a workspace before using this agent…"
-                            : selectedAgent
-                                ? `Message ${selectedAgent.name}…`
-                                : "Loading agents…"
+                        modelStatus.loading
+                            ? "Loading model assignment…"
+                            : !modelStatus.configured
+                                ? "Select a model above before chatting…"
+                                : selectedAgentUsesWorkspaceTools && !activeWorkspace
+                                    ? "Select a workspace before using this agent…"
+                                    : selectedAgent
+                                        ? `Message ${selectedAgent.name} with ${modelStatus.model}…`
+                                        : "Loading agents…"
                     }
                 />
                 </div>
             </div>
         </TooltipProvider>
     );
+}
+
+function unconfiguredModelStatus(
+    loading: boolean,
+): ChatModelSelectionStatus {
+    return {
+        loading,
+        configured: false,
+        providerId: null,
+        providerName: null,
+        model: null,
+    };
 }

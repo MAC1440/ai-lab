@@ -470,11 +470,17 @@ function ProviderLibraryCard({
             const localReference =
               model.pull_name || suggestCloudReference(model.name);
             const pullTarget =
-              cloudProvider && localPullProvider
-                ? localPullProvider
-                : undefined;
+              canPull
+                ? provider
+                : cloudProvider && localPullProvider
+                  ? localPullProvider
+                  : undefined;
+            const pullReference =
+              pullTarget?.id === provider.id
+                ? model.name
+                : localReference;
             const pullState = pullTarget
-              ? pulls[pullKey(pullTarget.id, localReference)]
+              ? pulls[pullKey(pullTarget.id, pullReference)]
               : undefined;
 
             return (
@@ -485,7 +491,7 @@ function ProviderLibraryCard({
                 profile={profile}
                 hardwareTier={hardwareModel?.tier}
                 pullTarget={pullTarget}
-                pullReference={localReference}
+                pullReference={pullReference}
                 pullState={pullState}
                 onPull={onPull}
               />
@@ -607,25 +613,39 @@ function LibraryModelCard({
 
       {pullTarget ? (
         <div className="mt-4 rounded-lg border border-border bg-surface p-3 dark:border-border dark:bg-surface-raised">
-          <p className="text-[10px] text-muted-foreground">
-            Local cloud reference
-          </p>
-          <p className="mt-1 break-all font-mono text-[11px] text-foreground">
-            {pullReference}
-          </p>
-          <button
-            type="button"
-            onClick={() => void onPull(pullTarget, pullReference)}
-            disabled={isPulling(pullState)}
-            className={`${secondaryButtonClass} mt-3 w-full justify-center`}
-          >
-            {isPulling(pullState) ? (
-              <LoaderCircleIcon className="size-3.5 animate-spin" />
-            ) : (
-              <CloudIcon className="size-3.5" />
-            )}
-            Pull through {pullTarget.name}
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-[10px] text-muted-foreground">
+                {pullTarget.id === provider.id
+                  ? availability === "cloud"
+                    ? "Cloud reference on this Ollama provider"
+                    : "Installed on this Ollama provider"
+                  : "Create a local Ollama cloud reference"}
+              </p>
+              <p className="mt-1 break-all font-mono text-[11px] text-foreground">
+                {pullReference}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void onPull(pullTarget, pullReference)}
+              disabled={isPulling(pullState)}
+              className={`${secondaryButtonClass} shrink-0 justify-center`}
+            >
+              {isPulling(pullState) ? (
+                <LoaderCircleIcon className="size-3.5 animate-spin" />
+              ) : availability === "cloud" ? (
+                <CloudIcon className="size-3.5" />
+              ) : (
+                <DownloadIcon className="size-3.5" />
+              )}
+              {pullTarget.id !== provider.id
+                ? `Pull to ${pullTarget.name}`
+                : availability === "cloud"
+                  ? "Refresh cloud model"
+                  : "Update model"}
+            </button>
+          </div>
           {pullState ? (
             <PullProgressCard state={pullState} compact />
           ) : null}
@@ -905,7 +925,7 @@ const inputClass =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-foreground outline-none ring-emerald-500/20 focus:border-success/30 focus:ring-4 dark:border-border dark:bg-surface-raised dark:text-foreground";
 
 const secondaryButtonClass =
-  "inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-surface-raised";
+  "inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-surface-raised";
 
 const primaryButtonClass =
-  "inline-flex items-center justify-center gap-2 rounded-lg bg-surface-raised px-3 py-2 text-xs font-medium text-accent-foreground transition disabled:cursor-not-allowed disabled:opacity-50 dark:bg-surface-hover dark:text-foreground";
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-surface-raised px-3 py-2 text-xs font-medium text-accent-foreground transition disabled:cursor-not-allowed disabled:opacity-50 dark:bg-surface-hover dark:text-foreground";

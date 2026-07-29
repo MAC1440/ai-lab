@@ -118,3 +118,20 @@ body {
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
+
+/* Interactive controls should visually advertise clickability. */
+button:not(:disabled),
+a[href],
+select:not(:disabled),
+summary,
+[role="button"]:not([aria-disabled="true"]),
+[role="option"]:not([data-disabled]) {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+[aria-disabled="true"],
+[data-disabled] {
+  cursor: not-allowed;
+}

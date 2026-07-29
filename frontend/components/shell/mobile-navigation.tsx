@@ -7,6 +7,7 @@ import {
   XIcon,
 } from "lucide-react";
 
+import { DrawerManagementSection } from "@/components/shell/drawer-management-section";
 import {
   isNavigationItemActive,
   primaryNavigation,
@@ -36,7 +37,7 @@ export function MobileNavigation({
         type="button"
         onClick={onClose}
         className={cn(
-          "absolute inset-0 bg-foreground/50 backdrop-blur-sm transition-opacity",
+          "absolute inset-0 cursor-pointer bg-foreground/50 backdrop-blur-sm transition-opacity",
           open ? "opacity-100" : "opacity-0",
         )}
         aria-label="Close navigation"
@@ -54,16 +55,18 @@ export function MobileNavigation({
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-foreground">AI Lab</p>
+            <p className="text-sm font-semibold text-foreground">
+              AI Lab
+            </p>
             <p className="text-[11px] text-muted-foreground">
-              Local agent workspace
+              Agent development workspace
             </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface-hover"
+            className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-surface-hover"
             aria-label="Close navigation"
           >
             <XIcon className="size-4" />
@@ -83,6 +86,11 @@ export function MobileNavigation({
             items={secondaryNavigation}
             pathname={pathname}
             onSelect={onClose}
+          />
+
+          <DrawerManagementSection
+            collapsed={false}
+            onExpand={() => undefined}
           />
         </div>
       </aside>
@@ -129,7 +137,9 @@ function MobileNavigationGroup({
           active
             ? "bg-accent/12 text-accent"
             : "text-muted-foreground",
-          disabled && "cursor-not-allowed opacity-50",
+          disabled
+            ? "cursor-not-allowed opacity-50"
+            : "cursor-pointer",
         );
 
         if (disabled) {

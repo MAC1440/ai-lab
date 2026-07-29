@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
-  CpuIcon,
+  CloudIcon,
   FlaskConicalIcon,
+  HardDriveIcon,
 } from "lucide-react";
 
+import { DrawerManagementSection } from "@/components/shell/drawer-management-section";
 import {
   isNavigationItemActive,
   primaryNavigation,
@@ -49,7 +51,7 @@ export function AppSidebar({
               AI Lab
             </p>
             <p className="truncate text-[11px] text-muted-foreground">
-              Local agent workspace
+              Agent development workspace
             </p>
           </div>
         ) : null}
@@ -69,6 +71,11 @@ export function AppSidebar({
           collapsed={collapsed}
           pathname={pathname}
         />
+
+        <DrawerManagementSection
+          collapsed={collapsed}
+          onExpand={onCollapse}
+        />
       </div>
 
       <div className="border-t border-border p-3">
@@ -78,15 +85,21 @@ export function AppSidebar({
             collapsed && "flex justify-center p-2",
           )}
         >
-          <CpuIcon className="size-4 shrink-0 text-accent" />
+          <div className="flex items-center gap-2">
+            <HardDriveIcon className="size-4 shrink-0 text-accent" />
+            {!collapsed ? (
+              <CloudIcon className="size-3.5 shrink-0 text-pending" />
+            ) : null}
+          </div>
 
           {!collapsed ? (
             <div className="mt-2">
               <p className="text-xs font-medium text-foreground">
-                Local-first runtime
+                Local and cloud runtime
               </p>
               <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                Models, files, and project context remain on this machine.
+                Local models stay on this machine. Cloud providers receive
+                prompts and context only when explicitly selected.
               </p>
             </div>
           ) : null}
@@ -96,7 +109,7 @@ export function AppSidebar({
           type="button"
           onClick={onCollapse}
           className={cn(
-            "mt-3 flex w-full items-center rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-surface-hover hover:text-foreground",
+            "mt-3 flex w-full cursor-pointer items-center rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-surface-hover hover:text-foreground",
             collapsed ? "justify-center" : "justify-between",
           )}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -162,7 +175,9 @@ function NavigationGroup({
           active
             ? "bg-accent/12 text-accent"
             : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
-          disabled && "cursor-not-allowed opacity-55",
+          disabled
+            ? "cursor-not-allowed opacity-55"
+            : "cursor-pointer",
         );
 
         if (disabled) {
