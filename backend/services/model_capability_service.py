@@ -9,6 +9,8 @@ from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from services.ollama_runtime import is_ollama_cloud_runtime
+
 
 StructuredOutputMode = Literal["native", "tool", "unsupported"]
 TaskStage = Literal["planning", "generation", "repair"]
@@ -251,7 +253,10 @@ class ModelCapabilityService:
         if saved is None:
             provider_kind = runtime.get("provider", {}).get("kind")
             structured_mode = (
-                "native" if provider_kind == "ollama" else "tool"
+                "native"
+                if provider_kind == "ollama"
+                and not is_ollama_cloud_runtime(runtime)
+                else "tool"
             )
             profile: Dict[str, Any] = {
                 "provider_id": provider_id,
@@ -273,6 +278,13 @@ class ModelCapabilityService:
         else:
             profile = deepcopy(saved)
             profile["profile_source"] = "saved"
+
+        if (
+            is_ollama_cloud_runtime(runtime)
+            and profile.get("structured_output_mode") == "native"
+        ):
+            profile["structured_output_mode"] = "tool"
+            profile["structured_output_fallback"] = "ollama_cloud"
 
         effective_context = min(
             configured_context,

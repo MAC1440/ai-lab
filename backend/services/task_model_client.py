@@ -7,6 +7,10 @@ from typing import TYPE_CHECKING, Any, Dict, Generic, Protocol, Type, TypeVar
 from pydantic import BaseModel
 
 from services.agent_service import AgentService
+from services.ollama_runtime import (
+    is_ollama_cloud_runtime,
+    ollama_model_settings_extra_body,
+)
 from services.task_model_output_adapter import (
     model_output_type,
     normalize_model_output,
@@ -97,6 +101,7 @@ class _InferredCapabilityService:
             "structured_output_mode": (
                 "native"
                 if runtime.get("provider", {}).get("kind") == "ollama"
+                and not is_ollama_cloud_runtime(runtime)
                 else "tool"
             ),
             "effective_context_window": context,
@@ -284,14 +289,16 @@ class PydanticTaskModelClient:
             stage,
             use_agent_prompt=use_agent_prompt,
         )
+        extra_body = ollama_model_settings_extra_body(
+            runtime,
+            context_window,
+        )
         run_arguments = {
             "usage_limits": UsageLimits(request_limit=self.request_limit),
             "model_settings": ModelSettings(
                 temperature=temperature,
                 max_tokens=max_tokens,
-                extra_body={"options": {"num_ctx": context_window}}
-                if runtime.get("provider", {}).get("kind") == "ollama"
-                else None,
+                extra_body=extra_body,
             ),
         }
 

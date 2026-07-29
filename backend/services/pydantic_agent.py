@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
 
 from services.agent_service import AgentService
+from services.ollama_runtime import ollama_model_settings_extra_body
 from services.pydantic_model import build_pydantic_model
 from tools.file_tools import (
     list_files as _list_files,
@@ -466,12 +467,12 @@ def _build_pydantic_agent(
         "temperature": generation["temperature"],
         "max_tokens": generation["max_tokens"],
     }
-    if runtime.get("provider", {}).get("kind") == "ollama":
-        model_settings["extra_body"] = {
-            "options":{
-                "num_ctx": generation["context_window"]
-            }
-        }
+    extra_body = ollama_model_settings_extra_body(
+        runtime,
+        generation["context_window"],
+    )
+    if extra_body is not None:
+        model_settings["extra_body"] = extra_body
     agent = Agent(
         model=model,
         instructions=config["system_prompt"],

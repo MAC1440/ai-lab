@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict
 from functools import lru_cache
+from typing import Any, Dict
 
 from pydantic_ai.models.ollama import OllamaModel
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -14,11 +14,13 @@ def build_pydantic_model(runtime: Dict[str, Any]):
 
     provider = runtime["provider"]
     model_name = runtime["model"]
+
     if provider["kind"] == "ollama":
         return OllamaModel(
             model_name,
             provider=OllamaProvider(
-                base_url=f"{provider['base_url'].rstrip('/')}/v1"
+                base_url=f"{provider['base_url'].rstrip('/')}/v1",
+                api_key=provider.get("api_key") or None,
             ),
         )
 

@@ -12,6 +12,8 @@ import httpx
 import keyring
 from pydantic import BaseModel, Field, field_validator
 
+from services.ollama_runtime import routes_to_ollama_cloud
+
 
 ProviderKind = Literal["ollama", "openai_compatible"]
 TaskStage = Literal["planning", "generation", "repair"]
@@ -237,23 +239,41 @@ class ProviderSettingsService:
         try:
             if provider["kind"] == "ollama":
                 response = httpx.get(
-                    f"{provider['base_url']}/api/tags", timeout=15.0
+                    f"{provider['base_url']}/api/tags",
+                    headers=headers,
+                    timeout=15.0,
                 )
                 response.raise_for_status()
                 raw_models = response.json().get("models", [])
-                models = [
-                    {
-                        "name": item.get("name") or item.get("model"),
-                        "size": item.get("size"),
-                        "modified_at": item.get("modified_at"),
-                        "warnings": self._model_warnings(
-                            item.get("name") or item.get("model") or "",
+                models = []
+                for item in raw_models:
+                    model_name = item.get("name") or item.get("model")
+                    if not model_name:
+                        continue
+                    is_cloud = routes_to_ollama_cloud(
+                        provider,
+                        model_name,
+                    )
+                    warnings = (
+                        [
+                            "This model runs remotely. Prompts, retrieved "
+                            "context, and tool-call arguments are sent to "
+                            "Ollama Cloud."
+                        ]
+                        if is_cloud
+                        else self._model_warnings(
+                            model_name,
                             item.get("size"),
-                        ),
-                    }
-                    for item in raw_models
-                    if item.get("name") or item.get("model")
-                ]
+                        )
+                    )
+                    models.append(
+                        {
+                            "name": model_name,
+                            "size": None if is_cloud else item.get("size"),
+                            "modified_at": item.get("modified_at"),
+                            "warnings": warnings,
+                        }
+                    )
             else:
                 response = httpx.get(
                     f"{provider['base_url']}/models",
@@ -373,8 +393,10 @@ class ProviderSettingsService:
         parsed = urlparse(clean)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("Provider URL must be an http:// or https:// URL")
-        if kind == "ollama" and clean.endswith("/v1"):
-            clean = clean[:-3].rstrip("/")
+        if kind == "ollama":
+            for suffix in ("/v1", "/api"):
+                if clean.endswith(suffix):
+                    clean = clean[: -len(suffix)].rstrip("/")
         if kind == "openai_compatible" and not clean.endswith("/v1"):
             clean = f"{clean}/v1"
         return clean
