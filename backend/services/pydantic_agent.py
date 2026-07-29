@@ -448,18 +448,25 @@ def _build_pydantic_agent(
         if tool_name in TOOL_FUNCTIONS
     ]
 
-    runtime = runtime or {
-        "model": config["model"],
-        "generation": {
-            "temperature": 0.1,
-            "max_tokens": 2048,
-            "context_window": 8192,
-        },
-        "provider": {
-            "kind": "ollama",
-            "base_url": "http://localhost:11434",
-        },
-    }
+    if runtime is None:
+        default_model = str(config.get("model") or "").strip()
+        if not default_model:
+            raise ValueError(
+                f"No model is configured for agent '{agent_id}'. Open the "
+                "Models page, discover or pull a model, and save an assignment."
+            )
+        runtime = {
+            "model": default_model,
+            "generation": {
+                "temperature": 0.1,
+                "max_tokens": 2048,
+                "context_window": 8192,
+            },
+            "provider": {
+                "kind": "ollama",
+                "base_url": "http://localhost:11434",
+            },
+        }
     model = build_pydantic_model(runtime)
     generation = runtime["generation"]
 

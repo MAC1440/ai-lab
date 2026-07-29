@@ -4,6 +4,8 @@ from unittest.mock import patch
 
 from pydantic_ai import ModelRetry
 
+from services.agent_service import AGENTS
+
 from services.pydantic_agent import (
     AgentRunDeps,
     FileChangeOperation,
@@ -16,10 +18,18 @@ from services.pydantic_agent import (
 
 class PydanticAgentTests(unittest.TestCase):
     def setUp(self):
+        self.original_models = {
+            agent_id: str(config.get("model") or "")
+            for agent_id, config in AGENTS.items()
+        }
+        for config in AGENTS.values():
+            config["model"] = "granite4.1:3b"
         get_pydantic_agent.cache_clear()
 
     def tearDown(self):
         get_pydantic_agent.cache_clear()
+        for agent_id, model in self.original_models.items():
+            AGENTS[agent_id]["model"] = model
 
     def test_creates_coding_agent(self):
         agent = get_pydantic_agent("coding")

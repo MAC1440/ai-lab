@@ -48,12 +48,30 @@ class ProviderSettingsServiceTests(unittest.TestCase):
             patcher.stop()
         self.temp_dir.cleanup()
 
-    def test_defaults_to_local_ollama_without_configuration(self):
+    def test_unconfigured_agent_is_visible_but_cannot_run(self):
+        resolved = self.service.resolve_agent("coding")
+        self.assertEqual(resolved["model"], "")
+        self.assertEqual(
+            resolved["assignment_source"],
+            "unconfigured",
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "No model is configured",
+        ):
+            self.service.runtime_config("coding", "")
+
+    def test_explicit_profile_fallback_is_not_hardcoded(self):
         runtime = self.service.runtime_config(
-            "coding", "granite4.1:3b"
+            "coding",
+            "qwen3:4b",
         )
         self.assertEqual(runtime["provider_id"], "ollama")
-        self.assertEqual(runtime["model"], "granite4.1:3b")
+        self.assertEqual(runtime["model"], "qwen3:4b")
+        self.assertEqual(
+            runtime["assignment_source"],
+            "agent_profile",
+        )
         self.assertEqual(runtime["generation"]["temperature"], 0.1)
 
     def test_api_key_is_not_written_to_json(self):

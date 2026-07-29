@@ -10,7 +10,6 @@ import {
   MemoryStickIcon,
   RefreshCwIcon,
   SaveIcon,
-  ServerIcon,
   ShieldAlertIcon,
   SparklesIcon,
   TriangleAlertIcon,
@@ -18,17 +17,16 @@ import {
 } from "lucide-react";
 
 import {
-  discoverModels,
   getModelSettings,
   saveAgentModel,
   saveTaskStageModel,
-  testProvider,
   type AgentModelSettings,
   type DiscoveredModel,
   type ModelProvider,
   type ModelSettingsSnapshot,
   type TaskStage,
 } from "@/features/model-settings/model-settings-api";
+import { ModelLibraryPanel } from "@/features/model-settings/model-library-panel";
 import {
   getModelCapabilities,
   getModelRecommendations,
@@ -46,10 +44,11 @@ import {
 } from "@/features/runtime/runtime-api";
 import { cn } from "@/lib/utils";
 
-type AgentId = "coding" | "unity" | "web";
+type AgentId = "general" | "coding" | "unity" | "web";
 type RuntimeStage = "chat" | TaskStage;
 
 const agentLabels: Record<AgentId, string> = {
+  general: "General",
   coding: "Coding",
   unity: "Unity",
   web: "Web",
@@ -112,50 +111,6 @@ export function ModelsRuntimeWorkspace() {
     const timer = window.setTimeout(() => void loadWorkspace(), 0);
     return () => window.clearTimeout(timer);
   }, [loadWorkspace]);
-
-  const discoverProvider = async (provider: ModelProvider) => {
-    const key = `discover:${provider.id}`;
-    setBusyKey(key);
-    setError(null);
-    setNotice(null);
-
-    try {
-      const result = await discoverModels(provider.id);
-      setDiscovered((current) => ({
-        ...current,
-        [provider.id]: result.models,
-      }));
-      setNotice(
-        `Discovered ${result.models.length} model${
-          result.models.length === 1 ? "" : "s"
-        } from ${provider.name}.`,
-      );
-    } catch (discoverError) {
-      setError(toMessage(discoverError, "Model discovery failed."));
-    } finally {
-      setBusyKey(null);
-    }
-  };
-
-  const testProviderConnection = async (provider: ModelProvider) => {
-    const key = `test:${provider.id}`;
-    setBusyKey(key);
-    setError(null);
-    setNotice(null);
-
-    try {
-      const result = await testProvider(provider.id);
-      setDiscovered((current) => ({
-        ...current,
-        [provider.id]: result.models,
-      }));
-      setNotice(result.message);
-    } catch (testError) {
-      setError(toMessage(testError, "Provider test failed."));
-    } finally {
-      setBusyKey(null);
-    }
-  };
 
   const saveAgentAssignment = async (
     agentId: AgentId,
@@ -283,10 +238,16 @@ export function ModelsRuntimeWorkspace() {
               discovered={discovered}
               hardware={hardware}
               profiles={profiles}
-              busyKey={busyKey}
               loading={loading}
-              onDiscover={discoverProvider}
-              onTest={testProviderConnection}
+              onDiscovered={(providerId, models) =>
+                setDiscovered((current) => ({
+                  ...current,
+                  [providerId]: models,
+                }))
+              }
+              onNotice={setNotice}
+              onError={setError}
+              onWorkspaceRefresh={loadWorkspace}
             />
 
             <AssignmentSection
@@ -333,14 +294,14 @@ function WorkspaceHeader({
     <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-success dark:text-success">
-          Local inference control
+          Model control plane
         </p>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground dark:text-foreground">
           Models and runtime
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
-          Inspect installed models, verify provider connectivity, manage agent
-          assignments, and keep context limits appropriate for this machine.
+          Browse local and cloud models, pull or register them with live
+          progress, assign each agent explicitly, and tune runtime limits.
         </p>
       </div>
 
@@ -448,245 +409,37 @@ function ProviderSection({
   discovered,
   hardware,
   profiles,
-  busyKey,
   loading,
-  onDiscover,
-  onTest,
+  onDiscovered,
+  onNotice,
+  onError,
+  onWorkspaceRefresh,
 }: {
   providers: ModelProvider[];
   discovered: Record<string, DiscoveredModel[]>;
   hardware: HardwareSnapshot | null;
   profiles: ModelCapabilityProfile[];
-  busyKey: string | null;
   loading: boolean;
-  onDiscover: (provider: ModelProvider) => Promise<void>;
-  onTest: (provider: ModelProvider) => Promise<void>;
+  onDiscovered: (
+    providerId: string,
+    models: DiscoveredModel[],
+  ) => void;
+  onNotice: (message: string | null) => void;
+  onError: (message: string | null) => void;
+  onWorkspaceRefresh: () => Promise<void>;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface shadow-sm dark:border-border dark:bg-surface-raised">
-      <div className="border-b border-border p-4 sm:p-5 dark:border-border">
-        <h3 className="text-sm font-semibold text-foreground dark:text-foreground">
-          Providers and installed models
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
-          Test the configured endpoint, discover models, and compare them with
-          saved capability profiles.
-        </p>
-      </div>
-
-      <div className="divide-y divide-border dark:divide-border">
-        {loading ? (
-          <div className="p-8 text-center text-xs text-muted-foreground">
-            Loading providers…
-          </div>
-        ) : providers.length === 0 ? (
-          <div className="p-8 text-center text-xs text-muted-foreground">
-            No model providers are configured.
-          </div>
-        ) : (
-          providers.map((provider) => (
-            <ProviderCard
-              key={provider.id}
-              provider={provider}
-              models={
-                discovered[provider.id]
-                ?? hardware?.installed_models.map((model) => ({
-                  name: model.name,
-                  size: model.size_bytes,
-                  modified_at: null,
-                  warnings:
-                    model.tier === "not_recommended"
-                      ? ["This model may exceed the practical hardware tier."]
-                      : [],
-                }))
-                ?? []
-              }
-              hardware={hardware}
-              profiles={profiles}
-              discovering={busyKey === `discover:${provider.id}`}
-              testing={busyKey === `test:${provider.id}`}
-              onDiscover={() => onDiscover(provider)}
-              onTest={() => onTest(provider)}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ProviderCard({
-  provider,
-  models,
-  hardware,
-  profiles,
-  discovering,
-  testing,
-  onDiscover,
-  onTest,
-}: {
-  provider: ModelProvider;
-  models: DiscoveredModel[];
-  hardware: HardwareSnapshot | null;
-  profiles: ModelCapabilityProfile[];
-  discovering: boolean;
-  testing: boolean;
-  onDiscover: () => Promise<void>;
-  onTest: () => Promise<void>;
-}) {
-  return (
-    <div className="p-4 sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-hover text-muted-foreground dark:bg-surface-raised dark:text-muted-foreground">
-            <ServerIcon className="size-4" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h4 className="truncate text-sm font-semibold text-foreground dark:text-foreground">
-                {provider.name}
-              </h4>
-              <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground dark:bg-surface-hover dark:text-muted-foreground">
-                {provider.kind.replace("_", " ")}
-              </span>
-              {provider.built_in ? (
-                <span className="rounded-full bg-success/10 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-success dark:text-success">
-                  Built in
-                </span>
-              ) : null}
-            </div>
-            <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground">
-              {provider.base_url}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => void onTest()}
-            disabled={testing || discovering}
-            className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-surface-hover disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-surface-raised"
-          >
-            {testing ? "Testing…" : "Test"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void onDiscover()}
-            disabled={discovering || testing}
-            className="rounded-lg bg-surface-raised px-3 py-2 text-xs font-medium text-accent-foreground disabled:opacity-50 dark:bg-surface-hover dark:text-foreground"
-          >
-            {discovering ? "Discovering…" : "Discover models"}
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {models.length === 0 ? (
-          <div className="col-span-full rounded-xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground dark:border-border">
-            Run discovery to list models from this provider.
-          </div>
-        ) : (
-          models.map((model) => {
-            const profile = profiles.find(
-              (item) =>
-                item.provider_id === provider.id
-                && item.model === model.name,
-            );
-            const hardwareModel = hardware?.installed_models.find(
-              (item) => item.name === model.name,
-            );
-
-            return (
-              <ModelCard
-                key={`${provider.id}:${model.name}`}
-                model={model}
-                profile={profile}
-                hardwareTier={hardwareModel?.tier}
-              />
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ModelCard({
-  model,
-  profile,
-  hardwareTier,
-}: {
-  model: DiscoveredModel;
-  profile?: ModelCapabilityProfile;
-  hardwareTier?: HardwareSnapshot["installed_models"][number]["tier"];
-}) {
-  const warnings = [
-    ...model.warnings,
-    ...(hardwareTier === "not_recommended"
-      ? ["Model is above the practical hardware recommendation."]
-      : []),
-    ...(profile?.structured_output_mode === "unsupported"
-      ? ["Structured task output is marked unsupported."]
-      : []),
-  ];
-
-  return (
-    <div className="rounded-xl border border-border bg-surface-hover/60 p-4 dark:border-border dark:bg-surface-raised/40">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-foreground dark:text-foreground">
-            {model.name}
-          </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {model.size ? formatBytes(model.size) : "Size unavailable"}
-          </p>
-        </div>
-
-        <span
-          className={cn(
-            "rounded-full px-2 py-1 text-[9px] font-medium uppercase tracking-wide",
-            tierClass(hardwareTier),
-          )}
-        >
-          {formatTier(hardwareTier)}
-        </span>
-      </div>
-
-      <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
-        <Metric label="Context" value={formatInteger(profile?.context_window)} />
-        <Metric
-          label="Max output"
-          value={formatInteger(profile?.max_output_tokens)}
-        />
-        <Metric
-          label="Measured speed"
-          value={
-            profile?.measured_tokens_per_second == null
-              ? "Not benchmarked"
-              : `${profile.measured_tokens_per_second.toFixed(2)} tok/s`
-          }
-        />
-        <Metric
-          label="Structured mode"
-          value={profile?.structured_output_mode ?? "Inferred"}
-        />
-      </dl>
-
-      {warnings.length > 0 ? (
-        <div className="mt-4 space-y-1.5">
-          {warnings.map((warning) => (
-            <p
-              key={warning}
-              className="flex items-start gap-2 text-[11px] leading-relaxed text-pending dark:text-pending"
-            >
-              <ShieldAlertIcon className="mt-0.5 size-3 shrink-0" />
-              {warning}
-            </p>
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <ModelLibraryPanel
+      providers={providers}
+      discovered={discovered}
+      hardware={hardware}
+      profiles={profiles}
+      loading={loading}
+      onDiscovered={onDiscovered}
+      onNotice={onNotice}
+      onError={onError}
+      onWorkspaceRefresh={onWorkspaceRefresh}
+    />
   );
 }
 

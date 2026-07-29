@@ -8,15 +8,10 @@ from urllib.parse import urlparse
 _CLOUD_MODEL_SUFFIXES = ("-cloud", ":cloud")
 
 
-def routes_to_ollama_cloud(
+def is_direct_ollama_cloud_provider(
     provider: Mapping[str, Any],
-    model_name: str = "",
 ) -> bool:
-    """Return whether an Ollama request is executed by Ollama Cloud.
-
-    Direct cloud providers are detected from the hostname. Cloud models routed
-    through a local Ollama daemon are detected from Ollama's cloud suffixes.
-    """
+    """Return whether an Ollama provider points directly at ollama.com."""
 
     if provider.get("kind") != "ollama":
         return False
@@ -24,11 +19,18 @@ def routes_to_ollama_cloud(
     hostname = (
         urlparse(str(provider.get("base_url") or "")).hostname or ""
     ).lower()
-    normalized_model = model_name.strip().lower()
+    return hostname == "ollama.com" or hostname.endswith(".ollama.com")
 
+
+def routes_to_ollama_cloud(
+    provider: Mapping[str, Any],
+    model_name: str = "",
+) -> bool:
+    """Return whether an Ollama request is executed by Ollama Cloud."""
+
+    normalized_model = model_name.strip().lower()
     return (
-        hostname == "ollama.com"
-        or hostname.endswith(".ollama.com")
+        is_direct_ollama_cloud_provider(provider)
         or normalized_model.endswith(_CLOUD_MODEL_SUFFIXES)
     )
 
@@ -46,16 +48,33 @@ def is_ollama_cloud_runtime(runtime: Mapping[str, Any]) -> bool:
     )
 
 
+def suggest_local_cloud_reference(model_name: str) -> str:
+    """Suggest the model name used when cloud is routed by local Ollama.
+
+    Ollama currently documents both ``:cloud`` and ``-cloud`` forms. Existing
+    cloud names are preserved. A tagged direct-cloud name such as
+    ``gpt-oss:120b`` becomes ``gpt-oss:120b-cloud``; an untagged name becomes
+    ``<name>:cloud``. The frontend keeps the suggestion visible and editable.
+    """
+
+    clean = model_name.strip()
+    lower = clean.lower()
+    if lower.endswith(_CLOUD_MODEL_SUFFIXES):
+        return clean
+
+    if ":" in clean:
+        repository, tag = clean.rsplit(":", 1)
+        if repository and tag:
+            return f"{repository}:{tag}-cloud"
+
+    return f"{clean}:cloud"
+
+
 def ollama_model_settings_extra_body(
     runtime: Mapping[str, Any],
     context_window: int,
 ) -> dict[str, Any] | None:
-    """Build local-only Ollama options for Pydantic AI model settings.
-
-    Ollama's OpenAI-compatible API has no supported request field for changing
-    context size. AI Lab preserves its existing local option for compatibility,
-    but never sends that local runtime option to cloud-hosted models.
-    """
+    """Build local-only Ollama options for Pydantic AI model settings."""
 
     provider = runtime.get("provider")
     if not isinstance(provider, Mapping):

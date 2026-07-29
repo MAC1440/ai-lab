@@ -35,7 +35,7 @@ AGENTS: Dict[str, AgentConfig] = {
     "general": {
         "id": "general", "name": "General Assistant",
         "description": "General chat without workspace access.",
-        "model": "granite4.1:3b",
+        "model": "",
         "system_prompt": (
             "You are a helpful personal assistant. Give accurate, direct, "
             "and concise answers. " + WEB_SEARCH_SAFETY_PROMPT
@@ -45,7 +45,7 @@ AGENTS: Dict[str, AgentConfig] = {
     "web": {
         "id": "web", "name": "Web Coding Agent",
         "description": "Builds and repairs Next.js, React, TypeScript, FastAPI, and Python web projects using reviewable workspace proposals.",
-        "model": "granite4.1:3b",
+        "model": "",
         "system_prompt": (
             "You are a focused web application coding agent. Work only from "
             "the selected workspace and the user's request. Before editing, "
@@ -65,7 +65,7 @@ AGENTS: Dict[str, AgentConfig] = {
     "unity": {
         "id": "unity", "name": "Unity Coding Agent",
         "description": "Builds and repairs Unity C# projects with Unity-document RAG and reviewable workspace proposals.",
-        "model": "granite4.1:3b",
+        "model": "",
         "system_prompt": (
             "You are a focused Unity C# coding agent. First inspect "
             "ProjectSettings/ProjectVersion.txt, Packages/manifest.json, "
@@ -84,7 +84,7 @@ AGENTS: Dict[str, AgentConfig] = {
     "coding": {
         "id": "coding", "name": "General Coding Agent",
         "description": "Fallback coding agent for projects not recognized as Web or Unity.",
-        "model": "granite4.1:3b",
+        "model": "",
         "system_prompt": (
             "You are a careful coding agent for an unclassified project. Inspect "
             "the relevant manifest, source files, imports, and tests. Prefer the "
@@ -99,12 +99,13 @@ AGENTS: Dict[str, AgentConfig] = {
 
 class AgentService:
     def list_agents(self) -> List[AgentConfig]:
-        return [deepcopy(agent) for agent in AGENTS.values()]
+        return [self.get_agent(agent_id) for agent_id in AGENTS]
 
     def get_agent(self, agent_id: str) -> AgentConfig:
         agent = AGENTS.get(agent_id)
         if agent is None:
             raise ValueError(f"Unknown agent: {agent_id}")
+
         return deepcopy(agent)
 
     def recommend_agent(self, project_types: Iterable[str]) -> Dict[str, Any]:

@@ -132,7 +132,7 @@ class PydanticAgentRunner:
 
         runtime = (
             self.provider_settings_service.runtime_config(
-                agent_id, config.get("model", "granite4.1:3b")
+                agent_id, config.get("model") or ""
             )
             if self.provider_settings_service is not None
             else None

@@ -149,7 +149,7 @@ class PydanticTaskModelClient:
         profile = self.agent_service.get_agent(agent_id)
         runtime = self.provider_settings_service.runtime_config(
             agent_id,
-            profile.get("model", "granite4.1:3b"),
+            profile.get("model") or "",
             stage=stage,
         )
         capability = self.model_capability_service.require_structured_stage(
@@ -176,7 +176,7 @@ class PydanticTaskModelClient:
         profile = self.agent_service.get_agent(agent_id)
         runtime = self.provider_settings_service.runtime_config(
             agent_id,
-            profile.get("model", "granite4.1:3b"),
+            profile.get("model") or "",
             stage=stage,
         )
         capability = self.model_capability_service.resolve_runtime(runtime)
@@ -209,7 +209,7 @@ class PydanticTaskModelClient:
         profile = self.agent_service.get_agent(agent_id)
         runtime = self.provider_settings_service.runtime_config(
             agent_id,
-            profile.get("model", "granite4.1:3b"),
+            profile.get("model") or "",
             stage=stage,
         )
         capability = self.model_capability_service.require_structured_stage(

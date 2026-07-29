@@ -12,7 +12,11 @@ import httpx
 import keyring
 from pydantic import BaseModel, Field, field_validator
 
-from services.ollama_runtime import routes_to_ollama_cloud
+from services.ollama_runtime import (
+    is_direct_ollama_cloud_provider,
+    routes_to_ollama_cloud,
+    suggest_local_cloud_reference,
+)
 
 
 ProviderKind = Literal["ollama", "openai_compatible"]
@@ -53,7 +57,7 @@ class AgentModelInput(BaseModel):
 
 
 class ProviderSettingsService:
-    """Persist provider metadata while keeping API keys out of the settings file."""
+    """Persist model provider metadata while keeping API keys out of JSON."""
 
     def __init__(self, settings_path: str | Path) -> None:
         self.settings_path = Path(settings_path)
@@ -91,19 +95,30 @@ class ProviderSettingsService:
             for provider in self._read()["providers"].values()
         ]
 
-    def get_provider(self, provider_id: str, *, include_secret: bool = False) -> Dict[str, Any]:
+    def get_provider(
+        self,
+        provider_id: str,
+        *,
+        include_secret: bool = False,
+    ) -> Dict[str, Any]:
         provider = self._read()["providers"].get(provider_id)
         if provider is None:
             raise ValueError(f"Unknown provider: {provider_id}")
+
         result = deepcopy(provider)
         if include_secret:
             result["api_key"] = self._get_secret(provider_id)
             return result
         return self._public_provider(result)
 
-    def save_provider(self, provider_id: str, data: ProviderInput) -> Dict[str, Any]:
+    def save_provider(
+        self,
+        provider_id: str,
+        data: ProviderInput,
+    ) -> Dict[str, Any]:
         self._validate_provider_id(provider_id)
         base_url = self._normalize_base_url(data.base_url, data.kind)
+
         with self._lock:
             document = self._read()
             existing = document["providers"].get(provider_id, {})
@@ -117,6 +132,7 @@ class ProviderSettingsService:
             self._write(document)
             if data.api_key is not None:
                 self._set_secret(provider_id, data.api_key.strip())
+
         return self._public_provider(document["providers"][provider_id])
 
     def delete_provider(self, provider_id: str) -> None:
@@ -126,7 +142,10 @@ class ProviderSettingsService:
             if provider is None:
                 raise ValueError(f"Unknown provider: {provider_id}")
             if provider.get("built_in"):
-                raise ValueError("The built-in Ollama provider cannot be deleted")
+                raise ValueError(
+                    "The built-in Ollama provider cannot be deleted"
+                )
+
             in_use = [
                 agent_id
                 for agent_id, override in document["agents"].items()
@@ -136,19 +155,27 @@ class ProviderSettingsService:
                 for stage, override in stage_overrides.items():
                     if override.get("provider_id") == provider_id:
                         in_use.append(f"{agent_id}:{stage}")
+
             if in_use:
                 raise ValueError(
                     "Provider is assigned to: " + ", ".join(sorted(in_use))
                 )
+
             del document["providers"][provider_id]
             self._write(document)
             self._delete_secret(provider_id)
 
-    def save_agent(self, agent_id: str, data: AgentModelInput) -> Dict[str, Any]:
+    def save_agent(
+        self,
+        agent_id: str,
+        data: AgentModelInput,
+    ) -> Dict[str, Any]:
         with self._lock:
             document = self._read()
             if data.provider_id not in document["providers"]:
-                raise ValueError(f"Unknown provider: {data.provider_id}")
+                raise ValueError(
+                    f"Unknown provider: {data.provider_id}"
+                )
             document["agents"][agent_id] = data.model_dump()
             self._write(document)
         return self.resolve_agent(agent_id)
@@ -162,14 +189,20 @@ class ProviderSettingsService:
         with self._lock:
             document = self._read()
             if data.provider_id not in document["providers"]:
-                raise ValueError(f"Unknown provider: {data.provider_id}")
+                raise ValueError(
+                    f"Unknown provider: {data.provider_id}"
+                )
             document["task_stages"].setdefault(agent_id, {})[stage] = (
                 data.model_dump()
             )
             self._write(document)
         return self.resolve_agent(agent_id, stage=stage)
 
-    def delete_task_stage(self, agent_id: str, stage: TaskStage) -> None:
+    def delete_task_stage(
+        self,
+        agent_id: str,
+        stage: TaskStage,
+    ) -> None:
         with self._lock:
             document = self._read()
             stages = document["task_stages"].get(agent_id, {})
@@ -186,7 +219,7 @@ class ProviderSettingsService:
         self,
         agent_id: str,
         *,
-        fallback_model: str = "granite4.1:3b",
+        fallback_model: str = "",
         stage: TaskStage | None = None,
     ) -> Dict[str, Any]:
         document = self._read()
@@ -195,24 +228,36 @@ class ProviderSettingsService:
             if stage is not None
             else None
         )
-        override = stage_override or document["agents"].get(agent_id)
-        if override is None:
+        agent_override = document["agents"].get(agent_id)
+        override = stage_override or agent_override
+
+        if stage_override is not None:
+            assignment_source = f"task_stage:{stage}"
+        elif agent_override is not None:
+            assignment_source = "agent"
+        else:
+            profile_fallback = str(fallback_model or "").strip()
             override = {
                 "provider_id": "ollama",
-                "model": os.getenv("OLLAMA_MODEL", fallback_model),
+                "model": profile_fallback,
                 "generation": GenerationSettings().model_dump(),
             }
+            assignment_source = (
+                "agent_profile"
+                if profile_fallback
+                else "unconfigured"
+            )
+
         provider = document["providers"].get(override["provider_id"])
         if provider is None:
             raise ValueError(
                 f"Agent '{agent_id}' references missing provider "
                 f"'{override['provider_id']}'"
             )
+
         return {
             **deepcopy(override),
-            "assignment_source": (
-                f"task_stage:{stage}" if stage_override is not None else "agent"
-            ),
+            "assignment_source": assignment_source,
             "provider": self._public_provider(provider),
         }
 
@@ -228,14 +273,28 @@ class ProviderSettingsService:
             fallback_model=fallback_model,
             stage=stage,
         )
+        if not str(resolved.get("model") or "").strip():
+            raise ValueError(
+                f"No model is configured for agent '{agent_id}'. Open the "
+                "Models page, discover or pull a model, and save an assignment."
+            )
+
         provider = self.get_provider(
-            resolved["provider_id"], include_secret=True
+            resolved["provider_id"],
+            include_secret=True,
         )
-        return {**resolved, "provider": provider}
+        return {
+            **resolved,
+            "provider": provider,
+        }
 
     def discover_models(self, provider_id: str) -> Dict[str, Any]:
-        provider = self.get_provider(provider_id, include_secret=True)
+        provider = self.get_provider(
+            provider_id,
+            include_secret=True,
+        )
         headers = self._headers(provider)
+
         try:
             if provider["kind"] == "ollama":
                 response = httpx.get(
@@ -245,35 +304,12 @@ class ProviderSettingsService:
                 )
                 response.raise_for_status()
                 raw_models = response.json().get("models", [])
-                models = []
-                for item in raw_models:
-                    model_name = item.get("name") or item.get("model")
-                    if not model_name:
-                        continue
-                    is_cloud = routes_to_ollama_cloud(
-                        provider,
-                        model_name,
-                    )
-                    warnings = (
-                        [
-                            "This model runs remotely. Prompts, retrieved "
-                            "context, and tool-call arguments are sent to "
-                            "Ollama Cloud."
-                        ]
-                        if is_cloud
-                        else self._model_warnings(
-                            model_name,
-                            item.get("size"),
-                        )
-                    )
-                    models.append(
-                        {
-                            "name": model_name,
-                            "size": None if is_cloud else item.get("size"),
-                            "modified_at": item.get("modified_at"),
-                            "warnings": warnings,
-                        }
-                    )
+                models = [
+                    self._ollama_model_record(provider, item)
+                    for item in raw_models
+                    if isinstance(item, dict)
+                    and (item.get("name") or item.get("model"))
+                ]
             else:
                 response = httpx.get(
                     f"{provider['base_url']}/models",
@@ -286,16 +322,28 @@ class ProviderSettingsService:
                         "name": item.get("id"),
                         "size": None,
                         "modified_at": None,
+                        "digest": None,
+                        "details": {},
+                        "availability": "remote",
+                        "ready": True,
+                        "pull_name": None,
                         "warnings": [],
                     }
                     for item in response.json().get("data", [])
-                    if item.get("id")
+                    if isinstance(item, dict) and item.get("id")
                 ]
         except (httpx.HTTPError, ValueError, TypeError) as error:
             raise RuntimeError(
                 f"Could not list models from {provider['name']}: {error}"
             ) from error
-        return {"provider": self._public_provider(provider), "models": models}
+
+        models.sort(
+            key=lambda item: str(item.get("name") or "").casefold()
+        )
+        return {
+            "provider": self._public_provider(provider),
+            "models": models,
+        }
 
     def test_provider(self, provider_id: str) -> Dict[str, Any]:
         discovered = self.discover_models(provider_id)
@@ -308,18 +356,68 @@ class ProviderSettingsService:
             **discovered,
         }
 
+    def _ollama_model_record(
+        self,
+        provider: Dict[str, Any],
+        item: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        model_name = str(
+            item.get("name") or item.get("model") or ""
+        )
+        cloud = routes_to_ollama_cloud(provider, model_name)
+        direct_cloud = is_direct_ollama_cloud_provider(provider)
+        details = item.get("details")
+        if not isinstance(details, dict):
+            details = {}
+
+        if cloud:
+            warnings = [
+                "This model runs remotely. Prompts, retrieved context, and "
+                "tool-call arguments are sent to Ollama Cloud."
+            ]
+        else:
+            warnings = self._model_warnings(
+                model_name,
+                item.get("size"),
+            )
+
+        return {
+            "name": model_name,
+            "size": None if cloud else item.get("size"),
+            "modified_at": item.get("modified_at"),
+            "digest": item.get("digest"),
+            "details": details,
+            "availability": "cloud" if cloud else "local",
+            "ready": True,
+            "pull_name": (
+                suggest_local_cloud_reference(model_name)
+                if direct_cloud
+                else model_name
+            ),
+            "warnings": warnings,
+        }
+
     @staticmethod
-    def _model_warnings(model: str, size: Any) -> list[str]:
+    def _model_warnings(
+        model: str,
+        size: Any,
+    ) -> list[str]:
         warnings: list[str] = []
         size_bytes = size if isinstance(size, int) else 0
         lower = model.lower()
+
         if size_bytes > 8 * 1024**3:
             warnings.append(
                 "This model is larger than 8 GB and may be slow with 16 GB RAM."
             )
         if any(token in lower for token in ("70b", "34b", "32b", "27b")):
-            warnings.append("This model is not practical on the current 3 GB GPU.")
-        elif any(token in lower for token in ("14b", "13b", "12b", "8b", "7b")):
+            warnings.append(
+                "This model is not practical on the current 3 GB GPU."
+            )
+        elif any(
+            token in lower
+            for token in ("14b", "13b", "12b", "8b", "7b")
+        ):
             warnings.append(
                 "Expect mostly CPU inference and slower tool loops on a 3 GB GPU."
             )
@@ -328,18 +426,37 @@ class ProviderSettingsService:
     @staticmethod
     def _headers(provider: Dict[str, Any]) -> Dict[str, str]:
         secret = provider.get("api_key")
-        return {"Authorization": f"Bearer {secret}"} if secret else {}
+        return (
+            {"Authorization": f"Bearer {secret}"}
+            if secret
+            else {}
+        )
 
-    def _public_provider(self, provider: Dict[str, Any]) -> Dict[str, Any]:
+    def _public_provider(
+        self,
+        provider: Dict[str, Any],
+    ) -> Dict[str, Any]:
         result = deepcopy(provider)
-        result["api_key_configured"] = bool(self._get_secret(provider["id"]))
+        result["api_key_configured"] = bool(
+            self._get_secret(provider["id"])
+        )
         result.pop("api_key", None)
+
+        cloud = is_direct_ollama_cloud_provider(result)
+        result["is_cloud"] = cloud
+        result["supports_pull"] = (
+            result.get("kind") == "ollama" and not cloud
+        )
         return result
 
     def _ensure_document(self) -> None:
         if self.settings_path.exists():
             return
-        native_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+        native_url = os.getenv(
+            "OLLAMA_BASE_URL",
+            "http://localhost:11434",
+        )
         self._write(
             {
                 "version": 1,
@@ -360,9 +477,14 @@ class ProviderSettingsService:
     def _read(self) -> Dict[str, Any]:
         with self._lock:
             try:
-                data = json.loads(self.settings_path.read_text("utf-8"))
+                data = json.loads(
+                    self.settings_path.read_text("utf-8")
+                )
             except (OSError, json.JSONDecodeError) as error:
-                raise RuntimeError(f"Could not read provider settings: {error}") from error
+                raise RuntimeError(
+                    f"Could not read provider settings: {error}"
+                ) from error
+
             data.setdefault("providers", {})
             data.setdefault("agents", {})
             data.setdefault("task_stages", {})
@@ -372,7 +494,11 @@ class ProviderSettingsService:
         with self._lock:
             temporary = self.settings_path.with_suffix(".tmp")
             temporary.write_text(
-                json.dumps(document, indent=2, ensure_ascii=False) + "\n",
+                json.dumps(
+                    document,
+                    indent=2,
+                    ensure_ascii=False,
+                ) + "\n",
                 encoding="utf-8",
             )
             temporary.replace(self.settings_path)
@@ -388,32 +514,59 @@ class ProviderSettingsService:
             )
 
     @staticmethod
-    def _normalize_base_url(base_url: str, kind: ProviderKind) -> str:
+    def _normalize_base_url(
+        base_url: str,
+        kind: ProviderKind,
+    ) -> str:
         clean = base_url.strip().rstrip("/")
         parsed = urlparse(clean)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError("Provider URL must be an http:// or https:// URL")
+
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+        ):
+            raise ValueError(
+                "Provider URL must be an http:// or https:// URL"
+            )
+
         if kind == "ollama":
             for suffix in ("/v1", "/api"):
                 if clean.endswith(suffix):
                     clean = clean[: -len(suffix)].rstrip("/")
-        if kind == "openai_compatible" and not clean.endswith("/v1"):
+        elif not clean.endswith("/v1"):
             clean = f"{clean}/v1"
+
         return clean
 
     @staticmethod
     def _get_secret(provider_id: str) -> Optional[str]:
-        env_name = f"AI_LAB_PROVIDER_{provider_id.upper().replace('-', '_')}_API_KEY"
+        env_name = (
+            f"AI_LAB_PROVIDER_"
+            f"{provider_id.upper().replace('-', '_')}_API_KEY"
+        )
         try:
-            return keyring.get_password(KEYRING_SERVICE, provider_id) or os.getenv(env_name)
+            return (
+                keyring.get_password(
+                    KEYRING_SERVICE,
+                    provider_id,
+                )
+                or os.getenv(env_name)
+            )
         except keyring.errors.KeyringError:
             return os.getenv(env_name)
 
     @staticmethod
-    def _set_secret(provider_id: str, secret: str) -> None:
+    def _set_secret(
+        provider_id: str,
+        secret: str,
+    ) -> None:
         try:
             if secret:
-                keyring.set_password(KEYRING_SERVICE, provider_id, secret)
+                keyring.set_password(
+                    KEYRING_SERVICE,
+                    provider_id,
+                    secret,
+                )
             else:
                 ProviderSettingsService._delete_secret(provider_id)
         except keyring.errors.KeyringError as error:
@@ -425,6 +578,12 @@ class ProviderSettingsService:
     @staticmethod
     def _delete_secret(provider_id: str) -> None:
         try:
-            keyring.delete_password(KEYRING_SERVICE, provider_id)
-        except (keyring.errors.PasswordDeleteError, keyring.errors.KeyringError):
+            keyring.delete_password(
+                KEYRING_SERVICE,
+                provider_id,
+            )
+        except (
+            keyring.errors.PasswordDeleteError,
+            keyring.errors.KeyringError,
+        ):
             pass

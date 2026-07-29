@@ -13,7 +13,12 @@ def build_pydantic_model(runtime: Dict[str, Any]):
     """Build a model from the current provider settings for one run."""
 
     provider = runtime["provider"]
-    model_name = runtime["model"]
+    model_name = str(runtime.get("model") or "").strip()
+    if not model_name:
+        raise ValueError(
+            "No model is configured for this run. Open the Models page, "
+            "discover or pull a model, and save an agent assignment."
+        )
 
     if provider["kind"] == "ollama":
         return OllamaModel(

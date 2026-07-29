@@ -24,9 +24,9 @@ class OllamaClient:
             model
             or os.getenv(
                 "OLLAMA_MODEL",
-                "granite4.1:3b",
+                "",
             )
-        )
+        ).strip()
         self.default_options: Dict[str, Any] = {
             "temperature": 0.7,
             "top_p": 0.9,
@@ -48,6 +48,14 @@ class OllamaClient:
 
         self._raise_ollama_error(response)
         return response.json()
+
+    def _require_model(self) -> str:
+        if not self.model:
+            raise RuntimeError(
+                "No Ollama chat model is configured. Open the Models page, "
+                "pull or discover a model, and save an agent assignment."
+            )
+        return self.model
 
     def _build_messages(
         self,
@@ -136,7 +144,7 @@ class OllamaClient:
         options: Optional[Dict[str, Any]] = None,
     ) -> str:
         payload = {
-            "model": self.model,
+            "model": self._require_model(),
             "messages": self._build_messages(
                 prompt,
                 system_prompt,
@@ -162,7 +170,7 @@ class OllamaClient:
         options: Optional[Dict[str, Any]] = None,
     ) -> Iterator[str]:
         payload = {
-            "model": self.model,
+            "model": self._require_model(),
             "messages": self._build_messages(
                 prompt,
                 system_prompt,
@@ -285,7 +293,7 @@ class OllamaClient:
         stream: bool,
     ) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
-            "model": self.model,
+            "model": self._require_model(),
             "messages": messages,
             "stream": stream,
             "options": {
