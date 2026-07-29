@@ -103,8 +103,14 @@ class ProviderSettingsServiceTests(unittest.TestCase):
         )
         coding = self.service.resolve_agent("coding")
         unity = self.service.resolve_agent("unity")
+
         self.assertEqual(coding["model"], "qwen3:4b")
-        self.assertEqual(unity["model"], "granite4.1:3b")
+        self.assertEqual(coding["assignment_source"], "agent")
+        self.assertEqual(unity["model"], "")
+        self.assertEqual(
+            unity["assignment_source"],
+            "unconfigured",
+        )
 
     def test_task_stage_can_use_a_different_model_from_chat_agent(self):
         self.service.save_agent(

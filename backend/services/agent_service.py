@@ -16,10 +16,13 @@ CHANGE_SAFETY_PROMPT = (
     "approval. Prefer propose_file_change_set for a coherent multi-file "
     "create/update task, use propose_file_change for one file, and "
     "propose_path_operation for delete, move/rename, or mkdir. Read every "
-    "existing file before changing, deleting, or moving it. A new file or "
-    "directory does not require a fake read. Never delete a directory. Never "
-    "claim a proposal was applied or a problem was fixed until approval and "
-    "verification have actually succeeded."
+    "existing file before changing, deleting, or moving it. Use read_file "
+    "with only file_path for a full read, or include start_line and end_line "
+    "for a bounded read; read_file_range is equivalent. After a tool "
+    "validation error, correct the arguments instead of repeating the same "
+    "call. A new file or directory does not require a fake read. Never delete "
+    "a directory. Never claim a proposal was applied or a problem was fixed "
+    "until approval and verification have actually succeeded."
 )
 WEB_SEARCH_SAFETY_PROMPT = (
     "Use web_search when the user asks for current information, online "

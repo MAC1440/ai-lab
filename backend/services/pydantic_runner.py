@@ -288,14 +288,16 @@ class PydanticAgentRunner:
             else 512
         )
 
+        request_limit = self._request_limit_for_policy(tool_policy)
+
         async with agent.run_stream_events(
             clean_prompt,
             message_history=message_history,
             instructions=run_instructions or None,
             deps=run_deps,
             usage_limits=UsageLimits(
-                request_limit=self.max_model_requests,
-                tool_calls_limit=self.max_model_requests * 2,
+                request_limit=request_limit,
+                tool_calls_limit=request_limit * 2,
             ),
         ) as events:
             async for event in events:
@@ -552,6 +554,16 @@ class PydanticAgentRunner:
                 "runtime_metric": runtime_metric,
             },
         }
+
+    def _request_limit_for_policy(
+        self,
+        tool_policy: ToolPolicy,
+    ) -> int:
+        """Return a bounded request budget for the selected workflow."""
+
+        if tool_policy == "propose":
+            return self.max_model_requests + 8
+        return self.max_model_requests
 
     @staticmethod
     def _build_tool_policy_instructions(tool_policy: ToolPolicy) -> str:

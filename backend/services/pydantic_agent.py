@@ -140,10 +140,26 @@ def search_files(
 def read_file(
     ctx: RunContext[AgentRunDeps],
     file_path: str,
+    start_line: int | None = None,
+    end_line: int | None = None,
 ) -> Any:
-    """Read a UTF-8 workspace file using its exact relative path."""
+    """Read a UTF-8 file, optionally limiting the inclusive line range."""
     try:
-        result = _read_file(file_path)
+        if start_line is None and end_line is None:
+            result = _read_file(file_path)
+        else:
+            resolved_start = 1 if start_line is None else start_line
+            resolved_end = (
+                resolved_start + 199
+                if end_line is None
+                else end_line
+            )
+            result = _read_file_range(
+                file_path=file_path,
+                start_line=resolved_start,
+                end_line=resolved_end,
+            )
+
         deps = _run_deps(ctx)
         if deps is not None and isinstance(result, dict):
             result_path = result.get("path")
