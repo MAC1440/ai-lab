@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import process
 import importlib.util
 import os
 import re
@@ -289,22 +290,38 @@ class TerminalService:
         resume_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         session = self._require_running_session(session_id)
-        command = self._claude_command(mode=mode, resume_id=resume_id)
-        claude_path = shutil.which("claude") or shutil.which("claude.cmd")
+
+        claude_path = shutil.which("claude.cmd") or shutil.which("claude")
         if claude_path is None:
             raise TerminalUnavailableError(
-                "Claude Code was not found on PATH. Install it and restart the backend."
+                "Claude Code is not installed. Install it from the terminal page."
             )
 
-        await asyncio.to_thread(self._write_process, session, command + "\r")
+        arguments = self._claude_arguments(
+            mode=mode,
+            resume_id=resume_id,
+        )
+
+        escaped_path = claude_path.replace("'", "''")
+        command = f"& '{escaped_path}'"
+
+        if arguments:
+            command = f"{command} {arguments}"
+
+        await asyncio.to_thread(
+            self._write_process,
+            session,
+            command + "\r",
+        )
+
         with self._lock:
             session.agent = "claude-code"
             session.last_activity_at = self._utc_now()
+
         return {
             "session": self._public(session),
             "command": command,
         }
-
     async def close_session(self, session_id: str) -> Dict[str, Any]:
         session = self._require_session(session_id)
         with self._lock:
@@ -534,26 +551,37 @@ class TerminalService:
         return environment
 
     @staticmethod
-    def _claude_command(*, mode: str, resume_id: Optional[str]) -> str:
+    def _claude_arguments(
+        *,
+        mode: str,
+        resume_id: Optional[str],
+    ) -> str:
         normalized = mode.strip().lower()
+
         if normalized == "new":
-            return "claude"
+            return ""
+
         if normalized == "continue":
-            return "claude --continue"
+            return "--continue"
+
         if normalized != "resume":
             raise ValueError("mode must be new, continue, or resume")
 
         if resume_id is None or not resume_id.strip():
-            return "claude --resume"
+            return "--resume"
+
         clean_resume_id = resume_id.strip()
+
         if len(clean_resume_id) > MAX_RESUME_ID_CHARACTERS:
             raise ValueError(
-                f"resume_id may not exceed {MAX_RESUME_ID_CHARACTERS} characters"
+                f"resume_id may not exceed "
+                f"{MAX_RESUME_ID_CHARACTERS} characters"
             )
+
         if not RESUME_ID_PATTERN.fullmatch(clean_resume_id):
             raise ValueError("resume_id contains unsupported characters")
-        return f'claude --resume "{clean_resume_id}"'
 
+        return f'--resume "{clean_resume_id}"'
     @staticmethod
     def _validated_dimensions(columns: int, rows: int) -> tuple[int, int]:
         if isinstance(columns, bool) or not isinstance(columns, int):
@@ -592,11 +620,16 @@ class TerminalService:
 
     @staticmethod
     def _read_process(process: TerminalProcess) -> str | bytes:
+    # pywinpty's high-level read is blocking. Reading a large amount can make an
+    # interactive shell appear frozen because xterm only displays characters
+    # after PowerShell echoes them through the PTY.
+    #
+    # Reading one character guarantees that prompts, keyboard echo and
+    # interactive applications such as Claude Code appear immediately.
         try:
-            return process.read(4096)
+            return process.read(1)
         except TypeError:
             return process.read()
-
     @staticmethod
     def _decode_output(output: str | bytes | Any) -> str:
         if isinstance(output, bytes):
@@ -635,3 +668,36 @@ class TerminalService:
     @staticmethod
     def _utc_now() -> str:
         return datetime.now(timezone.utc).isoformat()
+    
+    async def install_claude(
+        self,
+        session_id: str,
+    ) -> Dict[str, Any]:
+        session = self._require_running_session(session_id)
+
+        npm_path = shutil.which("npm.cmd") or shutil.which("npm")
+        if npm_path is None:
+            raise TerminalUnavailableError(
+                "npm was not found. Install Node.js before installing Claude Code."
+            )
+
+        escaped_path = npm_path.replace("'", "''")
+        command = (
+            f"& '{escaped_path}' install -g "
+            "@anthropic-ai/claude-code"
+        )
+
+        await asyncio.to_thread(
+            self._write_process,
+            session,
+            command + "\r",
+        )
+
+        with self._lock:
+            session.agent = "claude-installer"
+            session.last_activity_at = self._utc_now()
+
+        return {
+            "session": self._public(session),
+            "command": command,
+        }

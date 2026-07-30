@@ -7,6 +7,7 @@ load_dotenv()
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from contextlib import asynccontextmanager
 
 from routes.agents import router as agents_router  # noqa: E402
 from routes.changes import router as changes_router  # noqa: E402
@@ -32,13 +33,20 @@ from routes.unity_docs import router as unity_docs_router  # noqa: E402
 from routes.verifications import router as verifications_router  # noqa: E402
 from routes.workspaces import router as workspaces_router  # noqa: E402
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        yield
+    finally:
+        await terminal_service.close_all()
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title="AI Lab Backend",
         version="1.0.0",
         description="Local AI assistant backend",
-    )
+        lifespan=lifespan,
+)
 
     app.add_middleware(
         CORSMiddleware,
@@ -81,7 +89,7 @@ def create_app() -> FastAPI:
     app.include_router(reliability_benchmarks_router)
     app.include_router(model_benchmarks_router)
     app.include_router(runtime_insights_router)
-    app.add_event_handler("shutdown", terminal_service.close_all)
+    
     return app
 
 

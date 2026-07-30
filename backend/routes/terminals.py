@@ -205,3 +205,14 @@ def _websocket_client_allowed(websocket: WebSocket) -> bool:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
+
+@router.post("/sessions/{session_id}/claude/install")
+async def install_claude(session_id: str):
+    try:
+        return await terminal_service.install_claude(session_id)
+    except TerminalSessionNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except TerminalSessionClosedError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except TerminalUnavailableError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
