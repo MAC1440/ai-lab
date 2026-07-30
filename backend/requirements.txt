@@ -33,3 +33,6 @@ pathspec>=0.12,<2.0
 
 # Local RAG/vector storage
 chromadb~=1.5.9
+
+# Interactive Windows terminal / ConPTY support
+pywinpty~=3.0.5; sys_platform == "win32"

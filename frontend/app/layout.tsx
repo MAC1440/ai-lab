@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { StoreProvider } from "@/components/providers/store-provider";
 import { AppShell } from "@/components/shell/app-shell";
+import "@xterm/xterm/css/xterm.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
     template: "%s | AI Lab",
   },
   description:
-    "A local-first AI workspace for chat, coding tasks, knowledge, changes, and verification.",
+    "A local-first AI workspace for chat, coding tasks, knowledge, changes, verification, and direct workspace terminals.",
 };
 
 export default function RootLayout({

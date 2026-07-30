@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  MenuIcon, PanelLeftCloseIcon, PanelLeftOpenIcon,
-  PlusIcon, SparklesIcon,
+  MenuIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
+  PlusIcon,
+  SparklesIcon,
 } from "lucide-react";
 
 const sections: Record<string, { title: string; description: string }> = {
   "/": { title: "Agent Chat", description: "Inspect, reason, propose changes, and verify work." },
   "/tasks": { title: "Project Tasks", description: "Run bounded coding work from planning through verification." },
+  "/terminal": { title: "Workspace Terminal", description: "Run PowerShell and Claude Code directly in the selected workspace." },
   "/changes": { title: "Changes", description: "Review task-linked change sets and proposed file operations." },
   "/verification": { title: "Verification", description: "Inspect workspace checks, failures, and repair readiness." },
   "/knowledge": { title: "Knowledge and Context", description: "Inspect indexed sources, project retrieval, and workspace context." },

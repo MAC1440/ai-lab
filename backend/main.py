@@ -24,6 +24,10 @@ from routes.repairs import router as repairs_router  # noqa: E402
 from routes.runtime_insights import router as runtime_insights_router  # noqa: E402
 from routes.scaffolds import router as scaffolds_router  # noqa: E402
 from routes.system import router as system_router  # noqa: E402
+from routes.terminals import (  # noqa: E402
+    router as terminals_router,
+    terminal_service,
+)
 from routes.unity_docs import router as unity_docs_router  # noqa: E402
 from routes.verifications import router as verifications_router  # noqa: E402
 from routes.workspaces import router as workspaces_router  # noqa: E402
@@ -61,6 +65,7 @@ def create_app() -> FastAPI:
 
     app.include_router(agents_router)
     app.include_router(workspaces_router)
+    app.include_router(terminals_router)
     app.include_router(changes_router)
     app.include_router(conversations_router)
     app.include_router(repairs_router)
@@ -76,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(reliability_benchmarks_router)
     app.include_router(model_benchmarks_router)
     app.include_router(runtime_insights_router)
+    app.add_event_handler("shutdown", terminal_service.close_all)
     return app
 
 
