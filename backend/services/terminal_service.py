@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
-from typing import Any, Deque, Dict, Optional, Protocol
+from typing import Any, Callable, Deque, Dict, Optional, Protocol
 from uuid import uuid4
 
 from services.workspace_service import WorkspaceService
@@ -31,25 +31,32 @@ RESUME_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]+$")
 
 
 class TerminalUnavailableError(RuntimeError):
-    pass
+    """Raised when the local machine cannot provide the requested terminal."""
 
 
 class TerminalSessionNotFoundError(LookupError):
-    pass
+    """Raised when a terminal session id is unknown."""
 
 
 class TerminalSessionClosedError(RuntimeError):
-    pass
+    """Raised when input targets a terminal that is no longer running."""
 
 
 class TerminalProcess(Protocol):
     exitstatus: Optional[int]
 
     def read(self, size: int = 4096) -> str | bytes: ...
+
     def write(self, data: str) -> Any: ...
+
     def isalive(self) -> bool: ...
+
     def setwinsize(self, rows: int, cols: int) -> Any: ...
+
     def close(self, force: bool = True) -> Any: ...
+
+
+ProcessFactory = Callable[..., TerminalProcess]
 
 
 @dataclass
@@ -76,19 +83,27 @@ class _TerminalSession:
 
 
 class TerminalService:
+    """Own persistent workspace-bound PowerShell sessions backed by ConPTY."""
+
     def __init__(
         self,
         workspace_service: WorkspaceService,
         *,
+        process_factory: Optional[ProcessFactory] = None,
         platform_name: Optional[str] = None,
         max_history_characters: int = 200_000,
         max_sessions: int = 4,
     ) -> None:
+        if max_history_characters < 10_000:
+            raise ValueError("max_history_characters must be at least 10000")
+        if max_sessions < 1:
+            raise ValueError("max_sessions must be at least 1")
+
         self.workspace_service = workspace_service
+        self.process_factory = process_factory or self._spawn_windows_process
         self.platform_name = platform_name or os.name
         self.max_history_characters = max_history_characters
         self.max_sessions = max_sessions
-
         self._sessions: Dict[str, _TerminalSession] = {}
         self._workspace_sessions: Dict[str, str] = {}
         self._lock = RLock()
@@ -112,91 +127,95 @@ class TerminalService:
             existing = self._sessions.get(existing_id) if existing_id else None
 
             if existing is not None and self._is_running(existing):
-                return {"session": self._public(existing), "reused": True}
+                return {
+                    "session": self._public(existing),
+                    "reused": True,
+                }
 
             if existing is not None:
                 self._remove_session_locked(existing)
 
             running_count = sum(
-                1 for item in self._sessions.values() if self._is_running(item)
+                1 for session in self._sessions.values() if self._is_running(session)
             )
             if running_count >= self.max_sessions:
                 raise RuntimeError(
                     f"At most {self.max_sessions} terminal sessions may run at once"
                 )
 
-        shell_name, shell_path = self._resolve_shell(shell)
-        command_line = subprocess.list2cmdline(
-            [
-                shell_path,
-                "-NoLogo",
-                "-NoProfile",
-                "-NoExit",
-                "-Command",
-                "$Host.UI.RawUI.WindowTitle='AI Lab Terminal'",
-            ]
-        )
+            shell_name, shell_path = self._resolve_shell(shell)
+            command_line = subprocess.list2cmdline([shell_path, "-NoLogo"])
+            process = self.process_factory(
+                command_line=command_line,
+                cwd=str(workspace),
+                env=self._terminal_environment(),
+                dimensions=(rows, columns),
+            )
 
-        process = self._spawn_windows_process(
-            command_line=command_line,
-            cwd=str(workspace),
-            env=self._terminal_environment(),
-            dimensions=(rows, columns),
-        )
+            now = self._utc_now()
+            session = _TerminalSession(
+                session_id=uuid4().hex,
+                workspace=workspace,
+                workspace_key=workspace_key,
+                shell=shell_name,
+                shell_path=shell_path,
+                process=process,
+                columns=columns,
+                rows=rows,
+                created_at=now,
+                last_activity_at=now,
+            )
 
-        now = self._utc_now()
-        session = _TerminalSession(
-            session_id=uuid4().hex,
-            workspace=workspace,
-            workspace_key=workspace_key,
-            shell=shell_name,
-            shell_path=shell_path,
-            process=process,
-            columns=columns,
-            rows=rows,
-            created_at=now,
-            last_activity_at=now,
-        )
-
-        with self._lock:
             self._sessions[session.session_id] = session
             self._workspace_sessions[workspace_key] = session.session_id
 
-        reader = threading.Thread(
-            target=self._reader_worker,
-            args=(session.session_id, loop),
-            name=f"ai-lab-terminal-{session.session_id[:8]}",
-            daemon=True,
-        )
-        session.reader_thread = reader
-        reader.start()
+            reader = threading.Thread(
+                target=self._reader_worker,
+                args=(session.session_id, loop),
+                name=f"ai-lab-terminal-{session.session_id[:8]}",
+                daemon=True,
+            )
+            session.reader_thread = reader
+            reader.start()
 
-        return {"session": self._public(session), "reused": False}
+        return {
+            "session": self._public(session),
+            "reused": False,
+        }
 
     def diagnostics(self) -> Dict[str, Any]:
+        shell_paths = {
+            "pwsh": shutil.which("pwsh.exe") or shutil.which("pwsh"),
+            "powershell": shutil.which("powershell.exe")
+            or shutil.which("powershell"),
+        }
         claude_path = shutil.which("claude.cmd") or shutil.which("claude")
+        ollama_path = shutil.which("ollama.exe") or shutil.which("ollama")
+
         return {
             "platform": os.name,
             "supported": self.platform_name == "nt",
             "pywinpty_installed": importlib.util.find_spec("winpty") is not None,
-            "shells": {
-                "pwsh": shutil.which("pwsh.exe") or shutil.which("pwsh"),
-                "powershell": shutil.which("powershell.exe")
-                or shutil.which("powershell"),
-            },
+            "shells": shell_paths,
             "claude": {
-                "available": claude_path is not None,
-                "path": claude_path,
+                # Keep the existing frontend response shape unchanged.
+                "available": claude_path is not None and ollama_path is not None,
+                "path": (
+                    f"Ollama: {ollama_path} | Claude: {claude_path}"
+                    if claude_path and ollama_path
+                    else claude_path or ollama_path
+                ),
             },
             "loopback_only": os.getenv(
-                "TERMINAL_ALLOW_REMOTE", "false"
+                "TERMINAL_ALLOW_REMOTE",
+                "false",
             ).strip().lower()
             not in {"1", "true", "yes", "on"},
         }
 
     def list_sessions(self) -> Dict[str, Any]:
         with self._lock:
-            sessions = [self._public(item) for item in self._sessions.values()]
+            sessions = [self._public(session) for session in self._sessions.values()]
         sessions.sort(key=lambda item: item["created_at"], reverse=True)
         return {"sessions": sessions}
 
@@ -208,7 +227,7 @@ class TerminalService:
         session_id: str,
     ) -> tuple[asyncio.Queue[Dict[str, Any]], Dict[str, Any]]:
         session = self._require_session(session_id)
-        queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue(maxsize=512)
+        queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue(maxsize=256)
 
         with self._lock:
             session.subscribers.add(queue)
@@ -288,6 +307,8 @@ class TerminalService:
         mode: str = "new",
         resume_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """Launch Claude Code through Ollama instead of Anthropic login."""
+
         session = self._require_running_session(session_id)
 
         claude_path = shutil.which("claude.cmd") or shutil.which("claude")
@@ -296,11 +317,24 @@ class TerminalService:
                 "Claude Code is not installed. Install it from the terminal page."
             )
 
-        arguments = self._claude_arguments(mode=mode, resume_id=resume_id)
-        escaped_path = claude_path.replace("'", "''")
-        command = f"& '{escaped_path}'"
+        ollama_path = shutil.which("ollama.exe") or shutil.which("ollama")
+        if ollama_path is None:
+            raise TerminalUnavailableError(
+                "Ollama was not found. Install and start Ollama before launching "
+                "Claude Code locally."
+            )
+
+        arguments = self._claude_arguments(
+            mode=mode,
+            resume_id=resume_id,
+        )
+
+        escaped_ollama_path = ollama_path.replace("'", "''")
+        command = f"& '{escaped_ollama_path}' launch claude"
+
         if arguments:
-            command += f" {arguments}"
+            # Ollama forwards arguments after -- to Claude Code.
+            command = f"{command} -- {arguments}"
 
         await asyncio.to_thread(
             self._write_process,
@@ -309,7 +343,7 @@ class TerminalService:
         )
 
         with self._lock:
-            session.agent = "claude-code"
+            session.agent = "claude-code-ollama"
             session.last_activity_at = self._utc_now()
 
         return {
@@ -317,10 +351,13 @@ class TerminalService:
             "command": command,
         }
 
-    async def install_claude(self, session_id: str) -> Dict[str, Any]:
+    async def install_claude(
+        self,
+        session_id: str,
+    ) -> Dict[str, Any]:
         session = self._require_running_session(session_id)
-        npm_path = shutil.which("npm.cmd") or shutil.which("npm")
 
+        npm_path = shutil.which("npm.cmd") or shutil.which("npm")
         if npm_path is None:
             raise TerminalUnavailableError(
                 "npm was not found. Install Node.js before installing Claude Code."
@@ -399,15 +436,12 @@ class TerminalService:
 
         while not session.stop_reader.is_set():
             try:
-                # pywinpty's documented high-level API uses read() without a
-                # requested byte count. It blocks until output is available and
-                # then returns the available console data.
-                output = session.process.read()
+                output = self._read_process(session.process)
             except EOFError:
                 break
             except Exception as error:
                 if not session.stop_reader.is_set():
-                    terminal_error = f"{type(error).__name__}: {error}"
+                    terminal_error = str(error)
                 break
 
             text = self._decode_output(output)
@@ -424,12 +458,14 @@ class TerminalService:
                 continue
 
             try:
-                if not session.process.isalive():
-                    break
+                alive = bool(session.process.isalive())
             except Exception:
+                alive = False
+
+            if not alive:
                 break
 
-            time.sleep(0.01)
+            time.sleep(0.02)
 
         exit_code = getattr(session.process, "exitstatus", None)
 
@@ -574,7 +610,7 @@ class TerminalService:
     def _resolve_shell(self, requested: str) -> tuple[str, str]:
         if self.platform_name != "nt":
             raise TerminalUnavailableError(
-                "The embedded terminal currently requires Windows"
+                "The embedded PowerShell terminal currently requires Windows"
             )
 
         normalized = requested.strip().lower()
@@ -632,7 +668,8 @@ class TerminalService:
 
         if len(clean_resume_id) > MAX_RESUME_ID_CHARACTERS:
             raise ValueError(
-                f"resume_id may not exceed {MAX_RESUME_ID_CHARACTERS} characters"
+                f"resume_id may not exceed "
+                f"{MAX_RESUME_ID_CHARACTERS} characters"
             )
 
         if not RESUME_ID_PATTERN.fullmatch(clean_resume_id):
@@ -684,6 +721,13 @@ class TerminalService:
                 session.process.close(force=True)
         except Exception:
             pass
+
+    @staticmethod
+    def _read_process(process: TerminalProcess) -> str | bytes:
+        try:
+            return process.read(1)
+        except TypeError:
+            return process.read()
 
     @staticmethod
     def _decode_output(output: str | bytes | Any) -> str:
