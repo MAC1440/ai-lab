@@ -77,6 +77,7 @@ class AgentRunDeps:
     change_set_id: str | None = None
     repair_task_id: str | None = None
 
+
 EXPECTED_TOOL_ERRORS = (
     FileNotFoundError,
     NotADirectoryError,
@@ -113,10 +114,7 @@ def list_files(
 ) -> Any:
     """List files and folders in a workspace directory."""
     del ctx
-    try:
-        return _list_files(folder or ".")
-    except EXPECTED_TOOL_ERRORS as error:
-        return _tool_error(error)
+    return _list_files(folder or ".")
 
 
 def search_files(
@@ -127,47 +125,25 @@ def search_files(
 ) -> Any:
     """Find path names; read a returned file before drawing conclusions."""
     del ctx
-    try:
-        return _search_files(
-            query=query,
-            folder=folder or ".",
-            max_results=max_results,
-        )
-    except EXPECTED_TOOL_ERRORS as error:
-        return _tool_error(error)
+    return _search_files(
+        query=query,
+        folder=folder or ".",
+        max_results=max_results,
+    )
 
 
 def read_file(
     ctx: RunContext[AgentRunDeps],
     file_path: str,
-    start_line: int | None = None,
-    end_line: int | None = None,
 ) -> Any:
-    """Read a UTF-8 file, optionally limiting the inclusive line range."""
-    try:
-        if start_line is None and end_line is None:
-            result = _read_file(file_path)
-        else:
-            resolved_start = 1 if start_line is None else start_line
-            resolved_end = (
-                resolved_start + 199
-                if end_line is None
-                else end_line
-            )
-            result = _read_file_range(
-                file_path=file_path,
-                start_line=resolved_start,
-                end_line=resolved_end,
-            )
-
-        deps = _run_deps(ctx)
-        if deps is not None and isinstance(result, dict):
-            result_path = result.get("path")
-            if isinstance(result_path, str):
-                deps.inspected_paths.add(_normalized_path(result_path))
-        return result
-    except EXPECTED_TOOL_ERRORS as error:
-        return _tool_error(error)
+    """Read the complete UTF-8 content of one workspace file."""
+    result = _read_file(file_path)
+    deps = _run_deps(ctx)
+    if deps is not None and isinstance(result, dict):
+        result_path = result.get("path")
+        if isinstance(result_path, str):
+            deps.inspected_paths.add(_normalized_path(result_path))
+    return result
 
 
 def read_file_range(
@@ -177,20 +153,17 @@ def read_file_range(
     end_line: int = 200,
 ) -> Any:
     """Read an inclusive line range from a workspace file."""
-    try:
-        result = _read_file_range(
-            file_path=file_path,
-            start_line=start_line,
-            end_line=end_line,
-        )
-        deps = _run_deps(ctx)
-        if deps is not None and isinstance(result, dict):
-            result_path = result.get("path")
-            if isinstance(result_path, str):
-                deps.inspected_paths.add(_normalized_path(result_path))
-        return result
-    except EXPECTED_TOOL_ERRORS as error:
-        return _tool_error(error)
+    result = _read_file_range(
+        file_path=file_path,
+        start_line=start_line,
+        end_line=end_line,
+    )
+    deps = _run_deps(ctx)
+    if deps is not None and isinstance(result, dict):
+        result_path = result.get("path")
+        if isinstance(result_path, str):
+            deps.inspected_paths.add(_normalized_path(result_path))
+    return result
 
 
 def search_text(
@@ -202,15 +175,12 @@ def search_text(
 ) -> Any:
     """Search file contents; read relevant results before proposing changes."""
     del ctx
-    try:
-        return _search_text(
-            query=query,
-            folder=folder or ".",
-            file_glob=file_glob,
-            max_results=max_results,
-        )
-    except EXPECTED_TOOL_ERRORS as error:
-        return _tool_error(error)
+    return _search_text(
+        query=query,
+        folder=folder or ".",
+        file_glob=file_glob,
+        max_results=max_results,
+    )
 
 
 def web_search(
@@ -314,7 +284,9 @@ def propose_file_change_set(
             file_path = operation.file_path
             normalized = _normalized_path(file_path)
             try:
-                _read_file(file_path)
+                # Use the wrapper so successful reads are tracked in
+                # deps.inspected_paths automatically.
+                read_file(ctx, file_path)
             except FileNotFoundError:
                 continue
             except EXPECTED_TOOL_ERRORS:
@@ -404,25 +376,26 @@ def enforce_tool_policy(
 
     if deps.tool_policy == "inspect" and not deps.inspected_paths:
         raise ModelRetry(
-            "This request requires workspace inspection. Call read_file or "
-            "read_file_range on a relevant file before answering."
+            "MANDATORY: You must inspect at least one workspace file before "
+            "answering. Call read_file or read_file_range now. A text-only "
+            "answer is not accepted."
         )
 
     if deps.tool_policy == "propose" and not deps.proposed_paths:
         if not deps.inspected_paths:
             raise ModelRetry(
-                "This request requires a reviewable workspace proposal. "
-                "Inspect the relevant existing files with read_file or "
-                "read_file_range, then call propose_file_change_set for "
-                "related creates/updates or another appropriate proposal "
-                "tool. A text-only solution is not accepted."
+                "MANDATORY: You must create a reviewable code proposal. "
+                "Step 1: Call read_file or read_file_range to inspect "
+                "existing files. Step 2: Call propose_file_change_set with "
+                "the complete file contents. A text-only answer is not accepted."
             )
 
         inspected = ", ".join(sorted(deps.inspected_paths))
         raise ModelRetry(
-            "You inspected workspace files but did not create a reviewable "
-            "change. Call the appropriate proposal tool before "
-            f"answering. Inspected paths: {inspected}"
+            f"MANDATORY: You inspected these files: {inspected}. "
+            "Now you must call propose_file_change_set (for file changes) or "
+            "propose_path_operation (for deletes/moves) to create a reviewable "
+            "proposal. A text-only answer is not accepted."
         )
 
     return output

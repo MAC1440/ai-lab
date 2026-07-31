@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -102,7 +103,7 @@ class ConversationService:
         prompt: str,
         rag_top_k: int,
         rag_distance_threshold: Optional[float],
-    ) -> List[Dict[str, str]]:
+    ) -> List[Dict[str, Any]]:
         session = self.get_session(session_id)
         if session["status"] != "active":
             raise ConversationStateError("Archived conversations are read-only")
@@ -155,20 +156,105 @@ class ConversationService:
         self.store.update_session(session["session_id"], updated_at=now)
         return self.get_session(session_id)
 
-    def model_history(self, session_id: str) -> List[Dict[str, str]]:
+    def model_history(self, session_id: str) -> List[Dict[str, Any]]:
+        """Return conversation history with reconstructed tool calls and results.
+
+        This preserves the full tool-use context so the model remembers what
+        tools it called and what they returned across conversation turns.
+        """
         session = self.get_session(session_id)
         messages = session["messages"][-self.max_model_messages :]
-        selected: List[Dict[str, str]] = []
+        selected: List[Dict[str, Any]] = []
         used = 0
+
         for message in reversed(messages):
-            content = str(message["content"])
+            role = message.get("role")
+            content = str(message.get("content", ""))
+
+            if role not in {"user", "assistant"}:
+                continue
+
+            # Build this turn's messages in chronological order
+            turn_messages: List[Dict[str, Any]] = []
+            msg: Dict[str, Any] = {"role": role, "content": content}
+
+            if role == "assistant":
+                agent_result = message.get("agent_result")
+                if isinstance(agent_result, dict):
+                    tools_used = agent_result.get("tools_used", [])
+                    if tools_used:
+                        tool_calls = []
+                        for tool in tools_used:
+                            if isinstance(tool, dict):
+                                tool_calls.append({
+                                    "function": {
+                                        "name": tool.get("name", ""),
+                                        "arguments": tool.get("arguments", {}),
+                                    }
+                                })
+                        if tool_calls:
+                            msg["tool_calls"] = tool_calls
+
+                        for tool in tools_used:
+                            if not isinstance(tool, dict):
+                                continue
+                            tool_name = tool.get("name", "unknown")
+                            tool_args = tool.get("arguments", {})
+                            tool_status = tool.get("status", "")
+                            tool_error = tool.get("error", "")
+                            tool_result = tool.get("result")
+
+                            if tool_status == "success"::
+                                payload = {
+                                    "tool": tool_name,
+                                    "arguments": tool_args,
+                                    "status": "success",
+                                    "result": (
+                                        tool_result
+                                        if tool_result is not None
+                                        else "Completed successfully"
+                                    ),
+                                }
+                            else:
+                                payload = {
+                                    "tool": tool_name,
+                                    "arguments": tool_args,
+                                    "status": "error",
+                                    "error": tool_error or "Unknown error",
+                                }
+
+                            tool_content = json.dumps(
+                                payload, ensure_ascii=False, default=str
+                            )
+                            turn_messages.append({
+                                "role": "tool",
+                                "tool_name": tool_name,
+                                "content": tool_content,
+                            })
+
+            turn_messages.insert(0, msg)
+
+            # Budget check for the whole turn
+            turn_chars = sum(len(m.get("content", "")) for m in turn_messages)
             remaining = self.max_model_history_chars - used
             if remaining <= 0:
                 break
-            if len(content) > remaining:
-                content = content[-remaining:]
-            selected.append({"role": message["role"], "content": content})
-            used += len(content)
+
+            if turn_chars > remaining:
+                # Try to fit just the message without tool results
+                if len(content) <= remaining:
+                    result_msg = {"role": role, "content": content}
+                    if role == "assistant" and msg.get("tool_calls"):
+                        result_msg["tool_calls"] = msg["tool_calls"]
+                    selected.append(result_msg)
+                    used += len(content)
+                break
+
+            # Add turn messages in reverse order because selected will be
+            # reversed at the end to restore chronological order.
+            selected.extend(reversed(turn_messages))
+            used += turn_chars
+
         return list(reversed(selected))
 
     def _enrich(self, session: Dict[str, Any]) -> Dict[str, Any]:
@@ -188,7 +274,7 @@ class ConversationService:
         active = os.path.normcase(
             str(self.workspace_service.get_workspace().resolve())
         )
-        if active != os.path.normcase(session["workspace"]):
+        if active != os.normcase(session["workspace"]):
             raise ConversationNotFoundError("Conversation not found in this workspace")
 
     @staticmethod

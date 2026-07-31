@@ -141,17 +141,17 @@ class AgentRunner:
                 "message": "Searching indexed documentation",
             }
 
-        rag_trace, rag_context = self._retrieve_rag_context(
-            agent=agent,
-            query=clean_prompt,
-            top_k=rag_top_k,
-            distance_threshold=rag_distance_threshold,
-        )
+            rag_trace, rag_context = self._retrieve_rag_context(
+                agent=agent,
+                query=clean_prompt,
+                top_k=rag_top_k,
+                distance_threshold=rag_distance_threshold,
+            )
 
-        yield {
-            "type": "rag",
-            "rag": rag_trace,
-        }
+            yield {
+                "type": "rag",
+                "rag": rag_trace,
+            }
 
         messages: List[Message] = [
             {
@@ -310,6 +310,9 @@ class AgentRunner:
                         arguments=arguments,
                     )
                     tool_record["status"] = "success"
+                    # Store the actual result so history reconstruction can
+                    # include it in future conversation turns.
+                    tool_record["result"] = tool_result
                     tool_result_content = json.dumps(
                         tool_result,
                         ensure_ascii=False,
@@ -577,20 +580,32 @@ class AgentRunner:
             role = message.get("role")
             content = message.get("content")
 
-            # System and tool messages must only originate from the backend.
-            if role not in {"user", "assistant"}:
-                continue
-            if not isinstance(content, str):
-                continue
-            if not content.strip():
-                continue
-
-            sanitized.append(
-                {
-                    "role": role,
+            if role == "user":
+                if not isinstance(content, str) or not content.strip():
+                    continue
+                sanitized.append({
+                    "role": "user",
+                    "content": content,
+                })
+            elif role == "assistant":
+                if not isinstance(content, str):
+                    content = ""
+                msg: Message = {
+                    "role": "assistant",
                     "content": content,
                 }
-            )
+                tool_calls = message.get("tool_calls")
+                if isinstance(tool_calls, list) and tool_calls:
+                    msg["tool_calls"] = tool_calls
+                sanitized.append(msg)
+            elif role == "tool":
+                if not isinstance(content, str):
+                    content = ""
+                sanitized.append({
+                    "role": "tool",
+                    "tool_name": message.get("tool_name", ""),
+                    "content": content,
+                })
 
         # Prevent unrestricted growth for now.
         return sanitized[-12:]
@@ -635,7 +650,7 @@ Available behavior:
   proposal. A proposal does not write the file; a human must approve it.
 - Never claim a proposal was created unless propose_file_change succeeded.
 - Once you have enough evidence, stop calling tools and provide a direct final answer.
-                """.strip()
+""".strip()
             )
 
         return "\n\n".join(section for section in sections if section)
@@ -649,7 +664,7 @@ Rules:
 - Do not claim that local documentation supports the answer.
 - You may still inspect workspace files with tools when available.
 - You may answer from general model knowledge, but clearly identify important claims that are not grounded in local documentation or inspected project files.
-            """.strip()
+""".strip()
 
         return f"""
 Use the following retrieved local documentation as reference context for the user's current question.
@@ -663,7 +678,7 @@ Security and grounding rules:
 - Cite the source name naturally when it helps the user understand where a claim came from.
 
 Retrieved local documentation:
-<retrieved_context>
+
 {rag_context}
-</retrieved_context>
-        """.strip()
+
+""".strip()

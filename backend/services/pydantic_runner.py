@@ -23,7 +23,6 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
-    RetryPromptPart,
     TextPart,
     UserPromptPart,
 )
@@ -41,7 +40,6 @@ from services.project_context_service import (
 from services.provider_settings_service import ProviderSettingsService
 from services.mcp_service import MCPService
 from services.rag import RAGService
-
 
 Message = Dict[str, Any]
 AgentEvent = Dict[str, Any]
@@ -202,24 +200,27 @@ class PydanticAgentRunner:
                 "message": "Searching indexed documentation",
             }
 
-        rag_trace, rag_context = self._retrieve_rag_context(
-            enabled=use_rag,
-            query=clean_prompt,
-            top_k=rag_top_k,
-            distance_threshold=rag_distance_threshold,
-        )
-        rag_trace["resolved_from"] = rag_resolved_from
-        rag_trace["requested_mode"] = rag_mode
+            rag_trace, rag_context = self._retrieve_rag_context(
+                enabled=use_rag,
+                query=clean_prompt,
+                top_k=rag_top_k,
+                distance_threshold=rag_distance_threshold,
+            )
+            rag_trace["resolved_from"] = rag_resolved_from
+            rag_trace["requested_mode"] = rag_mode
 
-        yield {
-            "type": "rag",
-            "rag": rag_trace,
-        }
+            yield {
+                "type": "rag",
+                "rag": rag_trace,
+            }
 
-        rag_instructions = self._build_rag_instructions(
-            rag_trace=rag_trace,
-            rag_context=rag_context,
-        )
+            rag_instructions = self._build_rag_instructions(
+                rag_trace=rag_trace,
+                rag_context=rag_context,
+            )
+        else:
+            rag_instructions = ""
+
         project_context_instructions = build_project_context_instructions(
             project_context
         )
@@ -247,12 +248,14 @@ class PydanticAgentRunner:
         policy_instructions = self._build_tool_policy_instructions(
             tool_policy
         )
+        tool_instructions = self._build_tool_use_instructions(allowed_tool_names)
         run_instructions = "\n\n".join(
             instruction
             for instruction in (
                 project_context_instructions,
                 rag_instructions,
                 policy_instructions,
+                tool_instructions,
             )
             if instruction
         )
@@ -395,11 +398,11 @@ class PydanticAgentRunner:
                     if answer:
                         answer = ""
 
-                        if stream_answer_text:
-                            yield {
-                                "type": "answer_reset",
-                                "step": 1,
-                            }
+                    if stream_answer_text:
+                        yield {
+                            "type": "answer_reset",
+                            "step": 1,
+                        }
 
                     call_id = (
                         event.part.tool_call_id
@@ -440,10 +443,7 @@ class PydanticAgentRunner:
 
                     result_content = event.part.content
 
-                    if isinstance(event.part, RetryPromptPart):
-                        tool_record["status"] = "error"
-                        tool_record["error"] = str(result_content)
-                    elif (
+                    if (
                         isinstance(result_content, dict)
                         and "error" in result_content
                     ):
@@ -453,6 +453,9 @@ class PydanticAgentRunner:
                         )
                     else:
                         tool_record["status"] = "success"
+                        # Store the actual result so history reconstruction
+                        # can include it in future turns.
+                        tool_record["result"] = result_content
 
                     yield {
                         "type": "tool_result",
@@ -519,14 +522,14 @@ class PydanticAgentRunner:
                 temperature=temperature,
             )
 
-            yield {
-                "type": "metrics",
-                "metrics": {
-                    **runtime_metric,
-                    "metric_kind": "measured",
-                    "final": True,
-                },
-            }
+        yield {
+            "type": "metrics",
+            "metrics": {
+                **runtime_metric,
+                "metric_kind": "measured",
+                "final": True,
+            },
+        }
         steps = max(
             1,
             int(getattr(usage, "requests", 1) or 1),
@@ -577,7 +580,7 @@ This request is in enforced inspection mode.
   read_file_range before answering.
 - If the prompt names an exact path, read that path before searching broadly.
 - Do not invent symbols, files, or behavior that were not inspected.
-            """.strip()
+""".strip()
 
         return """
 This request is in enforced workspace-proposal mode.
@@ -595,7 +598,52 @@ This request is in enforced workspace-proposal mode.
   is not accepted as completed work.
 - Proposals are review-only. Files remain unchanged until human approval, and
   completion must not be claimed before verification succeeds.
-        """.strip()
+""".strip()
+
+    @staticmethod
+    def _build_tool_use_instructions(
+        allowed_tool_names: set[str],
+    ) -> str:
+        """Return general tool-use instructions for every run that has tools."""
+        if not allowed_tool_names:
+            return ""
+
+        lines = [
+            "You are operating inside a tool-use loop.",
+            "",
+            "Available behavior:",
+            "- Use list_files to discover project files and folders.",
+            "- Use search_files or search_text to locate relevant paths and symbols.",
+            "- Use read_file or read_file_range to inspect exact current content.",
+            "- You may call several tools across multiple steps.",
+            "- Use paths relative to the selected workspace.",
+            "- Prefer paths returned by list_files.",
+            "- Do not invent file names or file contents.",
+            "- Never claim you inspected a file unless read_file succeeded.",
+        ]
+
+        if {
+            "propose_file_change",
+            "propose_file_change_set",
+            "propose_path_operation",
+        }.intersection(allowed_tool_names):
+            lines.extend([
+                "- Never write files directly. If the user asks for a code change,",
+                "  read the target first and create a reviewable proposal.",
+                "- Never claim a proposal was created unless propose_file_change succeeded.",
+            ])
+
+        if "web_search" in allowed_tool_names:
+            lines.append(
+                "- Use web_search for external documentation when needed."
+            )
+
+        lines.append(
+            "- Once you have enough evidence, stop calling tools and "
+            "provide a direct final answer."
+        )
+
+        return "\n".join(lines)
 
     def _get_rag_service(self) -> RAGService:
         if self.rag_service is None:
@@ -770,7 +818,7 @@ Local documentation retrieval found no sufficiently relevant context.
 Do not claim that local documentation supports the answer.
 You may answer using inspected project files or general knowledge,
 but clearly distinguish those sources.
-            """.strip()
+""".strip()
 
         return f"""
 Use the retrieved local documentation below when it is relevant.
@@ -782,10 +830,9 @@ Rules:
 - Distinguish documentation facts from inspected project code.
 - Mention the source naturally when useful.
 
-<retrieved_context>
 {rag_context}
-</retrieved_context>
-        """.strip()
+
+""".strip()
 
     @staticmethod
     def _parse_arguments(arguments: Any) -> Dict[str, Any]:
@@ -800,6 +847,8 @@ Rules:
 
             if isinstance(parsed, dict):
                 return parsed
+
+            return {}
 
         return {}
 
@@ -839,13 +888,40 @@ Rules:
                     )
                 )
             elif role == "assistant":
+                # Reconstruct tool calls from history and append them as
+                # text context so the model remembers what it called.
+                tool_calls = message.get("tool_calls")
+                if isinstance(tool_calls, list) and tool_calls:
+                    tool_context = "\n\n[Tool calls made in this turn:\n"
+                    for tc in tool_calls:
+                        if not isinstance(tc, dict):
+                            continue
+                        func = tc.get("function", {})
+                        if not isinstance(func, dict):
+                            continue
+                        tool_name = func.get("name", "unknown")
+                        arguments = func.get("arguments", {})
+                        tool_context += (
+                            f"  - {tool_name}("
+                            f"{json.dumps(arguments, ensure_ascii=False, default=str)}"
+                            f")\n"
+                        )
+                    tool_context += "]"
+                    content = content.strip() + tool_context
+                messages.append(ModelResponse(parts=[TextPart(content=content)]))
+            elif role == "tool":
+                # Include tool results as user context so the model
+                # remembers what the tools returned.
+                tool_name = message.get("tool_name", "unknown")
+                tool_content = f"[Tool result from {tool_name}]: {content}"
                 messages.append(
-                    ModelResponse(
-                        parts=[TextPart(content=content)]
+                    ModelRequest(
+                        parts=[UserPromptPart(content=tool_content)]
                     )
                 )
 
         return messages
+
     @staticmethod
     def _usage_dict(usage: Any) -> Dict[str, Any]:
         if is_dataclass(usage):
