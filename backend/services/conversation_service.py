@@ -204,7 +204,7 @@ class ConversationService:
                             tool_error = tool.get("error", "")
                             tool_result = tool.get("result")
 
-                            if tool_status == "success"::
+                            if tool_status == "success":
                                 payload = {
                                     "tool": tool_name,
                                     "arguments": tool_args,
@@ -274,7 +274,7 @@ class ConversationService:
         active = os.path.normcase(
             str(self.workspace_service.get_workspace().resolve())
         )
-        if active != os.normcase(session["workspace"]):
+        if active != os.path.normcase(session["workspace"]):
             raise ConversationNotFoundError("Conversation not found in this workspace")
 
     @staticmethod
