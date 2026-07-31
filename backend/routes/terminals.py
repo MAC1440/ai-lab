@@ -5,7 +5,14 @@ import ipaddress
 import os
 from typing import Literal, Optional
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from pydantic import BaseModel, Field
 
 from dependencies import workspace_service
@@ -23,10 +30,8 @@ from services.terminal_service import (
 )
 
 
-router = APIRouter(
-    prefix="/terminals",
-    tags=["Terminals"],
-)
+router = APIRouter(prefix="/terminals", tags=["Terminals"])
+
 terminal_service = TerminalService(
     workspace_service,
     max_history_characters=int(
@@ -47,17 +52,60 @@ class LaunchClaudeRequest(BaseModel):
     resume_id: Optional[str] = None
 
 
-@router.get("/diagnostics")
+def _remote_terminal_enabled() -> bool:
+    return os.getenv("TERMINAL_ALLOW_REMOTE", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _host_is_loopback(host: str) -> bool:
+    clean_host = host.strip().lower()
+    if clean_host == "localhost":
+        return True
+
+    try:
+        return ipaddress.ip_address(clean_host).is_loopback
+    except ValueError:
+        return False
+
+
+def require_loopback_terminal_client(request: Request) -> None:
+    """Block terminal HTTP controls from non-loopback clients by default."""
+    if _remote_terminal_enabled():
+        return
+
+    client = request.client
+    if client is not None and _host_is_loopback(client.host):
+        return
+
+    raise HTTPException(
+        status_code=403,
+        detail="Terminal access is loopback-only",
+    )
+
+
+# REST controls can start processes or send commands, so they receive the same
+# loopback boundary as the terminal WebSocket. This remains opt-out through the
+# existing TERMINAL_ALLOW_REMOTE setting for deliberate LAN deployments.
+http_router = APIRouter(
+    dependencies=[Depends(require_loopback_terminal_client)],
+)
+
+
+@http_router.get("/diagnostics")
 def get_terminal_diagnostics():
     return terminal_service.diagnostics()
 
 
-@router.get("/sessions")
+@http_router.get("/sessions")
 def list_terminal_sessions():
     return terminal_service.list_sessions()
 
 
-@router.post("/sessions")
+@http_router.post("/sessions")
 async def create_terminal_session(request: CreateTerminalSessionRequest):
     try:
         return await terminal_service.create_session(
@@ -71,7 +119,7 @@ async def create_terminal_session(request: CreateTerminalSessionRequest):
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
-@router.get("/sessions/{session_id}")
+@http_router.get("/sessions/{session_id}")
 def get_terminal_session(session_id: str):
     try:
         return terminal_service.get_session(session_id)
@@ -81,7 +129,7 @@ def get_terminal_session(session_id: str):
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
-@router.post("/sessions/{session_id}/claude")
+@http_router.post("/sessions/{session_id}/claude")
 async def launch_claude(
     session_id: str,
     request: LaunchClaudeRequest,
@@ -100,7 +148,19 @@ async def launch_claude(
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
-@router.post("/sessions/{session_id}/interrupt")
+@http_router.post("/sessions/{session_id}/claude/install")
+async def install_claude(session_id: str):
+    try:
+        return await terminal_service.install_claude(session_id)
+    except TerminalSessionNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except TerminalSessionClosedError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except TerminalUnavailableError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@http_router.post("/sessions/{session_id}/interrupt")
 async def interrupt_terminal_session(session_id: str):
     try:
         return await terminal_service.interrupt(session_id)
@@ -110,7 +170,7 @@ async def interrupt_terminal_session(session_id: str):
         raise HTTPException(status_code=409, detail=str(error)) from error
 
 
-@router.delete("/sessions/{session_id}")
+@http_router.delete("/sessions/{session_id}")
 async def close_terminal_session(session_id: str):
     try:
         return await terminal_service.close_session(session_id)
@@ -121,7 +181,10 @@ async def close_terminal_session(session_id: str):
 @router.websocket("/sessions/{session_id}/ws")
 async def terminal_websocket(websocket: WebSocket, session_id: str):
     if not _websocket_client_allowed(websocket):
-        await websocket.close(code=4403, reason="Terminal access is loopback-only")
+        await websocket.close(
+            code=4403,
+            reason="Terminal access is loopback-only",
+        )
         return
 
     try:
@@ -143,6 +206,7 @@ async def terminal_websocket(websocket: WebSocket, session_id: str):
         while True:
             message = await websocket.receive_json()
             message_type = message.get("type")
+
             try:
                 if message_type == "input":
                     await terminal_service.write(
@@ -191,28 +255,11 @@ async def _send_terminal_events(
 
 
 def _websocket_client_allowed(websocket: WebSocket) -> bool:
-    allow_remote = os.getenv("TERMINAL_ALLOW_REMOTE", "false").strip().lower()
-    if allow_remote in {"1", "true", "yes", "on"}:
+    if _remote_terminal_enabled():
         return True
 
     client = websocket.client
-    if client is None:
-        return False
-    host = client.host.strip().lower()
-    if host == "localhost":
-        return True
-    try:
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return False
+    return client is not None and _host_is_loopback(client.host)
 
-@router.post("/sessions/{session_id}/claude/install")
-async def install_claude(session_id: str):
-    try:
-        return await terminal_service.install_claude(session_id)
-    except TerminalSessionNotFoundError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
-    except TerminalSessionClosedError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from error
-    except TerminalUnavailableError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
+
+router.include_router(http_router)

@@ -76,27 +76,44 @@ class TerminalServiceTests(unittest.IsolatedAsyncioTestCase):
         self.factory = FakeProcessFactory()
         self.service = TerminalService(
             TemporaryWorkspaceService(self.root),
-            process_factory=self.factory,
             platform_name="nt",
             max_history_characters=10_000,
             max_sessions=2,
         )
+        self.spawn_patch = patch.object(
+            self.service,
+            "_spawn_windows_process",
+            side_effect=self.factory,
+        )
+        self.spawn_patch.start()
+
+        def executable(name):
+            mapping = {
+                "pwsh.exe": r"C:\Program Files\PowerShell\7\pwsh.exe",
+                "claude.cmd": (
+                    r"C:\Users\test\AppData\Roaming\npm\claude.cmd"
+                ),
+                "claude": (
+                    r"C:\Users\test\AppData\Roaming\npm\claude.cmd"
+                ),
+                "ollama.exe": r"C:\Program Files\Ollama\ollama.exe",
+                "ollama": r"C:\Program Files\Ollama\ollama.exe",
+                "npm.cmd": r"C:\Program Files\nodejs\npm.cmd",
+                "npm": r"C:\Program Files\nodejs\npm.cmd",
+            }
+            return mapping.get(name)
+
         self.which_patch = patch.object(
             shutil,
             "which",
-            side_effect=lambda name: (
-                r"C:\Program Files\PowerShell\7\pwsh.exe"
-                if name == "pwsh.exe"
-                else r"C:\Users\test\AppData\Roaming\npm\claude.cmd"
-                if name in {"claude", "claude.cmd"}
-                else None
-            ),
+            side_effect=executable,
         )
         self.which_patch.start()
 
     async def asyncTearDown(self):
         self.service.close_all()
         self.which_patch.stop()
+        self.spawn_patch.stop()
         self.temp_dir.cleanup()
 
     async def test_session_starts_in_selected_workspace(self):
@@ -121,21 +138,32 @@ class TerminalServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(second["reused"])
         self.assertEqual(len(self.factory.calls), 1)
 
-    async def test_input_resize_interrupt_and_claude_commands_reach_pty(self):
+    async def test_input_resize_interrupt_and_ollama_claude_reach_pty(self):
         created = await self.service.create_session()
         session_id = created["session"]["session_id"]
         process = self.factory.processes[0]
 
         await self.service.write(session_id, "Get-Location\r")
         await self.service.resize(session_id, columns=140, rows=45)
-        launched = await self.service.launch_claude(session_id, mode="continue")
+        launched = await self.service.launch_claude(
+            session_id,
+            mode="continue",
+        )
         await self.service.interrupt(session_id)
 
+        command = (
+            "& 'C:\\Program Files\\Ollama\\ollama.exe' "
+            "launch claude -- --continue"
+        )
         self.assertEqual(process.writes[0], "Get-Location\r")
         self.assertEqual(process.resizes[-1], (45, 140))
-        self.assertIn("claude --continue\r", process.writes)
+        self.assertIn(command + "\r", process.writes)
         self.assertEqual(process.writes[-1], "\x03")
-        self.assertEqual(launched["command"], "claude --continue")
+        self.assertEqual(launched["command"], command)
+        self.assertEqual(
+            launched["session"]["agent"],
+            "claude-code-ollama",
+        )
 
     async def test_reader_broadcasts_output_and_keeps_snapshot_history(self):
         created = await self.service.create_session()
@@ -147,7 +175,10 @@ class TerminalServiceTests(unittest.IsolatedAsyncioTestCase):
         process.emit("PowerShell ready\r\n")
         event = await asyncio.wait_for(queue_one.get(), timeout=1)
 
-        self.assertEqual(event, {"type": "output", "data": "PowerShell ready\r\n"})
+        self.assertEqual(
+            event,
+            {"type": "output", "data": "PowerShell ready\r\n"},
+        )
         queue_two, snapshot = self.service.subscribe(session_id)
         self.assertIn("PowerShell ready", snapshot["output"])
         self.service.unsubscribe(session_id, queue_one)
@@ -174,7 +205,7 @@ class TerminalServiceTests(unittest.IsolatedAsyncioTestCase):
 
     def test_resume_id_rejects_shell_injection(self):
         with self.assertRaisesRegex(ValueError, "unsupported"):
-            self.service._claude_command(
+            self.service._claude_arguments(
                 mode="resume",
                 resume_id="abc; Remove-Item -Recurse *",
             )

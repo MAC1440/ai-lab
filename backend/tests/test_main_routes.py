@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -29,6 +30,14 @@ class ProductionRouteRegistrationTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["applied"])
+
+    def test_lifespan_closes_terminals_without_awaiting_sync_method(self):
+        with patch("main.terminal_service.close_all") as close_all:
+            with TestClient(create_app()) as client:
+                response = client.get("/health")
+                self.assertEqual(response.status_code, 200)
+
+        close_all.assert_called_once_with()
 
 
 if __name__ == "__main__":

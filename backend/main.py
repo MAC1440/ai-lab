@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 
@@ -7,7 +8,6 @@ load_dotenv()
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from contextlib import asynccontextmanager
 
 from routes.agents import router as agents_router  # noqa: E402
 from routes.changes import router as changes_router  # noqa: E402
@@ -33,12 +33,22 @@ from routes.unity_docs import router as unity_docs_router  # noqa: E402
 from routes.verifications import router as verifications_router  # noqa: E402
 from routes.workspaces import router as workspaces_router  # noqa: E402
 
+
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_: FastAPI):
     try:
         yield
     finally:
-        await terminal_service.close_all()
+        # TerminalService.close_all is deliberately synchronous. It performs
+        # bounded local process cleanup and must not be awaited.
+        terminal_service.close_all()
+
+
+def _cors_origins() -> list[str]:
+    configured = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+    origins = [item.strip() for item in configured.split(",") if item.strip()]
+    return origins or ["http://localhost:3000"]
+
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -46,14 +56,11 @@ def create_app() -> FastAPI:
         version="1.0.0",
         description="Local AI assistant backend",
         lifespan=lifespan,
-)
+    )
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=os.getenv(
-            "CORS_ORIGINS",
-            "http://localhost:3000",
-        ).split(","),
+        allow_origins=_cors_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -66,9 +73,7 @@ def create_app() -> FastAPI:
             "service": "ai-lab-backend",
             "version": app.version,
             "checkout_id": os.getenv("AI_LAB_CHECKOUT_ID"),
-            "source_fingerprint": os.getenv(
-                "AI_LAB_SOURCE_FINGERPRINT"
-            ),
+            "source_fingerprint": os.getenv("AI_LAB_SOURCE_FINGERPRINT"),
         }
 
     app.include_router(agents_router)
@@ -89,7 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(reliability_benchmarks_router)
     app.include_router(model_benchmarks_router)
     app.include_router(runtime_insights_router)
-    
+
     return app
 
 
