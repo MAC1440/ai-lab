@@ -96,12 +96,13 @@ def list_files(
     ctx: RunContext[AgentRunDeps],
     folder: str = ".",
 ) -> Any:
-    """List files and folders in a workspace directory."""
+    """List files and folders in a workspace directory.
+
+    Workspace errors deliberately propagate so Pydantic AI can return a proper
+    tool retry prompt instead of presenting an error dictionary as a success.
+    """
     del ctx
-    try:
-        return _list_files(folder or ".")
-    except EXPECTED_TOOL_ERRORS as error:
-        return _tool_error(error)
+    return _list_files(folder or ".")
 
 
 def search_files(
@@ -112,52 +113,29 @@ def search_files(
 ) -> Any:
     """Find path names; read a returned file before drawing conclusions."""
     del ctx
-    try:
-        return _search_files(
-            query=query,
-            folder=folder or ".",
-            max_results=max_results,
-        )
-    except EXPECTED_TOOL_ERRORS as error:
-        return _tool_error(error)
+    return _search_files(
+        query=query,
+        folder=folder or ".",
+        max_results=max_results,
+    )
 
 
 def read_file(
     ctx: RunContext[AgentRunDeps],
     file_path: str,
-    start_line: int | None = None,
-    end_line: int | None = None,
 ) -> Any:
-    """Read a UTF-8 file, optionally limiting the inclusive line range.
+    """Read the complete UTF-8 content of one workspace file.
 
-    Some local and cloud models attach start_line/end_line to read_file
-    instead of selecting read_file_range. Supporting both shapes avoids
-    wasting retries on an otherwise harmless tool-selection difference.
+    Partial reads belong to read_file_range. Keeping this schema strict makes
+    the Pydantic and legacy tool registries describe the same contract.
     """
-    try:
-        if start_line is None and end_line is None:
-            result = _read_file(file_path)
-        else:
-            resolved_start = 1 if start_line is None else start_line
-            resolved_end = (
-                resolved_start + 199
-                if end_line is None
-                else end_line
-            )
-            result = _read_file_range(
-                file_path=file_path,
-                start_line=resolved_start,
-                end_line=resolved_end,
-            )
-
-        deps = _run_deps(ctx)
-        if deps is not None and isinstance(result, dict):
-            result_path = result.get("path")
-            if isinstance(result_path, str):
-                deps.inspected_paths.add(_normalized_path(result_path))
-        return result
-    except EXPECTED_TOOL_ERRORS as error:
-        return _tool_error(error)
+    result = _read_file(file_path)
+    deps = _run_deps(ctx)
+    if deps is not None and isinstance(result, dict):
+        result_path = result.get("path")
+        if isinstance(result_path, str):
+            deps.inspected_paths.add(_normalized_path(result_path))
+    return result
 
 
 def read_file_range(
@@ -167,20 +145,17 @@ def read_file_range(
     end_line: int = 200,
 ) -> Any:
     """Read an inclusive line range from a workspace file."""
-    try:
-        result = _read_file_range(
-            file_path=file_path,
-            start_line=start_line,
-            end_line=end_line,
-        )
-        deps = _run_deps(ctx)
-        if deps is not None and isinstance(result, dict):
-            result_path = result.get("path")
-            if isinstance(result_path, str):
-                deps.inspected_paths.add(_normalized_path(result_path))
-        return result
-    except EXPECTED_TOOL_ERRORS as error:
-        return _tool_error(error)
+    result = _read_file_range(
+        file_path=file_path,
+        start_line=start_line,
+        end_line=end_line,
+    )
+    deps = _run_deps(ctx)
+    if deps is not None and isinstance(result, dict):
+        result_path = result.get("path")
+        if isinstance(result_path, str):
+            deps.inspected_paths.add(_normalized_path(result_path))
+    return result
 
 
 def search_text(
@@ -192,37 +167,25 @@ def search_text(
 ) -> Any:
     """Search file contents; read relevant results before proposing changes."""
     del ctx
-    try:
-        return _search_text(
-            query=query,
-            folder=folder or ".",
-            file_glob=file_glob,
-            max_results=max_results,
-        )
-    except EXPECTED_TOOL_ERRORS as error:
-        return _tool_error(error)
+    return _search_text(
+        query=query,
+        folder=folder or ".",
+        file_glob=file_glob,
+        max_results=max_results,
+    )
 
 
 def web_search(
     ctx: RunContext[AgentRunDeps],
     query: str,
-    max_results: int | str = 5,
+    max_results: int = 5,
 ) -> Any:
-    """Search the public web for current facts, sources, or documentation."""
+    """Search the public web for current facts, sources, or documentation.
+
+    Network/search failures remain structured context because retrying the same
+    external request may not help.
+    """
     del ctx
-
-    if isinstance(max_results, str):
-        clean = max_results.strip()
-        if clean.isdigit():
-            max_results = int(clean)
-        else:
-            max_results = 5
-
-    if isinstance(max_results, bool) or not isinstance(max_results, int):
-        max_results = 5
-
-    max_results = max(1, min(8, max_results))
-
     try:
         return _web_search(query=query, max_results=max_results)
     except EXPECTED_TOOL_ERRORS as error:
@@ -309,15 +272,19 @@ def propose_file_change_set(
             normalized = _normalized_path(file_path)
 
             try:
-                existing = _read_file(file_path)
+                # Use the public wrapper so a successful preflight read is
+                # recorded in deps.inspected_paths.
+                read_file(ctx, file_path)
             except FileNotFoundError:
+                # Genuinely new files do not require a fake read.
                 continue
             except EXPECTED_TOOL_ERRORS:
-                existing = None
+                # If existence cannot be safely established, keep the secure
+                # default and require a successful explicit read.
+                pass
 
             if (
-                existing is not None
-                and deps is not None
+                deps is not None
                 and normalized not in deps.inspected_paths
             ):
                 missing_reads.append(file_path)
