@@ -1,9 +1,9 @@
 import inspect
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from pydantic import ValidationError
-from pydantic_ai import Agent
+from pydantic_ai import Agent, ModelRetry
 from pydantic_ai.models.function import DeltaToolCall, FunctionModel
 
 from services.agent_runner import AgentRunner
@@ -82,9 +82,9 @@ class RobustToolContractTests(unittest.IsolatedAsyncioTestCase):
             ):
                 list_files(None, ".")
 
-    def test_change_set_preflight_tracks_successful_wrapper_reads(self):
+    def test_internal_preflight_does_not_count_as_model_inspection(self):
         deps = AgentRunDeps(tool_policy="propose")
-        ctx = type("Context", (), {"deps": deps})()
+        ctx = SimpleNamespace(deps=deps)
 
         with (
             patch(
@@ -99,6 +99,41 @@ class RobustToolContractTests(unittest.IsolatedAsyncioTestCase):
                 return_value={"proposal_id": "p1"},
             ) as propose,
         ):
+            with self.assertRaisesRegex(
+                ModelRetry,
+                r"read_file\('backend/app.py'\)",
+            ):
+                propose_file_change_set(
+                    ctx,
+                    operations=[
+                        {
+                            "file_path": "backend/app.py",
+                            "new_text": "new",
+                        }
+                    ],
+                )
+
+        self.assertNotIn("backend/app.py", deps.inspected_paths)
+        propose.assert_not_called()
+
+    def test_explicit_read_allows_existing_target_proposal(self):
+        deps = AgentRunDeps(tool_policy="propose")
+        ctx = SimpleNamespace(deps=deps)
+
+        with (
+            patch(
+                "services.pydantic_agent._read_file",
+                return_value={
+                    "path": "backend/app.py",
+                    "content": "old",
+                },
+            ),
+            patch(
+                "services.pydantic_agent._propose_file_change_set",
+                return_value={"proposal_id": "p1"},
+            ) as propose,
+        ):
+            read_result = read_file(ctx, "backend/app.py")
             result = propose_file_change_set(
                 ctx,
                 operations=[
@@ -109,6 +144,7 @@ class RobustToolContractTests(unittest.IsolatedAsyncioTestCase):
                 ],
             )
 
+        self.assertEqual(read_result["content"], "old")
         self.assertEqual(result, {"proposal_id": "p1"})
         self.assertIn("backend/app.py", deps.inspected_paths)
         propose.assert_called_once()

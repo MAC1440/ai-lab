@@ -270,21 +270,23 @@ def propose_file_change_set(
         for operation in validated_operations:
             file_path = operation.file_path
             normalized = _normalized_path(file_path)
+            target_exists = True
 
             try:
-                # Use the public wrapper so a successful preflight read is
-                # recorded in deps.inspected_paths.
-                read_file(ctx, file_path)
+                # This is only an existence check. Do not call the public
+                # read_file wrapper here: an internal preflight read is not a
+                # model-visible inspection and must not satisfy the policy.
+                _read_file(file_path)
             except FileNotFoundError:
-                # Genuinely new files do not require a fake read.
-                continue
+                target_exists = False
             except EXPECTED_TOOL_ERRORS:
-                # If existence cannot be safely established, keep the secure
-                # default and require a successful explicit read.
-                pass
+                # When existence cannot be established safely, require an
+                # explicit successful model-visible read before proposing.
+                target_exists = True
 
             if (
-                deps is not None
+                target_exists
+                and deps is not None
                 and normalized not in deps.inspected_paths
             ):
                 missing_reads.append(file_path)
@@ -378,14 +380,19 @@ def enforce_tool_policy(
     if deps.tool_policy == "propose" and not deps.proposed_paths:
         if not deps.inspected_paths:
             raise ModelRetry(
-                "MANDATORY: Create a reviewable code proposal. First inspect "
-                "the relevant existing files, then call a proposal tool."
+                "MANDATORY: A text-only solution is not accepted in proposal "
+                "mode. Step 1: Call read_file or read_file_range for every "
+                "existing target. Step 2: Call propose_file_change_set or "
+                "propose_path_operation. Step 3: Only provide the final answer "
+                "after the proposal tool succeeds."
             )
 
         inspected = ", ".join(sorted(deps.inspected_paths))
         raise ModelRetry(
-            f"MANDATORY: You inspected these files: {inspected}. Now call "
-            "propose_file_change_set or propose_path_operation."
+            "MANDATORY: A text-only solution is not accepted in proposal "
+            f"mode. You already inspected: {inspected}. Step 1: Call "
+            "propose_file_change_set or propose_path_operation now. Step 2: "
+            "Only provide the final answer after the proposal tool succeeds."
         )
 
     return output
